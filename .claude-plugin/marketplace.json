@@ -8,7 +8,7 @@
     {
       "name": "skill-set",
       "source": "./skills",
-      "description": "Collection of productivity skills including git workflow automation with Korean commit messages, ticket extraction, and more.",
+      "description": "Collection of productivity skills and development tools for enhanced workflow automation.",
       "version": "1.0.0",
       "author": {
         "name": "ether-moon"
