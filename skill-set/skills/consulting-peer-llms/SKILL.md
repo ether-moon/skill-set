@@ -103,7 +103,7 @@ EOF
 )
 
 # Execute in parallel
-gemini exec "$PROMPT" > /tmp/gemini-review.txt 2>&1 &
+gemini "$PROMPT" > /tmp/gemini-review.txt 2>&1 &
 GEMINI_PID=$!
 
 codex exec "$PROMPT" > /tmp/codex-review.txt 2>&1 &

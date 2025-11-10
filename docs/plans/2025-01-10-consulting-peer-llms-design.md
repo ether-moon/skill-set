@@ -134,7 +134,7 @@ EOF
 )
 
 # Execute in parallel
-gemini exec "$PROMPT" > /tmp/gemini-review.txt 2>&1 &
+gemini "$PROMPT" > /tmp/gemini-review.txt 2>&1 &
 GEMINI_PID=$!
 
 codex exec "$PROMPT" > /tmp/codex-review.txt 2>&1 &
@@ -250,9 +250,12 @@ Claude processes the raw responses:
 
 ### CLI Command Format
 
-Both CLIs support direct argument passing:
+CLIs have different command formats:
 ```bash
-gemini exec "your prompt text here"
+# Gemini: positional argument
+gemini "your prompt text here"
+
+# Codex: exec subcommand
 codex exec "your prompt text here"
 ```
 

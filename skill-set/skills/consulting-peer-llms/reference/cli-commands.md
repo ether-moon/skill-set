@@ -4,10 +4,13 @@ Detailed information about executing Gemini and Codex CLI tools for peer review.
 
 ## Command Format
 
-Both CLIs accept prompts as command-line arguments:
+Both CLIs accept prompts, but with different syntax:
 
 ```bash
-gemini exec "your prompt text here"
+# Gemini: positional argument (no subcommand needed)
+gemini "your prompt text here"
+
+# Codex: requires exec subcommand
 codex exec "your prompt text here"
 ```
 
@@ -17,7 +20,7 @@ codex exec "your prompt text here"
 
 ```bash
 # Execute both in background
-gemini exec "$PROMPT" > /tmp/gemini-review.txt 2>&1 &
+gemini "$PROMPT" > /tmp/gemini-review.txt 2>&1 &
 GEMINI_PID=$!
 
 codex exec "$PROMPT" > /tmp/codex-review.txt 2>&1 &
@@ -48,7 +51,7 @@ GEMINI_OUTPUT="$TEMP_DIR/gemini-review.txt"
 CODEX_OUTPUT="$TEMP_DIR/codex-review.txt"
 
 # Execute in parallel
-gemini exec "$PROMPT" > "$GEMINI_OUTPUT" 2>&1 &
+gemini "$PROMPT" > "$GEMINI_OUTPUT" 2>&1 &
 GEMINI_PID=$!
 
 codex exec "$PROMPT" > "$CODEX_OUTPUT" 2>&1 &
@@ -135,7 +138,7 @@ User authentication with JWT tokens
 EOF
 )
 
-gemini exec "$PROMPT"
+gemini "$PROMPT"
 ```
 
 The `'EOF'` (single quotes) prevents variable expansion in the heredoc.
@@ -165,7 +168,7 @@ Prevent CLIs from hanging indefinitely:
 
 ```bash
 # Kill after 60 seconds
-timeout 60s gemini exec "$PROMPT" > /tmp/gemini-review.txt 2>&1 &
+timeout 60s gemini "$PROMPT" > /tmp/gemini-review.txt 2>&1 &
 GEMINI_PID=$!
 
 timeout 60s codex exec "$PROMPT" > /tmp/codex-review.txt 2>&1 &
@@ -196,13 +199,13 @@ Based on typical response times:
 
 ```bash
 # Both to same file
-gemini exec "$PROMPT" > /tmp/output.txt 2>&1
+gemini "$PROMPT" > /tmp/output.txt 2>&1
 
 # Separate files
-gemini exec "$PROMPT" > /tmp/stdout.txt 2> /tmp/stderr.txt
+gemini "$PROMPT" > /tmp/stdout.txt 2> /tmp/stderr.txt
 
 # Discard stderr
-gemini exec "$PROMPT" 2>/dev/null
+gemini "$PROMPT" 2>/dev/null
 ```
 
 ### Why Capture stderr
@@ -274,7 +277,7 @@ fi
 
 **Parallel execution** (recommended):
 ```bash
-gemini exec "$PROMPT" > /tmp/gemini.txt 2>&1 &
+gemini "$PROMPT" > /tmp/gemini.txt 2>&1 &
 codex exec "$PROMPT" > /tmp/codex.txt 2>&1 &
 wait
 ```
@@ -283,7 +286,7 @@ Time: ~max(gemini_time, codex_time) = 10-20 seconds typical
 
 **Sequential execution** (slower):
 ```bash
-gemini exec "$PROMPT" > /tmp/gemini.txt
+gemini "$PROMPT" > /tmp/gemini.txt
 codex exec "$PROMPT" > /tmp/codex.txt
 ```
 
@@ -297,12 +300,12 @@ If system resources are constrained:
 
 ```bash
 # Limit CPU usage (nice)
-nice -n 10 gemini exec "$PROMPT" &
+nice -n 10 gemini "$PROMPT" &
 nice -n 10 codex exec "$PROMPT" &
 
 # Limit memory (ulimit)
 ulimit -v 2000000  # 2GB virtual memory limit
-gemini exec "$PROMPT" &
+gemini "$PROMPT" &
 codex exec "$PROMPT" &
 ```
 
@@ -317,7 +320,7 @@ GEMINI_FILE="$TEMP_DIR/gemini-review.txt"
 CODEX_FILE="$TEMP_DIR/codex-review.txt"
 
 # Execute CLIs
-gemini exec "$PROMPT" > "$GEMINI_FILE" 2>&1 &
+gemini "$PROMPT" > "$GEMINI_FILE" 2>&1 &
 codex exec "$PROMPT" > "$CODEX_FILE" 2>&1 &
 wait
 
@@ -387,7 +390,7 @@ Some CLIs may require authentication:
 
 ```bash
 # Check for auth errors in stderr
-gemini exec "$PROMPT" 2>&1 | grep -i "auth\|token\|login"
+gemini "$PROMPT" 2>&1 | grep -i "auth\|token\|login"
 
 # Set auth environment variables if needed
 export GEMINI_API_KEY="your-key"
@@ -416,7 +419,7 @@ EOF
 # Execute with timeout and error handling
 echo "Executing peer LLM reviews in parallel..."
 
-timeout $TIMEOUT gemini exec "$PROMPT" > "$TEMP_DIR/gemini.txt" 2>&1 &
+timeout $TIMEOUT gemini "$PROMPT" > "$TEMP_DIR/gemini.txt" 2>&1 &
 GEMINI_PID=$!
 
 timeout $TIMEOUT codex exec "$PROMPT" > "$TEMP_DIR/codex.txt" 2>&1 &
