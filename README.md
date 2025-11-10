@@ -36,6 +36,11 @@ Pre-built Playwright templates (19 scripts) for browser automation tasks - takes
 
 **Use when**: Testing web pages, automating browser tasks, or when user mentions screenshots, web testing, form automation, or Playwright.
 
+### 4. consulting-peer-llms
+Request feedback from other LLM CLI tools (Gemini, Codex) on current work - executes peer reviews in parallel and synthesizes responses into actionable insights.
+
+**Use when**: User explicitly requests review from other LLMs (e.g., "codex로 검증해줘", "gemini 피드백 받아줘").
+
 ## Usage
 
 Skills are automatically available after installation. Claude will use them when relevant to your task.
