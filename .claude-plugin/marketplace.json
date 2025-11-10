@@ -1,5 +1,5 @@
 {
-  "name": "ether-moon-skills",
+  "name": "skill-set",
   "owner": {
     "name": "ether-moon",
     "email": "ethermoon42@gmail.com"
@@ -13,6 +13,7 @@
       "author": {
         "name": "ether-moon"
       },
+      "repository": "https://github.com/ether-moon/skill-set",
       "commands": [
         {
           "name": "ss:commit",
