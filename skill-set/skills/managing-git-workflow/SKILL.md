@@ -1,17 +1,17 @@
 ---
 name: managing-git-workflow
-description: Automates git commits, push, and PR creation with Korean messages and ticket extraction. Use when performing git operations, creating commits/PRs, or when user mentions git, GitHub, commit, push, or pull request.
+description: Automates git commits, push, and PR creation with context-aware messages and ticket extraction. Use when performing git operations, creating commits/PRs, or when user mentions git, GitHub, commit, push, or pull request.
 ---
 
 # Managing Git Workflow
 
 ## Overview
 
-Automates git workflows for commit, push, and PR creation with Korean message generation and automatic ticket number extraction.
+Automates git workflows for commit, push, and PR creation with context-aware message generation and automatic ticket number extraction.
 
 ## When to Use
 
-- Creating commits with auto-generated Korean messages
+- Creating commits with auto-generated messages in project's language
 - Pushing changes (with automatic commit if needed)
 - Creating PRs (with automatic push and commit if needed)
 - When user mentions: git, commit, push, pull request, PR, GitHub
@@ -27,7 +27,7 @@ Automates git workflows for commit, push, and PR creation with Korean message ge
 ## Common Principles
 
 **Commit Messages:**
-- Always write in Korean
+- Use language specified in project context, prompts, or documentation (default to English if unspecified)
 - Follow existing project patterns (analyze with `git log --online -10`)
 - Include ticket numbers (FMT-XXXXX, FLEASVR-XXX, etc.) if found in branch name or changes
 

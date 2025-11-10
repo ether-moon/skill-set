@@ -18,7 +18,7 @@ source .claude/skills/managing-git-workflow/scripts/git-helpers.sh
 git status
 ```
 
-**Exit if:** No changes and branch is up to date → Output "푸시할 내용이 없습니다" and stop
+**Exit if:** No changes and branch is up to date → Output appropriate message in project's language and stop
 
 ### 2. Auto-Commit if Needed
 
@@ -32,7 +32,7 @@ if has_uncommitted_changes; then
     # Follow commit.md workflow:
     # - git add -A
     # - Analyze patterns (git log --oneline -10)
-    # - Generate Korean message
+    # - Generate message in project's language
     # - git commit -m "message"
 fi
 ```

@@ -82,27 +82,31 @@ ticket=$(extract_ticket_from_branch)
 
 ### 5. Generate PR Title and Description
 
+**Language:** Use language specified in project context, prompts, or documentation
+- Check project docs, README, or existing PR patterns for language preference
+- If unspecified, default to English
+
 **Title format:**
 ```
-[TICKET-123]: 기능 요약 (Korean)
+[TICKET-123]: Feature summary
 ```
 
 **If no ticket number:**
 ```
-기능 요약 (Korean)
+Feature summary
 ```
 
 **Description format:**
 ```markdown
 ## Summary
-- 변경사항 요약 (bullet points in Korean)
+- Summary of changes (bullet points)
 
 ## Changes
-- 구체적인 변경 내용
+- Specific change details
 
 ## Test Plan
-- [ ] 테스트 항목 1
-- [ ] 테스트 항목 2
+- [ ] Test item 1
+- [ ] Test item 2
 ```
 
 **Analysis for content:**
@@ -118,13 +122,13 @@ gh pr create \
   --title "<generated_title>" \
   --body "$(cat <<'EOF'
 ## Summary
-- 변경사항 요약
+- Summary of changes
 
 ## Changes
-- 구체적인 변경 내용
+- Specific change details
 
 ## Test Plan
-- [ ] 테스트 항목
+- [ ] Test item 1
 EOF
 )" \
   --base master
@@ -152,7 +156,7 @@ open "$pr_url"
 **Example output:**
 ```
 ✓ Pull request created: https://github.com/owner/repo/pull/123
-  Title: FLEASVR-287: Github spec kit 설치
+  Title: FLEASVR-287: Install Github spec kit
 
 Opening in browser...
 ```

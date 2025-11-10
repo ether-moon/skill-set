@@ -1,6 +1,6 @@
 # Commit Workflow
 
-Create a commit with auto-generated Korean message following project conventions.
+Create a commit with auto-generated message following project conventions and language preferences.
 
 ## Prerequisites
 
@@ -15,7 +15,7 @@ Create a commit with auto-generated Korean message following project conventions
 git status
 ```
 
-**Exit if:** No changes exist → Output "변경사항이 없습니다" and stop
+**Exit if:** No changes exist → Output appropriate message in project's language and stop
 
 ### 2. Stage Changes
 
@@ -43,7 +43,9 @@ git diff --cached --stat
 ### 4. Generate Commit Message
 
 **Rules:**
-- **Language:** Korean only
+- **Language:** Use language specified in project context, prompts, or documentation
+  - Check project docs, README, or existing commit patterns for language preference
+  - If unspecified, default to English
 - **Style:** Follow patterns from step 3
 - **Ticket numbers:** Include if detected in branch name or changes
   - Examples: FMT-1234, FLEASVR-287, ABC-123
@@ -57,16 +59,16 @@ extract_ticket_from_branch
 
 **Message format examples:**
 ```
-FMT-1234: 사용자 인증 로직 개선
-FLEASVR-287: Github spec kit 설치
-버그 수정: 빈 projectDir로 인한 오류 해결
+FMT-1234: Improve user authentication logic
+FLEASVR-287: Install Github spec kit
+Fix bug: Resolve empty projectDir error
 ```
 
 ### 5. Create Commit
 
 ```bash
 git commit -m "$(cat <<'EOF'
-생성된 커밋 메시지
+Generated commit message
 EOF
 )"
 ```
@@ -86,7 +88,7 @@ git log --oneline -1
 
 **Example output:**
 ```
-✓ Commit created: a1b2c3d FMT-1234: 사용자 인증 로직 개선
+✓ Commit created: a1b2c3d FMT-1234: Improve user authentication logic
   3 files changed, 45 insertions(+), 12 deletions(-)
 ```
 
