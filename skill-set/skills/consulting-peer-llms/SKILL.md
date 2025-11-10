@@ -85,11 +85,18 @@ Use structured prompt based on code-reviewer patterns.
 **Full template**: See [reference/prompt-template.md](reference/prompt-template.md)
 
 **Key sections:**
-1. What was implemented
-2. Requirements/plan
-3. Changes (SHAs + file list + summary)
-4. Review focus areas (quality, architecture, testing, requirements)
-5. Expected output format (critical/important/minor issues + strengths)
+1. Output language (if project/conversation uses non-English)
+2. What was implemented
+3. Requirements/plan
+4. Changes (SHAs + file list + summary)
+5. Review focus areas (quality, architecture, testing, requirements)
+6. Expected output format (critical/important/minor issues + strengths)
+
+**Language detection:**
+- Automatically detect conversation language (Korean, Japanese, etc.)
+- Add "Output Language" section if non-English detected
+- Omit if English or no clear preference
+- See template for detection logic
 
 ### Step 3: Execute in Parallel
 

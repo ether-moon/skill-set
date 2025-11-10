@@ -7,6 +7,12 @@ This template is based on the superpowers:code-reviewer prompt structure, adapte
 ```markdown
 # Code Review Request
 
+{If project context specifies output language, add this section:}
+## Output Language
+
+Please provide your review in {LANGUAGE} (e.g., Korean, Japanese, English).
+{End conditional section}
+
 ## What Was Implemented
 
 {Extract from conversation context}
@@ -134,6 +140,7 @@ When generating the prompt, replace these placeholders:
 
 | Variable | Source | Example |
 |----------|--------|---------|
+| `{LANGUAGE}` | Project context / conversation language | `Korean`, `Japanese`, `English` |
 | `{base_sha}` | `git rev-parse HEAD~1` or `origin/main` | `a3f2b91` |
 | `{current_sha}` | `git rev-parse HEAD` | `d8e4c72` |
 | `{modified_files}` | `git diff --name-only` | `src/auth.js\ntest/auth.test.js` |
@@ -141,6 +148,29 @@ When generating the prompt, replace these placeholders:
 | `{what_implemented}` | Conversation analysis | "Implemented JWT authentication" |
 | `{requirements}` | User's stated goal | "User requested secure login system" |
 | `{key_changes}` | Git diff analysis | "Added AuthService class..." |
+
+### Determining Output Language
+
+**Check project context in this order:**
+
+1. **Explicit language setting**: Check project config files (`.claude.md`, `AGENTS.md`, etc.)
+2. **Conversation language**: Analyze recent user messages
+   - Korean text detected → Use Korean
+   - Japanese text detected → Use Japanese
+   - Otherwise → Omit language specification (defaults to English)
+
+**Detection logic:**
+```bash
+# Check if recent conversation contains non-ASCII characters
+if echo "$RECENT_MESSAGES" | grep -q '[가-힣]'; then
+    LANGUAGE="Korean"
+elif echo "$RECENT_MESSAGES" | grep -q '[ぁ-ゔァ-ヴー々〆〤]'; then
+    LANGUAGE="Japanese"
+else
+    # Omit language specification (English default)
+    LANGUAGE=""
+fi
+```
 
 ## Context Optimization
 
@@ -169,13 +199,28 @@ When generating the prompt, replace these placeholders:
 
 ## Language Adaptation
 
-If the conversation is primarily in Korean:
-- Keep section headers in English (standardized structure)
-- Write descriptions in Korean
-- CLI output (git) stays in original format
+### When to Specify Output Language
 
-Example:
+**Include language specification when:**
+- User is communicating in non-English language (Korean, Japanese, etc.)
+- Project has explicit language preference in config
+- Commit messages are in specific language
+
+**Omit language specification when:**
+- Conversation is entirely in English
+- No clear language preference detected
+- Mixed language usage (defaults to English)
+
+### Examples by Language
+
+**Korean project:**
 ```markdown
+# Code Review Request
+
+## Output Language
+
+Please provide your review in Korean.
+
 ## What Was Implemented
 
 JWT 토큰 기반 사용자 인증 시스템을 구현했습니다.
@@ -183,6 +228,36 @@ JWT 토큰 기반 사용자 인증 시스템을 구현했습니다.
 ## Requirements/Plan
 
 사용자가 세션 관리가 포함된 안전한 로그인 시스템을 요청했습니다.
+```
+
+**Japanese project:**
+```markdown
+# Code Review Request
+
+## Output Language
+
+Please provide your review in Japanese.
+
+## What Was Implemented
+
+JWT トークンベースのユーザー認証システムを実装しました。
+
+## Requirements/Plan
+
+ユーザーがセッション管理を含む安全なログインシステムを要求しました。
+```
+
+**English project (no language specification):**
+```markdown
+# Code Review Request
+
+## What Was Implemented
+
+Implemented user authentication with JWT tokens.
+
+## Requirements/Plan
+
+User requested secure login system with session management.
 ```
 
 ## Customization Points
