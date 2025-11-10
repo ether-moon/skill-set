@@ -14,10 +14,10 @@ Get feedback from other LLM CLI tools (Gemini, Codex) on your current work. This
 ## When to Use
 
 Use this skill when the user explicitly requests:
-- "codex로 검증해줘"
-- "gemini 피드백 받아줘"
-- "다른 LLM들한테 리뷰 받고 싶어"
-- "peer review 해줘"
+- "Validate this with codex"
+- "Get feedback from gemini"
+- "I want a review from other LLMs"
+- "Do a peer review"
 
 **Do NOT use this skill:**
 - Automatically without user request
@@ -39,7 +39,7 @@ which gemini codex
 
 **Minimal invocation:**
 ```
-User: "gemini랑 codex로 이 코드 리뷰해줘"
+User: "Review this code with gemini and codex"
 
 You:
 1. Collect context (conversation + git changes)
@@ -256,7 +256,7 @@ Keep prompts focused to avoid token bloat:
 
 **Typical workflow:**
 1. Implement feature with Claude
-2. User requests: "gemini로 검증해줘"
+2. User requests: "Validate with gemini"
 3. **Use this skill** → Get peer feedback
 4. Address critical/important issues
 5. Use `managing-git-workflow` to commit/push/PR
@@ -270,7 +270,7 @@ Keep prompts focused to avoid token bloat:
 
 **Before major commit:**
 ```
-User: "커밋하기 전에 codex한테 리뷰받고 싶어"
+User: "I want a review from codex before committing"
 → Run peer review
 → Address issues
 → Then commit
@@ -278,7 +278,7 @@ User: "커밋하기 전에 codex한테 리뷰받고 싶어"
 
 **Second opinion:**
 ```
-User: "이 아키텍처 괜찮은지 gemini한테 물어봐줘"
+User: "Ask gemini if this architecture is okay"
 → Run peer review focusing on architecture
 → Evaluate feedback
 → Refine if needed
@@ -286,7 +286,7 @@ User: "이 아키텍처 괜찮은지 gemini한테 물어봐줘"
 
 **Cross-validation:**
 ```
-User: "다른 LLM들도 같은 생각인지 확인해줘"
+User: "Check if other LLMs agree"
 → Run peer review
 → Check consensus in final report
 ```

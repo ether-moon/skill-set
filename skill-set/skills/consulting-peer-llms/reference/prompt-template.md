@@ -223,11 +223,11 @@ Please provide your review in Korean.
 
 ## What Was Implemented
 
-JWT 토큰 기반 사용자 인증 시스템을 구현했습니다.
+Implemented JWT token-based user authentication system.
 
 ## Requirements/Plan
 
-사용자가 세션 관리가 포함된 안전한 로그인 시스템을 요청했습니다.
+User requested a secure login system with session management.
 ```
 
 **Japanese project:**
@@ -304,15 +304,15 @@ Please assess:
 
 ## What Was Implemented
 
-JWT 토큰 기반의 사용자 인증 시스템을 구현했습니다. 로그인, 로그아웃, 토큰 갱신 기능을 포함합니다.
+Implemented JWT token-based user authentication system. Includes login, logout, and token refresh functionality.
 
 ## Requirements/Plan
 
-사용자가 다음을 요청했습니다:
-- 안전한 로그인/로그아웃 기능
-- JWT 토큰 기반 세션 관리
-- 자동 토큰 갱신
-- 권한 검증 미들웨어
+User requested the following:
+- Secure login/logout functionality
+- JWT token-based session management
+- Automatic token refresh
+- Permission validation middleware
 
 ## Changes
 
