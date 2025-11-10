@@ -6,9 +6,9 @@
   },
   "plugins": [
     {
-      "name": "managing-git-workflow",
-      "source": "./skills/managing-git-workflow",
-      "description": "Automates git commits, push, and PR creation with Korean messages and ticket extraction. Use when performing git operations, creating commits/PRs, or when user mentions git, GitHub, commit, push, or pull request.",
+      "name": "skill-set",
+      "source": "./skills",
+      "description": "Collection of productivity skills including git workflow automation with Korean commit messages, ticket extraction, and more.",
       "version": "1.0.0",
       "author": {
         "name": "ether-moon"
