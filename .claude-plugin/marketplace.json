@@ -1,33 +1,13 @@
 {
   "name": "skill-set",
   "owner": {
-    "name": "ether-moon",
-    "email": "ethermoon42@gmail.com"
+    "name": "ether-moon"
   },
   "plugins": [
     {
       "name": "skill-set",
-      "source": "./skills",
-      "description": "Collection of productivity skills and development tools for enhanced workflow automation.",
-      "version": "1.0.0",
-      "author": {
-        "name": "ether-moon"
-      },
-      "repository": "https://github.com/ether-moon/skill-set",
-      "commands": [
-        {
-          "name": "ss:commit",
-          "source": "./commands/commit.md"
-        },
-        {
-          "name": "ss:push",
-          "source": "./commands/push.md"
-        },
-        {
-          "name": "ss:pr",
-          "source": "./commands/pr.md"
-        }
-      ]
+      "source": "./skill-set",
+      "description": "Collection of productivity skills and development tools for enhanced workflow automation."
     }
   ]
 }

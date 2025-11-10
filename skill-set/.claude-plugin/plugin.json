@@ -1,0 +1,22 @@
+{
+  "name": "skill-set",
+  "description": "Collection of productivity skills and development tools for enhanced workflow automation.",
+  "version": "1.0.0",
+  "author": {
+    "name": "ether-moon"
+  },
+  "license": "MIT",
+  "commands": [
+    "./commands/"
+  ],
+  "mcpServers": {
+    "linear": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://mcp.linear.app/sse"
+      ]
+    }
+  }
+}
