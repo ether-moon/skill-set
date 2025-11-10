@@ -7,7 +7,7 @@ Collection of productivity skills and development tools for Claude Code.
 Add this plugin marketplace to Claude Code:
 
 ```bash
-/plugin marketplace add https://github.com/ether-moon/skill-set
+/plugin marketplace add ether-moon/skill-set
 ```
 
 Then install the skill-set plugin:
@@ -16,17 +16,36 @@ Then install the skill-set plugin:
 /plugin install skill-set
 ```
 
+## Available Skills
+
+### 1. managing-git-workflow
+Automates git operations (commit, push, PR) with context-aware message generation in the project's language and automatic ticket extraction from branch names.
+
+**Commands**:
+- `/skill-set:commit` - Create a git commit with context-aware messages and ticket extraction
+- `/skill-set:push` - Push changes to remote (auto-commits if needed)
+- `/skill-set:pr` - Create a pull request (auto-push and commit if needed)
+
+### 2. understanding-code-context
+Efficient code exploration using LSP symbolic tools (Serena) and official documentation (Context7) instead of text search and full file reading.
+
+**Use when**: Exploring codebases, finding implementations, understanding library usage, or tracing dependencies.
+
+### 3. browser-automation
+Pre-built Playwright templates (19 scripts) for browser automation tasks - takes screenshots, generates PDFs, clicks elements, fills forms, monitors console/network.
+
+**Use when**: Testing web pages, automating browser tasks, or when user mentions screenshots, web testing, form automation, or Playwright.
+
 ## Usage
 
-### Available Skills
+Skills are automatically available after installation. Claude will use them when relevant to your task.
 
-- **managing-git-workflow**: Automates git commits, push, and PR creation with Korean commit messages and automatic ticket extraction
+You can explicitly invoke skills using:
+```
+Use the [skill-name] skill to [task description]
+```
 
-### Available Commands
-
-- `/ss:commit` - Create a git commit with Korean messages and ticket extraction
-- `/ss:push` - Push changes to remote (auto-commits if needed)
-- `/ss:pr` - Create a pull request (auto-push and commit if needed)
+Or use the slash commands directly for git workflows.
 
 ## License
 
