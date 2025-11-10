@@ -27,12 +27,12 @@ Use this skill when the user explicitly requests:
 ## Prerequisites
 
 Required CLI tools must be installed:
-- `gemini-cli` - Google Gemini CLI tool
-- `codex-cli` - OpenAI Codex CLI tool
+- `gemini` - Google Gemini CLI tool
+- `codex` - OpenAI Codex CLI tool
 
 Verify availability:
 ```bash
-which gemini-cli codex-cli
+which gemini codex
 ```
 
 ## Quick Start
@@ -103,10 +103,10 @@ EOF
 )
 
 # Execute in parallel
-gemini-cli "$PROMPT" > /tmp/gemini-review.txt 2>&1 &
+gemini exec "$PROMPT" > /tmp/gemini-review.txt 2>&1 &
 GEMINI_PID=$!
 
-codex-cli "$PROMPT" > /tmp/codex-review.txt 2>&1 &
+codex exec "$PROMPT" > /tmp/codex-review.txt 2>&1 &
 CODEX_PID=$!
 
 # Wait for completion
@@ -304,18 +304,18 @@ If you catch yourself doing these, STOP:
 
 ## Troubleshooting
 
-**"gemini-cli: command not found"**
-- Check installation: `which gemini-cli`
+**"gemini: command not found"**
+- Check installation: `which gemini`
 - Verify PATH includes CLI location
 - Install if missing
 
 **"Empty response from CLI"**
-- Check CLI can run: `gemini-cli "test"`
+- Check CLI can run: `gemini "test"`
 - Verify API keys/auth if required
 - Check prompt isn't too long
 
 **"Both CLIs failed"**
-- Run diagnostics: `gemini-cli --version && codex-cli --version`
+- Run diagnostics: `gemini --version && codex --version`
 - Check system logs for errors
 - Verify network connectivity if cloud-based
 

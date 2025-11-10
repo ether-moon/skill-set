@@ -134,10 +134,10 @@ EOF
 )
 
 # Execute in parallel
-gemini-cli "$PROMPT" > /tmp/gemini-review.txt 2>&1 &
+gemini exec "$PROMPT" > /tmp/gemini-review.txt 2>&1 &
 GEMINI_PID=$!
 
-codex-cli "$PROMPT" > /tmp/codex-review.txt 2>&1 &
+codex exec "$PROMPT" > /tmp/codex-review.txt 2>&1 &
 CODEX_PID=$!
 
 # Wait for completion
@@ -252,8 +252,8 @@ Claude processes the raw responses:
 
 Both CLIs support direct argument passing:
 ```bash
-gemini-cli "your prompt text here"
-codex-cli "your prompt text here"
+gemini exec "your prompt text here"
+codex exec "your prompt text here"
 ```
 
 ### Temporary Files

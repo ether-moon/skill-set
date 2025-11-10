@@ -601,8 +601,8 @@ If both fail:
 **Error:** Both peer LLM CLIs failed to execute.
 
 Please check:
-- CLI installation: `which gemini-cli codex-cli`
-- CLI functionality: `gemini-cli "test"`
+- CLI installation: `which gemini codex`
+- CLI functionality: `gemini "test"`
 - API authentication if required
 
 Cannot proceed with peer review until CLIs are functional.

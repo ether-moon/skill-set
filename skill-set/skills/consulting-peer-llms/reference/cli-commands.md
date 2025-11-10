@@ -7,8 +7,8 @@ Detailed information about executing Gemini and Codex CLI tools for peer review.
 Both CLIs accept prompts as command-line arguments:
 
 ```bash
-gemini-cli "your prompt text here"
-codex-cli "your prompt text here"
+gemini exec "your prompt text here"
+codex exec "your prompt text here"
 ```
 
 ## Parallel Execution Pattern
@@ -17,10 +17,10 @@ codex-cli "your prompt text here"
 
 ```bash
 # Execute both in background
-gemini-cli "$PROMPT" > /tmp/gemini-review.txt 2>&1 &
+gemini exec "$PROMPT" > /tmp/gemini-review.txt 2>&1 &
 GEMINI_PID=$!
 
-codex-cli "$PROMPT" > /tmp/codex-review.txt 2>&1 &
+codex exec "$PROMPT" > /tmp/codex-review.txt 2>&1 &
 CODEX_PID=$!
 
 # Wait for both to complete
@@ -48,10 +48,10 @@ GEMINI_OUTPUT="$TEMP_DIR/gemini-review.txt"
 CODEX_OUTPUT="$TEMP_DIR/codex-review.txt"
 
 # Execute in parallel
-gemini-cli "$PROMPT" > "$GEMINI_OUTPUT" 2>&1 &
+gemini exec "$PROMPT" > "$GEMINI_OUTPUT" 2>&1 &
 GEMINI_PID=$!
 
-codex-cli "$PROMPT" > "$CODEX_OUTPUT" 2>&1 &
+codex exec "$PROMPT" > "$CODEX_OUTPUT" 2>&1 &
 CODEX_PID=$!
 
 # Wait and capture exit codes
@@ -135,7 +135,7 @@ User authentication with JWT tokens
 EOF
 )
 
-gemini-cli "$PROMPT"
+gemini exec "$PROMPT"
 ```
 
 The `'EOF'` (single quotes) prevents variable expansion in the heredoc.
@@ -146,13 +146,13 @@ If passing prompt directly (not via heredoc):
 
 ```bash
 # Escape double quotes
-gemini-cli "Review this \"important\" function"
+gemini "Review this \"important\" function"
 
 # Escape dollar signs
-gemini-cli "Check variable \$USER usage"
+gemini "Check variable \$USER usage"
 
 # Escape backticks
-gemini-cli "Examine \`git status\` output"
+gemini "Examine \`git status\` output"
 ```
 
 **Better:** Use heredoc to avoid escaping issues.
@@ -165,10 +165,10 @@ Prevent CLIs from hanging indefinitely:
 
 ```bash
 # Kill after 60 seconds
-timeout 60s gemini-cli "$PROMPT" > /tmp/gemini-review.txt 2>&1 &
+timeout 60s gemini exec "$PROMPT" > /tmp/gemini-review.txt 2>&1 &
 GEMINI_PID=$!
 
-timeout 60s codex-cli "$PROMPT" > /tmp/codex-review.txt 2>&1 &
+timeout 60s codex exec "$PROMPT" > /tmp/codex-review.txt 2>&1 &
 CODEX_PID=$!
 
 wait $GEMINI_PID
@@ -196,13 +196,13 @@ Based on typical response times:
 
 ```bash
 # Both to same file
-gemini-cli "$PROMPT" > /tmp/output.txt 2>&1
+gemini exec "$PROMPT" > /tmp/output.txt 2>&1
 
 # Separate files
-gemini-cli "$PROMPT" > /tmp/stdout.txt 2> /tmp/stderr.txt
+gemini exec "$PROMPT" > /tmp/stdout.txt 2> /tmp/stderr.txt
 
 # Discard stderr
-gemini-cli "$PROMPT" 2>/dev/null
+gemini exec "$PROMPT" 2>/dev/null
 ```
 
 ### Why Capture stderr
@@ -220,16 +220,16 @@ Capturing stderr helps with debugging when things fail.
 
 ```bash
 # Check if installed
-which gemini-cli
-which codex-cli
+which gemini
+which codex
 
 # Check version
-gemini-cli --version
-codex-cli --version
+gemini --version
+codex --version
 
 # Test basic execution
-gemini-cli "test prompt" >/dev/null 2>&1 && echo "Gemini: OK" || echo "Gemini: FAIL"
-codex-cli "test prompt" >/dev/null 2>&1 && echo "Codex: OK" || echo "Codex: FAIL"
+gemini "test prompt" >/dev/null 2>&1 && echo "Gemini: OK" || echo "Gemini: FAIL"
+codex "test prompt" >/dev/null 2>&1 && echo "Codex: OK" || echo "Codex: FAIL"
 ```
 
 ### Pre-flight Check Script
@@ -254,10 +254,10 @@ check_cli() {
     return 0
 }
 
-check_cli gemini-cli
+check_cli gemini
 GEMINI_STATUS=$?
 
-check_cli codex-cli
+check_cli codex
 CODEX_STATUS=$?
 
 if [ $GEMINI_STATUS -ne 0 ] && [ $CODEX_STATUS -ne 0 ]; then
@@ -274,8 +274,8 @@ fi
 
 **Parallel execution** (recommended):
 ```bash
-gemini-cli "$PROMPT" > /tmp/gemini.txt 2>&1 &
-codex-cli "$PROMPT" > /tmp/codex.txt 2>&1 &
+gemini exec "$PROMPT" > /tmp/gemini.txt 2>&1 &
+codex exec "$PROMPT" > /tmp/codex.txt 2>&1 &
 wait
 ```
 
@@ -283,8 +283,8 @@ Time: ~max(gemini_time, codex_time) = 10-20 seconds typical
 
 **Sequential execution** (slower):
 ```bash
-gemini-cli "$PROMPT" > /tmp/gemini.txt
-codex-cli "$PROMPT" > /tmp/codex.txt
+gemini exec "$PROMPT" > /tmp/gemini.txt
+codex exec "$PROMPT" > /tmp/codex.txt
 ```
 
 Time: gemini_time + codex_time = 20-40 seconds typical
@@ -297,13 +297,13 @@ If system resources are constrained:
 
 ```bash
 # Limit CPU usage (nice)
-nice -n 10 gemini-cli "$PROMPT" &
-nice -n 10 codex-cli "$PROMPT" &
+nice -n 10 gemini exec "$PROMPT" &
+nice -n 10 codex exec "$PROMPT" &
 
 # Limit memory (ulimit)
 ulimit -v 2000000  # 2GB virtual memory limit
-gemini-cli "$PROMPT" &
-codex-cli "$PROMPT" &
+gemini exec "$PROMPT" &
+codex exec "$PROMPT" &
 ```
 
 ## Temporary File Management
@@ -317,8 +317,8 @@ GEMINI_FILE="$TEMP_DIR/gemini-review.txt"
 CODEX_FILE="$TEMP_DIR/codex-review.txt"
 
 # Execute CLIs
-gemini-cli "$PROMPT" > "$GEMINI_FILE" 2>&1 &
-codex-cli "$PROMPT" > "$CODEX_FILE" 2>&1 &
+gemini exec "$PROMPT" > "$GEMINI_FILE" 2>&1 &
+codex exec "$PROMPT" > "$CODEX_FILE" 2>&1 &
 wait
 
 # Process results
@@ -349,8 +349,8 @@ trap cleanup EXIT
 echo $PATH
 
 # Find CLI location
-find / -name gemini-cli 2>/dev/null
-find / -name codex-cli 2>/dev/null
+find / -name gemini 2>/dev/null
+find / -name codex 2>/dev/null
 
 # Add to PATH if needed
 export PATH=$PATH:/path/to/cli/directory
@@ -360,19 +360,19 @@ export PATH=$PATH:/path/to/cli/directory
 
 ```bash
 # Check permissions
-ls -l $(which gemini-cli)
-ls -l $(which codex-cli)
+ls -l $(which gemini)
+ls -l $(which codex)
 
 # Make executable
-chmod +x /path/to/gemini-cli
-chmod +x /path/to/codex-cli
+chmod +x /path/to/gemini
+chmod +x /path/to/codex
 ```
 
 ### Empty Output
 
 ```bash
 # Check if CLI produces output
-gemini-cli "simple test" 2>&1 | tee /tmp/debug.txt
+gemini "simple test" 2>&1 | tee /tmp/debug.txt
 echo "Exit code: $?"
 echo "Output length: $(wc -c < /tmp/debug.txt)"
 
@@ -387,7 +387,7 @@ Some CLIs may require authentication:
 
 ```bash
 # Check for auth errors in stderr
-gemini-cli "$PROMPT" 2>&1 | grep -i "auth\|token\|login"
+gemini exec "$PROMPT" 2>&1 | grep -i "auth\|token\|login"
 
 # Set auth environment variables if needed
 export GEMINI_API_KEY="your-key"
@@ -416,10 +416,10 @@ EOF
 # Execute with timeout and error handling
 echo "Executing peer LLM reviews in parallel..."
 
-timeout $TIMEOUT gemini-cli "$PROMPT" > "$TEMP_DIR/gemini.txt" 2>&1 &
+timeout $TIMEOUT gemini exec "$PROMPT" > "$TEMP_DIR/gemini.txt" 2>&1 &
 GEMINI_PID=$!
 
-timeout $TIMEOUT codex-cli "$PROMPT" > "$TEMP_DIR/codex.txt" 2>&1 &
+timeout $TIMEOUT codex exec "$PROMPT" > "$TEMP_DIR/codex.txt" 2>&1 &
 CODEX_PID=$!
 
 # Wait and capture results
