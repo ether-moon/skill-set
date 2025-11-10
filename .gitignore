@@ -1,2 +1,5 @@
 .claude
 .DS_Store
+
+# Playwright output files
+tmp/playwright/
