@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SKILLS_DIR="${HOME}/.config/superpowers/skills"
-SKILLS_REPO="https://github.com/obra/superpowers-skills.git"
+SKILLS_DIR="${HOME}/.config/skill-set/skills"
+SKILLS_REPO="https://github.com/ether-moon/skill-set.git"
 
 # Check if skills directory exists and is a valid git repo
 if [ -d "$SKILLS_DIR/.git" ]; then
@@ -49,40 +49,20 @@ fi
 echo "Initializing skills repository..."
 
 # Handle migration from old installation
-if [ -d "${HOME}/.config/superpowers/.git" ]; then
+if [ -d "${HOME}/.config/skill-set/.git" ]; then
     echo "Found existing installation. Backing up..."
-    mv "${HOME}/.config/superpowers/.git" "${HOME}/.config/superpowers/.git.bak"
+    mv "${HOME}/.config/skill-set/.git" "${HOME}/.config/skill-set/.git.bak"
 
-    if [ -d "${HOME}/.config/superpowers/skills" ]; then
-        mv "${HOME}/.config/superpowers/skills" "${HOME}/.config/superpowers/skills.bak"
-        echo "Your old skills are in ~/.config/superpowers/skills.bak"
+    if [ -d "${HOME}/.config/skill-set/skills" ]; then
+        mv "${HOME}/.config/skill-set/skills" "${HOME}/.config/skill-set/skills.bak"
+        echo "Your old skills are in ~/.config/skill-set/skills.bak"
     fi
 fi
 
 # Clone the skills repository
-mkdir -p "${HOME}/.config/superpowers"
+mkdir -p "${HOME}/.config/skill-set"
 git clone "$SKILLS_REPO" "$SKILLS_DIR"
 
 cd "$SKILLS_DIR"
-
-# Offer to fork if gh is installed
-if command -v gh &> /dev/null; then
-    echo ""
-    echo "GitHub CLI detected. Would you like to fork superpowers-skills?"
-    echo "Forking allows you to share skill improvements with the community."
-    echo ""
-    read -p "Fork superpowers-skills? (y/N): " -n 1 -r
-    echo
-
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        gh repo fork obra/superpowers-skills --remote=true
-        echo "Forked! You can now contribute skills back to the community."
-    else
-        git remote add upstream "$SKILLS_REPO"
-    fi
-else
-    # No gh, just set up upstream remote
-    git remote add upstream "$SKILLS_REPO"
-fi
 
 echo "Skills repository initialized at $SKILLS_DIR"
