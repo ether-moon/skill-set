@@ -1,37 +1,73 @@
-# Browser Automation Templates
+# Browser Automation Reference
 
-This directory contains 19 ready-to-use Playwright automation templates that work like MCP tools.
+Hybrid approach using Playwright CLI for simple tasks and templates for complex interactions.
 
 ## Setup
 
-First time only, in the skill directory:
+First time only:
 ```bash
-cd $SKILL_DIR
-npm install playwright
+npm install -g playwright
 npx playwright install chromium
 ```
 
-## Quick Start
+## CLI-First Approach
 
-All templates follow the pattern:
+**Always prefer CLI** for these simple tasks:
+
+### Screenshot
 ```bash
-node $SKILL_DIR/templates/<template-name>.js <arguments>
+npx playwright screenshot <url> <filename>
+
+# Example
+npx playwright screenshot https://example.com ./tmp/playwright/screenshot.png
 ```
 
-No need to `cd` to the skill directory - use absolute paths from anywhere.
+### PDF Generation
+```bash
+npx playwright pdf <url> <filename>
 
-**Output files**: Screenshots, PDFs, and other generated files are saved to `./tmp/playwright/` in your current working directory by default. The directory is created automatically if it doesn't exist.
+# Example
+npx playwright pdf https://example.com ./tmp/playwright/page.pdf
+```
 
-## Templates by Category
+### Open Browser (Manual Inspection)
+```bash
+npx playwright open <url>
+
+# Example - opens browser for manual testing
+npx playwright open https://example.com
+```
+
+---
+
+## Templates for Complex Tasks
+
+Use templates when you need state management, event listening, or multi-step logic.
+
+**Pattern**: `node $SKILL_DIR/templates/<template-name>.js <arguments>`
+
+**Output files**: Generated files are saved to `./tmp/playwright/` by default.
+
+### Page Monitoring
+
+**Capture accessibility snapshot**
+```bash
+node $SKILL_DIR/templates/snapshot.js https://example.com
+```
+
+**Get console messages** (requires event listening)
+```bash
+node $SKILL_DIR/templates/console-messages.js https://example.com
+```
+
+**Get network requests** (requires event listening)
+```bash
+node $SKILL_DIR/templates/network-requests.js https://example.com
+```
 
 ### Browser Control
 
-**Navigate to URL**
-```bash
-node $SKILL_DIR/templates/navigate.js https://example.com
-```
-
-**Navigate back**
+**Navigate back** (with wait logic)
 ```bash
 node $SKILL_DIR/templates/navigate-back.js https://example.com
 ```
@@ -39,41 +75,6 @@ node $SKILL_DIR/templates/navigate-back.js https://example.com
 **Resize window**
 ```bash
 node $SKILL_DIR/templates/resize.js https://example.com 1920 1080
-```
-
-### Page Information
-
-**Take screenshot**
-```bash
-node $SKILL_DIR/templates/screenshot.js https://example.com
-# Output: ./tmp/playwright/screenshot.png
-
-# Custom path
-node $SKILL_DIR/templates/screenshot.js https://example.com ./tmp/playwright/custom.png
-```
-
-**Capture accessibility snapshot**
-```bash
-node $SKILL_DIR/templates/snapshot.js https://example.com
-```
-
-**Get console messages**
-```bash
-node $SKILL_DIR/templates/console-messages.js https://example.com
-```
-
-**Get network requests**
-```bash
-node $SKILL_DIR/templates/network-requests.js https://example.com
-```
-
-**Generate PDF**
-```bash
-node $SKILL_DIR/templates/pdf.js https://example.com
-# Output: ./tmp/playwright/page.pdf
-
-# Custom path
-node $SKILL_DIR/templates/pdf.js https://example.com ./tmp/playwright/custom.pdf
 ```
 
 ### User Interactions
@@ -126,6 +127,10 @@ node $SKILL_DIR/templates/file-upload.js https://example.com "input[type=file]" 
 **Evaluate JavaScript**
 ```bash
 node $SKILL_DIR/templates/evaluate.js https://example.com "document.title"
+
+# Examples
+node $SKILL_DIR/templates/evaluate.js https://example.com "document.querySelectorAll('a').length"
+node $SKILL_DIR/templates/evaluate.js https://example.com "Array.from(document.querySelectorAll('h1')).map(h => h.textContent)"
 ```
 
 **Handle dialogs**

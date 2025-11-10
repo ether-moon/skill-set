@@ -1,13 +1,13 @@
 ---
 name: browser-automation
-description: Automates browser interactions with 19 Playwright templates - takes screenshots, generates PDFs, clicks elements, fills forms, monitors console/network. Use when testing web pages, automating browser tasks, or when user mentions screenshots, web testing, form automation, or Playwright
+description: Automates browser interactions using Playwright CLI and templates - takes screenshots, generates PDFs, clicks elements, fills forms, monitors console/network. Use when testing web pages, automating browser tasks, or when user mentions screenshots, web testing, form automation, or Playwright
 ---
 
 # Browser Automation
 
 ## Overview
 
-MCP-like browser automation using pre-built Playwright templates. Provides 19 ready-to-use scripts for common automation tasks without MCP server overhead.
+Hybrid browser automation using Playwright CLI for simple tasks and templates for complex interactions. Provides efficient automation without MCP server overhead.
 
 ## When to Use
 
@@ -22,60 +22,81 @@ MCP-like browser automation using pre-built Playwright templates. Provides 19 re
 - Simple HTTP requests suffice (use fetch/curl)
 - Need persistent browser sessions across conversations
 
-## Available Templates
+## Hybrid Approach
 
-### Browser Control (3)
-- Navigate to URL
-- Navigate back
-- Resize browser window
+### CLI-Native (Simple Tasks)
+Use Playwright CLI directly for:
+- **Screenshot**: `npx playwright screenshot <url> <filename>`
+- **PDF**: `npx playwright pdf <url> <filename>`
+- **Open browser**: `npx playwright open <url>` (for manual inspection)
 
-### Page Information (5)
-- Take screenshot
-- Capture accessibility snapshot
-- Get console messages
-- Get network requests
-- Generate PDF
+### Templates (Complex Interactions)
+Use templates (16 total) for tasks requiring state management, event handling, or multi-step logic:
 
-### User Interactions (6)
-- Click element
-- Fill form field
+**User Interactions (6)**
+- Click element with wait
+- Fill form field with validation
 - Hover over element
 - Drag and drop
 - Press keyboard key
 - Select dropdown option
 
-### Form Handling (2)
+**Form Handling (2)**
 - Fill multiple fields (bulk)
 - Upload file
 
-### Advanced (3)
+**Page Monitoring (3)**
+- Capture accessibility snapshot
+- Get console messages (event listening)
+- Get network requests (event listening)
+
+**Advanced (5)**
 - Evaluate JavaScript
+- Navigate back with wait
+- Resize browser window
 - Handle dialogs (alert/confirm/prompt)
-- Wait for element
+- Wait for element with timeout
 
 ## Quick Start
 
-First time setup (in skill directory):
+First time setup:
 ```bash
-cd $SKILL_DIR
-npm install playwright
+npm install -g playwright
 npx playwright install chromium
 ```
 
-Example usage:
+### CLI Examples (Simple Tasks)
 ```bash
-node $SKILL_DIR/templates/screenshot.js https://example.com ./tmp/playwright/screenshot.png
+# Screenshot
+npx playwright screenshot https://example.com ./tmp/playwright/screenshot.png
+
+# PDF
+npx playwright pdf https://example.com ./tmp/playwright/page.pdf
+
+# Open browser for manual inspection
+npx playwright open https://example.com
+```
+
+### Template Examples (Complex Tasks)
+```bash
+# Click element (requires wait logic)
 node $SKILL_DIR/templates/click.js https://example.com "button:has-text('Submit')"
+
+# Fill form (multiple fields)
+node $SKILL_DIR/templates/fill-form.js https://example.com '{"input[name=email]":"test@example.com"}'
+
+# Monitor console (event listening)
+node $SKILL_DIR/templates/console-messages.js https://example.com
 ```
 
 **Important Guidelines:**
+- **Prefer CLI first**: Use `npx playwright` for screenshots, PDFs, and simple evaluation
+- **Use templates when needed**: Complex interactions, event listening, multi-step logic
 - `$SKILL_DIR` is automatically set to the skill's absolute path by Claude
-- Always use `$SKILL_DIR/templates/` prefix for template files
-- Never use `cd` before running templates
-- Always use the provided template files - never write inline Playwright code with `node -e` or heredocs
-- If a template doesn't exist for your use case, combine multiple templates or use the evaluate.js template for custom JavaScript
+- Never use `cd` before running commands
+- Never write inline Playwright code with `node -e` or heredocs
 
-**Note**: Output files (screenshots, PDFs, etc.) are saved to `./tmp/playwright/` in the current project directory by default.
+**Note**: Output files are saved to `./tmp/playwright/` in the current project directory by default.
 
 ## Documentation
 
