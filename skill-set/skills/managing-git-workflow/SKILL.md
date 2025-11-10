@@ -43,7 +43,7 @@ Automates git workflows for commit, push, and PR creation with context-aware mes
 
 ```bash
 # Load helper functions
-source .claude/skills/managing-git-workflow/scripts/git-helpers.sh
+source $SKILL_DIR/scripts/git-helpers.sh
 
 # Check status
 has_uncommitted_changes  # returns 0 if true

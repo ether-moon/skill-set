@@ -57,19 +57,20 @@ MCP-like browser automation using pre-built Playwright templates. Provides 19 re
 
 First time setup (in skill directory):
 ```bash
-cd ~/.claude/skills/browser-automation
+cd $SKILL_DIR
 npm install playwright
 npx playwright install chromium
 ```
 
 Example usage:
 ```bash
-node ~/.claude/skills/browser-automation/templates/screenshot.js https://example.com ./tmp/playwright/screenshot.png
-node ~/.claude/skills/browser-automation/templates/click.js https://example.com "button:has-text('Submit')"
+node $SKILL_DIR/templates/screenshot.js https://example.com ./tmp/playwright/screenshot.png
+node $SKILL_DIR/templates/click.js https://example.com "button:has-text('Submit')"
 ```
 
 **Important Guidelines:**
-- Always use absolute paths to template files (e.g., `~/.claude/skills/browser-automation/templates/screenshot.js`)
+- `$SKILL_DIR` is automatically set to the skill's absolute path by Claude
+- Always use `$SKILL_DIR/templates/` prefix for template files
 - Never use `cd` before running templates
 - Always use the provided template files - never write inline Playwright code with `node -e` or heredocs
 - If a template doesn't exist for your use case, combine multiple templates or use the evaluate.js template for custom JavaScript

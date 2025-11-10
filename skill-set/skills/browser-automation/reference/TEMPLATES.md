@@ -6,7 +6,7 @@ This directory contains 19 ready-to-use Playwright automation templates that wor
 
 First time only, in the skill directory:
 ```bash
-cd ~/.claude/skills/browser-automation
+cd $SKILL_DIR
 npm install playwright
 npx playwright install chromium
 ```
@@ -15,7 +15,7 @@ npx playwright install chromium
 
 All templates follow the pattern:
 ```bash
-node ~/.claude/skills/browser-automation/templates/<template-name>.js <arguments>
+node $SKILL_DIR/templates/<template-name>.js <arguments>
 ```
 
 No need to `cd` to the skill directory - use absolute paths from anywhere.
@@ -28,121 +28,121 @@ No need to `cd` to the skill directory - use absolute paths from anywhere.
 
 **Navigate to URL**
 ```bash
-node ~/.claude/skills/browser-automation/templates/navigate.js https://example.com
+node $SKILL_DIR/templates/navigate.js https://example.com
 ```
 
 **Navigate back**
 ```bash
-node ~/.claude/skills/browser-automation/templates/navigate-back.js https://example.com
+node $SKILL_DIR/templates/navigate-back.js https://example.com
 ```
 
 **Resize window**
 ```bash
-node ~/.claude/skills/browser-automation/templates/resize.js https://example.com 1920 1080
+node $SKILL_DIR/templates/resize.js https://example.com 1920 1080
 ```
 
 ### Page Information
 
 **Take screenshot**
 ```bash
-node ~/.claude/skills/browser-automation/templates/screenshot.js https://example.com
+node $SKILL_DIR/templates/screenshot.js https://example.com
 # Output: ./tmp/playwright/screenshot.png
 
 # Custom path
-node ~/.claude/skills/browser-automation/templates/screenshot.js https://example.com ./tmp/playwright/custom.png
+node $SKILL_DIR/templates/screenshot.js https://example.com ./tmp/playwright/custom.png
 ```
 
 **Capture accessibility snapshot**
 ```bash
-node ~/.claude/skills/browser-automation/templates/snapshot.js https://example.com
+node $SKILL_DIR/templates/snapshot.js https://example.com
 ```
 
 **Get console messages**
 ```bash
-node ~/.claude/skills/browser-automation/templates/console-messages.js https://example.com
+node $SKILL_DIR/templates/console-messages.js https://example.com
 ```
 
 **Get network requests**
 ```bash
-node ~/.claude/skills/browser-automation/templates/network-requests.js https://example.com
+node $SKILL_DIR/templates/network-requests.js https://example.com
 ```
 
 **Generate PDF**
 ```bash
-node ~/.claude/skills/browser-automation/templates/pdf.js https://example.com
+node $SKILL_DIR/templates/pdf.js https://example.com
 # Output: ./tmp/playwright/page.pdf
 
 # Custom path
-node ~/.claude/skills/browser-automation/templates/pdf.js https://example.com ./tmp/playwright/custom.pdf
+node $SKILL_DIR/templates/pdf.js https://example.com ./tmp/playwright/custom.pdf
 ```
 
 ### User Interactions
 
 **Click element**
 ```bash
-node ~/.claude/skills/browser-automation/templates/click.js https://example.com "button:has-text('Submit')"
+node $SKILL_DIR/templates/click.js https://example.com "button:has-text('Submit')"
 ```
 
 **Fill form field**
 ```bash
-node ~/.claude/skills/browser-automation/templates/fill.js https://example.com "input[name='email']" "test@example.com"
+node $SKILL_DIR/templates/fill.js https://example.com "input[name='email']" "test@example.com"
 ```
 
 **Hover over element**
 ```bash
-node ~/.claude/skills/browser-automation/templates/hover.js https://example.com ".menu-item"
+node $SKILL_DIR/templates/hover.js https://example.com ".menu-item"
 ```
 
 **Drag and drop**
 ```bash
-node ~/.claude/skills/browser-automation/templates/drag.js https://example.com "#source" "#target"
+node $SKILL_DIR/templates/drag.js https://example.com "#source" "#target"
 ```
 
 **Press keyboard key**
 ```bash
-node ~/.claude/skills/browser-automation/templates/press-key.js https://example.com Enter
+node $SKILL_DIR/templates/press-key.js https://example.com Enter
 ```
 Common keys: Enter, Escape, ArrowDown, ArrowUp, Tab, Space
 
 **Select dropdown option**
 ```bash
-node ~/.claude/skills/browser-automation/templates/select.js https://example.com "select[name='country']" "US"
+node $SKILL_DIR/templates/select.js https://example.com "select[name='country']" "US"
 ```
 
 ### Form Handling
 
 **Fill multiple form fields**
 ```bash
-node ~/.claude/skills/browser-automation/templates/fill-form.js https://example.com '{"input[name=email]":"test@example.com","input[name=name]":"John"}'
+node $SKILL_DIR/templates/fill-form.js https://example.com '{"input[name=email]":"test@example.com","input[name=name]":"John"}'
 ```
 
 **Upload file**
 ```bash
-node ~/.claude/skills/browser-automation/templates/file-upload.js https://example.com "input[type=file]" "./tmp/playwright/upload.pdf"
+node $SKILL_DIR/templates/file-upload.js https://example.com "input[type=file]" "./tmp/playwright/upload.pdf"
 ```
 
 ### Advanced
 
 **Evaluate JavaScript**
 ```bash
-node ~/.claude/skills/browser-automation/templates/evaluate.js https://example.com "document.title"
+node $SKILL_DIR/templates/evaluate.js https://example.com "document.title"
 ```
 
 **Handle dialogs**
 ```bash
 # Accept alert/confirm
-node ~/.claude/skills/browser-automation/templates/handle-dialog.js https://example.com accept
+node $SKILL_DIR/templates/handle-dialog.js https://example.com accept
 
 # Accept prompt with text
-node ~/.claude/skills/browser-automation/templates/handle-dialog.js https://example.com accept "My Input"
+node $SKILL_DIR/templates/handle-dialog.js https://example.com accept "My Input"
 
 # Dismiss dialog
-node ~/.claude/skills/browser-automation/templates/handle-dialog.js https://example.com dismiss
+node $SKILL_DIR/templates/handle-dialog.js https://example.com dismiss
 ```
 
 **Wait for element**
 ```bash
-node ~/.claude/skills/browser-automation/templates/wait-for.js https://example.com ".loaded" 10000
+node $SKILL_DIR/templates/wait-for.js https://example.com ".loaded" 10000
 ```
 
 ## Selector Tips
