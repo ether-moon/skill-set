@@ -167,11 +167,11 @@ gemini "Examine \`git status\` output"
 Prevent CLIs from hanging indefinitely:
 
 ```bash
-# Kill after 60 seconds
-timeout 60s gemini "$PROMPT" > /tmp/gemini-review.txt 2>&1 &
+# Use 300s (5 minutes) timeout
+timeout 300s gemini "$PROMPT" > /tmp/gemini-review.txt 2>&1 &
 GEMINI_PID=$!
 
-timeout 60s codex exec "$PROMPT" > /tmp/codex-review.txt 2>&1 &
+timeout 300s codex exec "$PROMPT" > /tmp/codex-review.txt 2>&1 &
 CODEX_PID=$!
 
 wait $GEMINI_PID
@@ -182,16 +182,83 @@ CODEX_EXIT=$?
 
 # Exit code 124 means timeout
 if [ $GEMINI_EXIT -eq 124 ]; then
-    echo "Gemini CLI timed out after 60 seconds" >&2
+    echo "Gemini CLI timed out after 300 seconds" >&2
 fi
 ```
 
-### Adjusting Timeout
+### Recommended Timeout
 
-Based on typical response times:
-- **Quick reviews** (small changes): 30s timeout
-- **Standard reviews** (moderate changes): 60s timeout
-- **Complex reviews** (large refactors): 120s timeout
+**Use 300s (5 minutes) for all reviews:**
+```bash
+# Fixed 300s timeout
+timeout 300s gemini "$PROMPT" > /tmp/gemini-review.txt 2>&1 &
+GEMINI_PID=$!
+
+timeout 300s codex exec "$PROMPT" > /tmp/codex-review.txt 2>&1 &
+CODEX_PID=$!
+
+wait $GEMINI_PID
+GEMINI_EXIT=$?
+
+wait $CODEX_PID
+CODEX_EXIT=$?
+
+# Exit code 124 means timeout
+if [ $GEMINI_EXIT -eq 124 ]; then
+    echo "Gemini CLI timed out after 300 seconds" >&2
+fi
+if [ $CODEX_EXIT -eq 124 ]; then
+    echo "Codex CLI timed out after 300 seconds" >&2
+fi
+```
+
+This timeout is sufficient for most reviews, including complex architectural changes.
+
+### Troubleshooting Persistent Timeouts
+
+If still timing out after 300s (exit code 124):
+
+**1. Test CLI responsiveness:**
+```bash
+# Test with simple prompt
+time gemini "Hello, respond with OK"
+time codex exec "Hello, respond with OK"
+
+# If this takes >10 seconds, CLI has startup/auth issues
+```
+
+**2. Reduce prompt complexity:**
+```bash
+# Instead of full git diff
+DIFF_SUMMARY=$(git diff --stat HEAD~1..HEAD | head -20)
+
+# Instead of all conversation
+RECENT_CONTEXT="Last 3 exchanges summary"
+
+# Shorter prompt = faster response
+```
+
+**3. Check system resources:**
+```bash
+# CPU usage
+top -l 1 | grep "CPU usage"
+
+# Memory available
+vm_stat | grep "Pages free"
+
+# Network latency (if cloud-based CLIs)
+ping -c 3 api.anthropic.com
+```
+
+**4. Split the review:**
+```bash
+# Instead of reviewing everything at once, split by concern
+timeout 300s gemini "Review security issues only: $CHANGES" > /tmp/gemini-security.txt &
+timeout 300s codex exec "Review performance issues only: $CHANGES" > /tmp/codex-performance.txt &
+wait
+
+# Then combine results
+```
 
 ## Output Redirection
 
@@ -404,7 +471,7 @@ export CODEX_API_KEY="your-key"
 set -euo pipefail
 
 # Configuration
-TIMEOUT=60s
+TIMEOUT=300s
 TEMP_DIR=$(mktemp -d)
 trap "rm -rf $TEMP_DIR" EXIT
 

@@ -216,10 +216,16 @@ Analyze both responses and generate synthesized assessment.
 - Report failure clearly
 - Suggest checking CLI installation:
   ```bash
-  which gemini-cli codex-cli
-  gemini-cli --version
-  codex-cli --version
+  which gemini codex
+  gemini --version
+  codex --version
   ```
+
+**Timeout issues (exit code 124):**
+- Use 300s (5 minutes) timeout: `timeout 300s`
+- This allows time for complex reviews
+- Reduce prompt size if still timing out: Focus on key changes only
+- Check CLI responsiveness: `time gemini "test"`
 
 **No retries**: Keep execution fast and simple.
 
