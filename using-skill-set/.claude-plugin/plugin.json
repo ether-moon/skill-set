@@ -6,6 +6,9 @@
     "name": "ether-moon"
   },
   "license": "MIT",
+  "skills": [
+    "./SKILL.md"
+  ],
   "hooks": {
     "SessionStart": [
       {

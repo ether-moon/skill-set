@@ -5,5 +5,8 @@
   "author": {
     "name": "ether-moon"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "skills": [
+    "./SKILL.md"
+  ]
 }
