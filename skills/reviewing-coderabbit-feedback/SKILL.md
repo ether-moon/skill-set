@@ -59,23 +59,41 @@ Interactive processing of CodeRabbit AI review comments through user conversatio
 - Developer confirmation replies: "Applied", "Done", "Fixed"
 - Duplicate suggestions (process once only)
 
-## Interactive Workflow
+## Language Detection
 
-### Phase 1: Collection & Classification (Automatic)
+**IMPORTANT: Detect and use user's preferred language for all communication.**
 
-1. **Pre-check**: Verify clean working directory
-   ```bash
-   git status --porcelain
-   # If output exists: "⚠️ 커밋되지 않은 변경사항이 있습니다. 먼저 변경사항을 커밋해주세요." → STOP
-   ```
+**Detection priority (check in order):**
+1. **User's current messages** - What language is the user speaking in this conversation?
+2. **Project context** - Check CLAUDE.md, README.md, recent commits for language patterns
+3. **Git history** - `git log --oneline -5` to see commit message language
+4. **Default** - If no clear indication, use **English**
 
-2. **Setup Tracking**: Create TodoWrite todos for ALL workflow steps
-   ```markdown
-   - [ ] Pre-check git status
-   - [ ] Discover PR and collect comments (with pagination)
-   - [ ] Filter and classify feedback by severity
-   - [ ] Discuss CRITICAL/MAJOR with user
-   - [ ] Analyze MINOR and provide recommendations
+**Apply detected language to:**
+- All conversational messages with user
+- PR comment content
+- Reports and summaries
+- Error messages and warnings
+- Status updates
+
+**Always keep in English:**
+- Code examples
+- Bash commands and scripts
+- File paths
+- Technical API calls
+
+**Language variable usage in templates:**
+```
+[In user's language]  ← This marker means content should be in detected language
+```
+
+**Example detection:**
+```
+# User writes in Korean → Use Korean
+# User writes in English → Use English
+# User writes in Spanish → Use Spanish
+# No clear signal → Use English (default)
+```
    - [ ] Apply agreed changes
    - [ ] Commit and push changes
    - [ ] Post PR comment with verification
@@ -174,59 +192,63 @@ Interactive processing of CodeRabbit AI review comments through user conversatio
 **Step 2.1 - Present Summary and CRITICAL/MAJOR Items:**
 
 ```
-발견된 피드백: 총 23건
-- CRITICAL: 2건 (보안 취약점 1, 데이터 손실 위험 1)
-- MAJOR: 5건 (성능 이슈 3, 중요한 버그 2)
-- MINOR: 16건 (코드 품질 개선)
+[In user's language]
 
-## 즉시 처리가 필요한 항목 (CRITICAL/MAJOR 7건)
+Found feedback: 23 items total
+- CRITICAL: 2 items (security vulnerability 1, data loss risk 1)
+- MAJOR: 5 items (performance issues 3, significant bugs 2)
+- MINOR: 16 items (code quality improvements)
+
+## Items Requiring Immediate Attention (CRITICAL/MAJOR 7 items)
 
 ### CRITICAL
-1. `auth/login.ts:45` - SQL Injection 취약점
-   - 문제: 사용자 입력을 직접 쿼리에 사용
-   - 제안: Prepared statement 사용
-   - 위험도: ⚠️ 높음 (보안)
+1. `auth/login.ts:45` - SQL Injection vulnerability
+   - Issue: User input directly in query
+   - Suggestion: Use prepared statements
+   - Risk: ⚠️ High (security)
 
-2. `data/sync.ts:89` - 데이터 손실 위험
-   - 문제: 트랜잭션 없이 연속 삭제 수행
-   - 제안: 트랜잭션 래핑 추가
-   - 위험도: ⚠️ 높음 (데이터 무결성)
+2. `data/sync.ts:89` - Data loss risk
+   - Issue: Sequential deletes without transaction
+   - Suggestion: Add transaction wrapper
+   - Risk: ⚠️ High (data integrity)
 
 ### MAJOR
-3. `api/users.ts:123` - N+1 쿼리 문제
-   - 문제: 루프 내 개별 쿼리 실행
-   - 제안: Eager loading으로 일괄 조회
-   - 영향: 성능 (현재 100개 항목에 101번 쿼리)
+3. `api/users.ts:123` - N+1 query problem
+   - Issue: Individual queries in loop
+   - Suggestion: Use eager loading for batch retrieval
+   - Impact: Performance (currently 101 queries for 100 items)
 
-4. `cache/redis.ts:56` - 메모리 누수
-   - 문제: 연결 종료 누락
-   - 제안: finally 블록에 close() 추가
-   - 영향: 리소스
+4. `cache/redis.ts:56` - Memory leak
+   - Issue: Missing connection close
+   - Suggestion: Add close() in finally block
+   - Impact: Resource exhaustion
 
-[...계속]
+[...more items]
 
-이 항목들을 어떻게 처리하시겠습니까?
-- [1] 모두 적용 (권장 - CRITICAL/MAJOR는 필수 수정 사항)
-- [2] 개별 선택 (각 항목별로 확인)
-- [3] 상세 정보 먼저 보기
-- [4] MINOR 항목 분석부터 시작
+How would you like to proceed?
+- [1] Apply all (recommended - CRITICAL/MAJOR are mandatory fixes)
+- [2] Review individually (confirm each item)
+- [3] See details first
+- [4] Start with MINOR analysis
 ```
 
 **Step 2.2 - Individual Selection Mode (Option 2):**
 
 ```
-각 항목별로 검토하겠습니다.
+[In user's language]
 
-[1/7] CRITICAL: `auth/login.ts:45` - SQL Injection 취약점
+Reviewing each item individually.
 
-현재 코드:
+[1/7] CRITICAL: `auth/login.ts:45` - SQL Injection vulnerability
+
+Current code:
 ```typescript
 const user = await db.query(
   `SELECT * FROM users WHERE email = '${email}'`
 );
 ```
 
-제안 변경:
+Suggested change:
 ```typescript
 const user = await db.query(
   'SELECT * FROM users WHERE email = $1',
@@ -234,133 +256,135 @@ const user = await db.query(
 );
 ```
 
-**CodeRabbit 분석:**
-- SQL Injection 공격 가능
-- 악의적 입력으로 전체 데이터 유출 위험
+**CodeRabbit Analysis:**
+- SQL Injection attack possible
+- Risk of full data breach with malicious input
 
-**위험도:** ⚠️ CRITICAL (즉시 수정 필요)
+**Severity:** ⚠️ CRITICAL (immediate fix required)
 
-적용하시겠습니까? [Y/n/skip]
+Apply this change? [Y/n/skip]
 > Y
 
-✅ 적용 예정 목록에 추가
+✅ Added to apply list
 
-[2/7] CRITICAL: `data/sync.ts:89` - 데이터 손실 위험
+[2/7] CRITICAL: `data/sync.ts:89` - Data loss risk
 [...]
 ```
 
 **Step 2.3 - MINOR Analysis & Recommendations:**
 
 ```
-✅ CRITICAL/MAJOR 항목 7건 선택 완료
+[In user's language]
 
-이제 MINOR 권장사항 16건을 분석하겠습니다.
-각 항목을 검토하여 적용 여부를 제안해 드리겠습니다.
+✅ CRITICAL/MAJOR selection complete (7 items)
 
-[분석 중...]
+Now analyzing 16 MINOR recommendations.
+Reviewing each item to provide application recommendations.
 
-## MINOR 권장사항 분석 완료
+[Analyzing...]
 
-### ✅ 적용 권장 (4건)
-명확한 개선 효과가 있는 항목들입니다.
+## MINOR Recommendations Analysis Complete
 
-1. `utils/format.ts:34` - 변수명 명확화 (`data` → `formattedUserData`)
-   - 근거: 타입 추론 개선, 가독성 향상, 스코프 내 다른 data 변수와 충돌 가능
-   - 영향: 매우 낮음 (변수명만 변경, 5줄)
-   - 예상 효과: 코드 이해도 증가, 유지보수 용이
-   - 권장: ✅ 적용
+### ✅ Recommended to Apply (4 items)
+Items with clear improvement benefits.
 
-2. `api/response.ts:67` - 에러 핸들링 개선
-   - 현재: try-catch만 있고 에러 로깅 없음
-   - 제안: logger.error() 추가
-   - 근거: 프로덕션 디버깅 시 에러 추적 불가능
-   - 영향: 낮음 (1줄 추가)
-   - 예상 효과: 문제 발생 시 빠른 원인 파악
-   - 권장: ✅ 적용
+1. `utils/format.ts:34` - Variable name clarification (`data` → `formattedUserData`)
+   - Rationale: Improved type inference, better readability, avoids conflicts with other data variables in scope
+   - Impact: Very low (variable rename only, 5 lines)
+   - Expected benefit: Increased code comprehension, easier maintenance
+   - Recommendation: ✅ Apply
 
-3. `models/user.ts:123` - 타입 단언 제거
-   - 현재: `as User` 강제 캐스팅
-   - 제안: 타입 가드 함수 사용
-   - 근거: 런타임 타입 불일치 위험
-   - 영향: 중간 (타입 가드 함수 추가 필요, 10줄)
-   - 예상 효과: 타입 안정성 증가
-   - 권장: ✅ 적용
+2. `api/response.ts:67` - Error handling improvement
+   - Current: try-catch만 있고 에러 로깅 없음
+   - Suggestion: logger.error() 추가
+   - Rationale: 프로덕션 디버깅 시 에러 추적 불가능
+   - Impact: 낮음 (1줄 추가)
+   - Expected benefit: 문제 발생 시 빠른 원인 파악
+   - recommended: ✅ applied / apply
 
-4. `services/notification.ts:45` - 매직 넘버 상수화
-   - 현재: `setTimeout(() => ..., 5000)`
-   - 제안: `const RETRY_DELAY_MS = 5000`
-   - 근거: 의미 명확화, 재사용 가능
-   - 영향: 매우 낮음 (상수 선언 1줄)
-   - 예상 효과: 코드 가독성, 설정 변경 용이
-   - 권장: ✅ 적용
+3. `models/user.ts:123` - Remove type assertion
+   - Current: `as User` 강제 캐스팅
+   - Suggestion: 타입 가드 함수 사용
+   - Rationale: 런타임 타입 불일치 위험
+   - Impact: 중간 (타입 가드 함수 추가 필요, 10줄)
+   - Expected benefit: 타입 안정성 증가
+   - recommended: ✅ applied / apply
 
-### 🔄 선택 적용 (9건)
+4. `services/notification.ts:45` - Extract magic number to constant
+   - Current: `setTimeout(() => ..., 5000)`
+   - Suggestion: `const RETRY_DELAY_MS = 5000`
+   - Rationale: 의미 명확화, 재사용 가능
+   - Impact: 매우 낮음 (상수 선언 1줄)
+   - Expected benefit: 코드 가독성, 설정 변경 용이
+   - recommended: ✅ applied / apply
+
+### 🔄 선택 applied / apply (9items)
 프로젝트 스타일이나 향후 확장성에 따라 결정할 사항들입니다.
 
-5. `components/Button.tsx:89` - 함수 분리 제안
-   - 현재: 25줄 단일 함수
-   - 제안: 3개 함수로 분리 (렌더링/이벤트/스타일)
-   - 평가: 현재도 충분히 읽기 쉬움, 분리 시 오버헤드 발생
-   - 권장: 🔄 향후 기능 추가 시 고려 (현재는 불필요)
+5. `components/Button.tsx:89` - Function extraction suggestion
+   - Current: 25줄 단일 함수
+   - Suggestion: 3개 함수로 분리 (렌더링/이벤트/스타일)
+   - Assessment: 현재도 충분히 읽기 쉬움, 분리 시 오버헤드 발생
+   - recommended: 🔄 향후 기능 추가 시 고려 (현재는 Unnecessary)
 
-6. `hooks/useAuth.ts:34` - 커스텀 훅 추출
-   - 현재: 동일 패턴 3곳에서 반복
-   - 제안: useAuthCheck 훅으로 추출
-   - 평가: 추상화 이득 vs 복잡도 증가 trade-off
-   - 권장: 🔄 4개 이상 반복 시 고려
+6. `hooks/useAuth.ts:34` - Extract custom hook
+   - Current: 동일 패턴 3곳에서 반복
+   - Suggestion: useAuthCheck 훅으로 추출
+   - Assessment: 추상화 이득 vs 복잡도 증가 trade-off
+   - recommended: 🔄 4개 이상 반복 시 고려
 
-7. `api/middleware.ts:78` - 에러 메시지 상세화
-   - 현재: "Invalid request"
-   - 제안: "Invalid request: missing required field 'email'"
-   - 평가: 보안과 사용성 사이 균형 문제
-   - 권장: 🔄 프로젝트 정책에 따라 결정
+7. `api/middleware.ts:78` - Detailed error messages
+   - Current: "Invalid request"
+   - Suggestion: "Invalid request: missing required field 'email'"
+   - Assessment: 보안과 사용성 사이 균형 문제
+   - recommended: 🔄 프로젝트 정책에 따라 결정
 
-[... 더 많은 선택 적용 항목]
+[... 더 많은 선택 applied / apply 항목]
 
-### ❌ 불필요 (3건)
-적용하지 않는 것이 더 좋은 항목들입니다.
+### ❌ Unnecessary (3items)
+applied / apply하지 않는 것이 더 좋은 항목들입니다.
 
-14. `config/db.ts:12` - 주석 추가 제안
-    - 제안: 각 설정값에 주석 설명 추가
-    - 평가: 코드가 충분히 자명하며, 과도한 주석은 유지보수 부담
-    - 근거:
+14. `config/db.ts:12` - Add comments suggestion
+    - Suggestion: 각 설정값에 주석 설명 추가
+    - Assessment: 코드가 충분히 자명하며, Excessive comments은 유지보수 부담
+    - Rationale:
       * 설정명이 명확 (`maxConnections`, `timeoutMs`)
       * 타입과 기본값이 문서화 역할
       * 주석은 *왜*를 설명해야 하는데 *무엇*을 반복
-    - 권장: ❌ 불필요
+    - recommended: ❌ Unnecessary
 
 15. `utils/array.ts:56` - Lodash 사용 제안
-    - 현재: 네이티브 map/filter 체이닝
-    - 제안: Lodash chain 사용
-    - 평가: 불필요한 의존성 추가
-    - 근거:
+    - Current: 네이티브 map/filter 체이닝
+    - Suggestion: Lodash chain 사용
+    - Assessment: Unnecessary dependency 추가
+    - Rationale:
       * 네이티브 메서드로 충분히 명확
       * 번들 사이즈 증가 (수십 KB)
       * 팀원 모두 네이티브 메서드에 익숙
-    - 권장: ❌ 불필요
+    - recommended: ❌ Unnecessary
 
-16. `tests/user.test.ts:123` - 테스트 케이스 추가 제안
-    - 제안: 엣지 케이스 10개 추가
-    - 평가: 과도한 테스트, 실용성 낮음
-    - 근거:
+16. `tests/user.test.ts:123` - Add test cases 제안
+    - Suggestion: 엣지 케이스 10개 추가
+    - Assessment: 과도한 테스트, 실용성 낮음
+    - Rationale:
       * 제안된 케이스들이 실제 발생 가능성 극히 낮음
       * 테스트 유지보수 비용 증가
       * 핵심 시나리오는 이미 커버
-    - 권장: ❌ 불필요
+    - recommended: ❌ Unnecessary
 
 ---
 
-## 처리 방안 제안
+## processing 방안 제안
 
-**즉시 적용 권장:** CRITICAL 2건 + MAJOR 5건 + MINOR 적용권장 4건 = 11건
-**향후 고려:** MINOR 선택적용 9건
-**적용 안 함:** MINOR 불필요 3건
+**즉시 applied / apply recommended:** CRITICAL 2items + MAJOR 5items + MINOR applied / applyrecommended 4items = 11items
+**Consider in future:** MINOR 선택applied / apply 9items
+**applied / apply 안 함:** MINOR Unnecessary 3items
 
-어떻게 진행하시겠습니까?
-- [1] 권장사항 모두 적용 (11건) - 추천
-- [2] CRITICAL/MAJOR만 적용 (7건)
+How would you like to proceed?
+- [1] recommended사항 모두 applied / apply (11items) - 추천
+- [2] CRITICAL/MAJOR만 applied / apply (7items)
 - [3] 개별 선택 (원하는 항목만 선택)
-- [4] 선택 적용 항목도 함께 검토
+- [4] 선택 applied / apply 항목도 함께 review
 - [5] 전체 중단
 
 > [사용자 선택 대기]
@@ -372,14 +396,14 @@ const user = await db.query(
 > 3
 
 개별 선택 모드로 진행하겠습니다.
-먼저 CRITICAL/MAJOR부터 확인합니다. (강력 권장)
+먼저 CRITICAL/MAJOR부터 확인합니다. (강력 recommended)
 
-[CRITICAL/MAJOR 7건 개별 확인... 위의 2.2 과정]
+[CRITICAL/MAJOR 7items 개별 확인... 위의 2.2 과정]
 
-이제 MINOR 적용 권장 항목을 확인하시겠습니까? [Y/n]
+이제 MINOR applied / apply recommended 항목을 확인하시겠습니까? [Y/n]
 > Y
 
-[권장 1/4] `utils/format.ts:34` - 변수명 명확화
+[recommended 1/4] `utils/format.ts:34` - 변수명 명확화
 
 현재 코드:
 ```typescript
@@ -403,55 +427,55 @@ function formatUser(raw: any) {
 }
 ```
 
-**분석:**
+**analysis / analyzing:**
 - ✅ 가독성 향상 확실
 - ✅ 영향 범위 최소 (5줄)
 - ✅ 부작용 없음
 - ✅ 다른 data 변수와 구분 명확
 
-적용하시겠습니까? [Y/n/skip/detail]
+applied / apply하시겠습니까? [Y/n/skip/detail]
 > Y
 
-✅ 적용 목록에 추가
+✅ applied / apply 목록에 추가
 
-[권장 2/4] `api/response.ts:67` - 에러 핸들링 개선
+[recommended 2/4] `api/response.ts:67` - Error handling improvement
 [...]
 ```
 
 **Step 2.5 - Final Confirmation:**
 
 ```
-## 최종 처리 요약
+## 최종 processing 요약
 
-✅ 적용 예정: 11건
-- CRITICAL: 2건
+✅ applied / apply 예정: 11items
+- CRITICAL: 2items
   * auth/login.ts:45 - SQL Injection 수정
   * data/sync.ts:89 - 트랜잭션 추가
-- MAJOR: 5건
+- MAJOR: 5items
   * api/users.ts:123 - N+1 쿼리 해결
   * cache/redis.ts:56 - 메모리 누수 수정
-  * [...3건 더]
-- MINOR (적용 권장): 4건
+  * [...3items 더]
+- MINOR (applied / apply recommended): 4items
   * utils/format.ts:34 - 변수명 명확화
   * api/response.ts:67 - 에러 로깅 추가
   * models/user.ts:123 - 타입 가드 사용
-  * services/notification.ts:45 - 매직 넘버 상수화
+  * services/notification.ts:45 - Extract magic number to constant
 
-🔄 건너뜀 - 향후 고려: 9건
+🔄 skipped - Consider in future: 9items
 - components/Button.tsx:89 - 함수 분리 (현재 복잡도 적정)
 - hooks/useAuth.ts:34 - 커스텀 훅 (반복 3회, 4회부터 고려)
-- [...7건 더]
+- [...7items 더]
 
-❌ 건너뜀 - 불필요: 3건
-- config/db.ts:12 - 과도한 주석 (코드가 자명)
-- utils/array.ts:56 - 불필요한 의존성 추가
+❌ skipped - Unnecessary: 3items
+- config/db.ts:12 - Excessive comments (코드가 자명)
+- utils/array.ts:56 - Unnecessary dependency 추가
 - tests/user.test.ts:123 - 과도한 엣지 케이스
 
 ---
 
-이대로 진행하시겠습니까?
-- [1] 예, 진행 (11건 적용)
-- [2] 검토 내용 수정 (추가/제거)
+Proceed as planned?
+- [1] 예, 진행 (11items applied / apply)
+- [2] review 내용 수정 (추가/제거)
 - [3] 전체 중단
 
 > [사용자 선택 대기]
@@ -462,31 +486,31 @@ function formatUser(raw: any) {
 **Step 3.1 - Apply Changes:**
 
 ```
-변경사항을 적용하겠습니다.
+changes을 applied / apply하겠습니다.
 
 [1/11] CRITICAL: auth/login.ts:45 - SQL Injection 수정
-✅ 완료
+✅ complete / completed
 
 [2/11] CRITICAL: data/sync.ts:89 - 트랜잭션 추가
-✅ 완료
+✅ complete / completed
 
 [3/11] MAJOR: api/users.ts:123 - N+1 쿼리 해결
-✅ 완료
+✅ complete / completed
 
 [...]
 
 [11/11] MINOR: services/notification.ts:45 - 상수화
-✅ 완료
+✅ complete / completed
 
-✅ 모든 변경사항 적용 완료 (11/11)
+✅ 모든 changes applied / apply complete / completed (11/11)
 ```
 
 **Step 3.2 - Commit & Push:**
 
 ```
-변경사항을 커밋하고 푸시합니다.
+changes을 commit하고 push합니다.
 
-커밋 메시지: "fix: Apply CodeRabbit feedback
+commit 메시지: "fix: Apply CodeRabbit feedback
 
 - CRITICAL: SQL injection, transaction safety
 - MAJOR: N+1 queries, memory leaks, resource handling
@@ -503,68 +527,68 @@ Applied 11 items (2 critical, 5 major, 4 minor recommended)"
 [실행] git push
 ✅ Pushed to origin/coderabbit-review-skill
 
-모든 변경사항이 커밋되고 푸시되었습니다.
+모든 changes이 commit되고 push되었습니다.
 ```
 
 **Step 3.3 - Generate & Review PR Comment:**
 
 ```
-PR에 게시할 코멘트를 작성했습니다.
+PR에 post할 코멘트를 작성했습니다.
 
 ---
 @coderabbitai resolve
 
-## CodeRabbit 피드백 처리 완료
+## CodeRabbit 피드백 processing complete / completed
 
-### 적용 완료 (11건)
+### applied / apply complete / completed (11items)
 
-**CRITICAL (2건)**
-- `auth/login.ts:45` - SQL Injection 취약점 수정 (Prepared statement 적용)
+**CRITICAL (2items)**
+- `auth/login.ts:45` - SQL Injection 취약점 수정 (Prepared statement applied / apply)
 - `data/sync.ts:89` - 트랜잭션 추가로 데이터 손실 위험 제거
 
-**MAJOR (5건)**
+**MAJOR (5items)**
 - `api/users.ts:123` - N+1 쿼리 해결 (eager loading으로 101→1 쿼리 감소)
 - `cache/redis.ts:56` - 메모리 누수 수정 (finally 블록 추가)
 - `services/payment.ts:234` - 결제 실패 시 롤백 로직 추가
 - `api/search.ts:89` - 인덱스 누락 경고 해결 (복합 인덱스 추가)
 - `workers/job.ts:156` - 무한 루프 위험 제거 (최대 재시도 횟수 설정)
 
-**MINOR - 적용 권장 (4건)**
+**MINOR - applied / apply recommended (4items)**
 - `utils/format.ts:34` - 변수명 명확화 (data → formattedUserData)
 - `api/response.ts:67` - 에러 로깅 추가
 - `models/user.ts:123` - 타입 가드 사용으로 안정성 향상
-- `services/notification.ts:45` - 매직 넘버 상수화
+- `services/notification.ts:45` - Extract magic number to constant
 
-### 검토 완료 - 적용 안 함 (12건)
+### review complete / completed - applied / apply 안 함 (12items)
 
-**향후 고려 항목 (9건)**
-- `components/Button.tsx:89` - 함수 분리 제안 (현재 복잡도 적정)
-- `hooks/useAuth.ts:34` - 커스텀 훅 추출 (반복 3회, 4회부터 고려)
-- `api/middleware.ts:78` - 에러 메시지 상세화 (보안 정책 검토 필요)
+**Consider in future 항목 (9items)**
+- `components/Button.tsx:89` - Function extraction suggestion (현재 복잡도 적정)
+- `hooks/useAuth.ts:34` - Extract custom hook (반복 3회, 4회부터 고려)
+- `api/middleware.ts:78` - Detailed error messages (보안 정책 review 필요)
 - `utils/validator.ts:45` - 정규식 성능 최적화 (현재 사용량에서 영향 미미)
-- `components/Modal.tsx:123` - 접근성 속성 추가 (다음 스프린트 일괄 적용 예정)
+- `components/Modal.tsx:123` - 접근성 속성 추가 (다음 스프린트 일괄 applied / apply 예정)
 - `services/cache.ts:67` - 캐시 무효화 전략 개선 (아키텍처 논의 후 결정)
 - `api/pagination.ts:34` - 커서 기반 페이지네이션 (현재 offset 방식 충분)
 - `tests/integration/api.test.ts:89` - 테스트 격리 개선 (리팩토링 시 함께 진행)
 - `docs/api.md:12` - API 문서 업데이트 (다음 릴리스 전 일괄 작업)
 
-**불필요 (3건)**
-- `config/db.ts:12` - 과도한 주석 추가 (코드가 충분히 자명함)
-- `utils/array.ts:56` - Lodash 사용 제안 (불필요한 의존성, 네이티브로 충분)
+**Unnecessary (3items)**
+- `config/db.ts:12` - Excessive comments 추가 (코드가 충분히 자명함)
+- `utils/array.ts:56` - Lodash 사용 제안 (Unnecessary dependency, 네이티브로 충분)
 - `tests/user.test.ts:123` - 극단적 엣지 케이스 테스트 (실용성 낮음)
 
-### 통계
-- 총 23건 검토
-- 적용: 11건 (CRITICAL 2 + MAJOR 5 + MINOR 4)
-- 향후 고려: 9건
-- 불필요: 3건
+### Statistics
+- Total 23items review
+- applied / apply: 11items (CRITICAL 2 + MAJOR 5 + MINOR 4)
+- Consider in future: 9items
+- Unnecessary: 3items
 
 ---
 
-이 코멘트를 PR에 게시하시겠습니까?
-- [1] 예, 게시
+이 코멘트를 PR에 post하시겠습니까?
+- [1] 예, post
 - [2] 내용 수정
-- [3] 게시 안 함 (권장하지 않음)
+- [3] post 안 함 (recommended하지 않음)
 
 > [사용자 선택 대기]
 ```
@@ -575,15 +599,15 @@ PR에 게시할 코멘트를 작성했습니다.
 > 2
 
 코멘트를 어떻게 수정하시겠습니까?
-- [1] 적용 항목 설명 추가/수정
-- [2] 건너뛴 항목 설명 추가/수정
+- [1] applied / apply 항목 설명 추가/수정
+- [2] items너뛴 항목 설명 추가/수정
 - [3] 직접 편집 (전체 텍스트)
-- [4] 취소하고 그대로 게시
+- [4] 취소하고 그대로 post
 
 > 1
 
-적용 항목 중 수정할 항목의 번호나 파일명을 입력하세요:
-(예: "1", "auth/login.ts:45", 또는 "done"으로 완료)
+applied / apply 항목 중 수정할 항목의 번호나 파일명을 입력하세요:
+(예: "1", "auth/login.ts:45", 또는 "done"으로 complete / completed)
 
 > api/users.ts:123
 
@@ -593,7 +617,7 @@ PR에 게시할 코멘트를 작성했습니다.
 새 설명을 입력하세요: (빈 줄 입력 시 현재 유지)
 > N+1 쿼리 해결 (includes를 사용한 eager loading으로 성능 개선)
 
-✅ 업데이트 완료
+✅ 업데이트 complete / completed
 
 다음 항목? (번호/파일명 또는 "done")
 > done
@@ -603,17 +627,17 @@ PR에 게시할 코멘트를 작성했습니다.
 
 [수정된 코멘트 전체 다시 표시]
 
-게시하시겠습니까? [Y/n/edit]
+post하시겠습니까? [Y/n/edit]
 > Y
 ```
 
 **Step 3.5 - Post & Verify:**
 
 ```
-PR 코멘트를 게시하고 검증합니다.
+PR 코멘트를 post하고 검증합니다.
 
 [실행] gh pr comment 123 --body "..."
-✅ 코멘트 게시 성공
+✅ 코멘트 post 성공
 
 [대기] GitHub API 동기화 중... (2초)
 
@@ -628,20 +652,20 @@ PR 코멘트를 게시하고 검증합니다.
 
 ---
 
-✅ 모든 단계 완료! 🎉
+✅ 모든 단계 complete / completed! 🎉
 
 ## 최종 요약
-- ✅ 11건 코드 변경 적용
-- ✅ 변경사항 커밋 및 푸시 (a1b2c3d)
-- ✅ PR 코멘트 게시 및 검증
-- ✅ CodeRabbit 해결 마킹 완료
+- ✅ 11items 코드 변경 applied / apply
+- ✅ changes commit 및 push (a1b2c3d)
+- ✅ PR 코멘트 post 및 검증
+- ✅ CodeRabbit 해결 마킹 complete / completed
 
-처리 내용:
-- CRITICAL: 2건 (보안 취약점, 데이터 손실 위험 해결)
-- MAJOR: 5건 (성능 및 중요 버그 수정)
-- MINOR: 4건 (코드 품질 개선)
+processing 내용:
+- CRITICAL: 2items (보안 취약점, 데이터 손실 위험 해결)
+- MAJOR: 5items (성능 및 중요 버그 수정)
+- MINOR: 4items (코드 품질 개선)
 
-향후 고려 항목 9건은 적절한 시점에 검토하시면 됩니다.
+Consider in future 항목 9items은 적절한 시점에 review하시면 됩니다.
 ```
 
 ## The Iron Law: PR Comment is MANDATORY
@@ -660,7 +684,7 @@ PR 코멘트를 게시하고 검증합니다.
    gh pr comment "$PR_NUMBER" --body "$(cat <<'COMMENT_EOF'
    @coderabbitai resolve
 
-   ## CodeRabbit 피드백 처리 완료
+   ## CodeRabbit 피드백 processing complete / completed
    [내용...]
    COMMENT_EOF
    )"
