@@ -36,14 +36,14 @@ Automates git workflows for commit, push, and PR creation with context-aware mes
 - Use descriptive, concrete names
 
 **Helper Scripts:**
-- Common git operations available in `scripts/git-helpers.sh`
+- Common git operations available in `git-helpers.sh`
 - Use `source` to load helpers when needed
 
 ## Quick Reference
 
 ```bash
 # Load helper functions
-source $SKILL_DIR/scripts/git-helpers.sh
+source $SKILL_DIR/git-helpers.sh
 
 # Check status
 has_uncommitted_changes  # returns 0 if true

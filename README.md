@@ -130,27 +130,38 @@ Use namespaced commands directly:
 ## Project Structure
 
 ```
-skill-set/
-├── .claude-plugin/
-│   ├── plugin.json              # Plugin metadata
-│   └── marketplace.json         # Marketplace registration
-├── .mcp.json                    # MCP server definitions
-├── commands/                    # Namespaced slash commands
-│   ├── git/                     # Git workflow commands
-│   ├── coderabbit/              # CodeRabbit commands
-│   └── consulting/              # Peer review commands
-├── skills/                      # All skills
-│   ├── managing-git-workflow/
-│   ├── understanding-code-context/
-│   ├── browser-automation/
-│   ├── consulting-peer-llms/
-│   └── using-skill-set/
-├── agents/                      # Isolated subagents
-│   └── coderabbit-feedback.md
-├── hooks/                       # Event handlers
-│   └── hooks.json
-├── scripts/                     # Utility scripts
-└── docs/                        # Documentation
+plugins/
+└── skill-set/                   # Unified plugin
+    ├── .claude-plugin/
+    │   ├── plugin.json          # Plugin metadata
+    │   └── marketplace.json     # Marketplace registration
+    ├── .mcp.json                # MCP server definitions
+    ├── commands/                # Namespaced slash commands
+    │   ├── git/                 # Git workflow commands
+    │   ├── coderabbit/          # CodeRabbit commands
+    │   └── consulting/          # Peer review commands
+    ├── skills/                  # All skills with integrated scripts
+    │   ├── managing-git-workflow/
+    │   │   ├── SKILL.md
+    │   │   ├── git-helpers.sh   # Utility script
+    │   │   └── reference/
+    │   ├── understanding-code-context/
+    │   │   ├── SKILL.md
+    │   │   └── reference/
+    │   ├── browser-automation/
+    │   │   ├── SKILL.md
+    │   │   ├── reference/
+    │   │   └── templates/       # 16 Playwright scripts
+    │   ├── consulting-peer-llms/
+    │   │   ├── SKILL.md
+    │   │   └── reference/
+    │   └── using-skill-set/
+    │       ├── SKILL.md
+    │       └── session-start.sh # Session hook script
+    ├── agents/                  # Isolated subagents
+    │   └── coderabbit-feedback.md
+    └── hooks/                   # Event handlers
+        └── hooks.json
 ```
 
 ## Design Philosophy

@@ -5,7 +5,7 @@ All notable changes to the skill-set plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0] - 2025-11-11
+## [1.0.0] - 2025-11-11
 
 ### Changed
 
@@ -51,8 +51,6 @@ Users upgrading from v1.x should:
 3. All command paths remain the same, but are now organized under namespaced directories
 4. Skills are now loaded from `skills/{skill-name}/` instead of plugin root
 
-## [1.0.0] - 2025-01-10
-
 ### Added
 
 - Initial release with 6 independent plugins:
@@ -63,5 +61,4 @@ Users upgrading from v1.x should:
   - `using-skill-set`: Session initialization
   - `coderabbit-feedback`: CodeRabbit review processing
 
-[2.0.0]: https://github.com/ether-moon/skill-set/releases/tag/v2.0.0
 [1.0.0]: https://github.com/ether-moon/skill-set/releases/tag/v1.0.0
