@@ -1,6 +1,6 @@
 # skill-set
 
-Unified productivity plugin for Claude Code providing comprehensive development tools and automated workflows. Version 2.0 consolidates all features into a single, easy-to-install plugin.
+Unified productivity plugin for Claude Code providing comprehensive development tools and automated workflows.
 
 ## Installation
 
@@ -11,14 +11,6 @@ Add this plugin to Claude Code:
 ```
 
 That's it! All features are now available in a single unified plugin.
-
-## What's New in v2.0
-
-**Major architectural change**: All previously separate plugins are now unified into a single `skill-set` plugin.
-
-**Migration from v1.x**: If you previously installed individual plugins (using-skill-set, browser-automation, etc.), you can now uninstall them and install the unified plugin instead.
-
-See [CHANGELOG.md](CHANGELOG.md) for detailed migration notes.
 
 ## Features
 

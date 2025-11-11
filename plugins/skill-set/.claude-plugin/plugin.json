@@ -9,6 +9,8 @@
   "commands": [
     "./commands/"
   ],
-  "agents": "./agents/",
+  "agents": [
+    "./agents/coderabbit-feedback.md"
+  ],
   "hooks": "./hooks/hooks.json"
 }
