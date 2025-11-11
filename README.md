@@ -41,14 +41,24 @@ Automates browser interactions using Playwright CLI and templates for screenshot
 - 19 pre-built templates
 
 ### consulting-peer-llms
-Execute peer reviews from other LLM tools (Gemini, Codex) in parallel and synthesize actionable insights.
+Execute peer reviews from other LLM tools (Gemini, Codex, Claude) in parallel and synthesize actionable insights.
 
 **Use when**: User explicitly requests review from other LLMs (e.g., "validate with codex", "get feedback from gemini").
 
+**Usage**:
+```bash
+# Auto-detect and use all installed CLIs
+/consulting-peer-llms:review
+
+# Use specific CLIs
+/consulting-peer-llms:review gemini codex
+```
+
 **Features**:
+- Dynamic CLI selection
 - Parallel LLM execution
 - Synthesized reports
-- Context-aware prompts
+- Auto-detection of installed tools
 
 ### managing-git-workflow
 Automates git commits, push, and PR creation with context-aware messages and ticket extraction.
