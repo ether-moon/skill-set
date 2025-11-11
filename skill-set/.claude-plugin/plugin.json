@@ -9,6 +9,9 @@
   "commands": [
     "./commands/"
   ],
+  "agents": [
+    "./agents/coderabbit-feedback.md"
+  ],
   "mcpServers": {
     "linear": {
       "command": "npx",

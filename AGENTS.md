@@ -4,38 +4,44 @@
 
 **skill-set** is a collection of productivity skills and development tools for Claude Code. The plugin provides automated workflows for common development tasks.
 
-### Current Skills
+### Current Tools
 
+#### Skills
 1. **managing-git-workflow**: Automates git operations (commit, push, PR) with context-aware message generation in the project's language and automatic ticket extraction from branch names
 2. **understanding-code-context**: Efficient code exploration using LSP symbolic tools (Serena) and official documentation (Context7) instead of text search
 3. **browser-automation**: Pre-built Playwright templates (19 scripts) for browser automation tasks without MCP server overhead
-4. **coderabbit-feedback**: Interactive CodeRabbit review processing with severity-based classification, user discussion, and verified completion workflow
+
+#### Agents
+1. **coderabbit-feedback**: Interactive CodeRabbit review processing with severity-based classification, user discussion, and verified completion workflow. Runs as isolated subagent for better context management.
 
 ### Project Structure
 
 ```
 skill-set/
-├── commands/           # Slash commands (/skill-set:commit, /skill-set:push, /skill-set:pr)
+├── commands/           # Slash commands (/skill-set:commit, /skill-set:push, /skill-set:pr, /skill-set:coderabbit-feedback)
 │   ├── commit.md
 │   ├── push.md
-│   └── pr.md
-└── skills/
-    ├── managing-git-workflow/
-    │   ├── SKILL.md
-    │   └── reference/
-    │       ├── commit.md
-    │       ├── push.md
-    │       └── pr.md
-    ├── understanding-code-context/
-    │   ├── SKILL.md
-    │   └── reference/
-    │       ├── tools.md
-    │       ├── workflows.md
-    │       └── anti-patterns.md
-    └── browser-automation/
-        ├── SKILL.md
-        └── templates/
-            └── README.md
+│   ├── pr.md
+│   └── coderabbit-feedback.md
+├── skills/
+│   ├── managing-git-workflow/
+│   │   ├── SKILL.md
+│   │   └── reference/
+│   │       ├── commit.md
+│   │       ├── push.md
+│   │       └── pr.md
+│   ├── understanding-code-context/
+│   │   ├── SKILL.md
+│   │   └── reference/
+│   │       ├── tools.md
+│   │       ├── workflows.md
+│   │       └── anti-patterns.md
+│   └── browser-automation/
+│       ├── SKILL.md
+│       └── templates/
+│           └── README.md
+└── agents/             # Isolated subagents for complex workflows
+    └── coderabbit-feedback.md
 ```
 
 ### Design Patterns Used
