@@ -1,0 +1,9 @@
+{
+  "name": "browser-automation",
+  "description": "Automates browser interactions using Playwright CLI and templates for screenshots, PDFs, form filling, and monitoring.",
+  "version": "1.0.0",
+  "author": {
+    "name": "ether-moon"
+  },
+  "license": "MIT"
+}

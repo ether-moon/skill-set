@@ -1,6 +1,6 @@
 {
-  "name": "skill-set",
-  "description": "Collection of productivity skills and development tools for enhanced workflow automation.",
+  "name": "coderabbit-feedback",
+  "description": "Interactive CodeRabbit review processing with severity classification and verified completion workflow.",
   "version": "1.0.0",
   "author": {
     "name": "ether-moon"

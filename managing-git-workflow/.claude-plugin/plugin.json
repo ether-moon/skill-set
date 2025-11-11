@@ -1,0 +1,12 @@
+{
+  "name": "managing-git-workflow",
+  "description": "Automates git commits, push, and PR creation with context-aware messages and ticket extraction.",
+  "version": "1.0.0",
+  "author": {
+    "name": "ether-moon"
+  },
+  "license": "MIT",
+  "commands": [
+    "./commands/"
+  ]
+}
