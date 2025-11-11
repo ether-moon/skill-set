@@ -2,7 +2,7 @@
 
 ## Project Context
 
-**skill-set** is a collection of productivity skills and development tools for Claude Code. The plugin provides automated workflows for common development tasks.
+**skill-set** is a unified productivity plugin for Claude Code providing comprehensive development tools and automated workflows. All features are now integrated into a single plugin for simplified installation and management.
 
 ### Current Tools
 
@@ -10,6 +10,8 @@
 1. **managing-git-workflow**: Automates git operations (commit, push, PR) with context-aware message generation in the project's language and automatic ticket extraction from branch names
 2. **understanding-code-context**: Efficient code exploration using LSP symbolic tools (Serena) and official documentation (Context7) instead of text search
 3. **browser-automation**: Pre-built Playwright templates (19 scripts) for browser automation tasks without MCP server overhead
+4. **consulting-peer-llms**: Execute peer reviews from other LLM tools (Gemini, Codex, Claude) in parallel and synthesize actionable insights
+5. **using-skill-set**: Establishes mandatory workflows for finding and using skill-set features at session start
 
 #### Agents
 1. **coderabbit-feedback**: Interactive CodeRabbit review processing with severity-based classification, user discussion, and verified completion workflow. Runs as isolated subagent for better context management.
@@ -17,13 +19,21 @@
 ### Project Structure
 
 ```
-skill-set/
-├── commands/           # Slash commands (/skill-set:commit, /skill-set:push, /skill-set:pr, /skill-set:coderabbit-feedback)
-│   ├── commit.md
-│   ├── push.md
-│   ├── pr.md
-│   └── coderabbit-feedback.md
-├── skills/
+skill-set/                          # Unified plugin
+├── .claude-plugin/
+│   ├── plugin.json                # Plugin metadata
+│   └── marketplace.json           # Marketplace registration
+├── .mcp.json                      # MCP server definitions
+├── commands/                      # Namespaced slash commands
+│   ├── git/
+│   │   ├── commit.md             # /skill-set:git:commit
+│   │   ├── push.md               # /skill-set:git:push
+│   │   └── pr.md                 # /skill-set:git:pr
+│   ├── coderabbit/
+│   │   └── fix.md                # /skill-set:coderabbit:fix
+│   └── consulting/
+│       └── review.md             # /skill-set:consulting:review
+├── skills/                        # All skills in one location
 │   ├── managing-git-workflow/
 │   │   ├── SKILL.md
 │   │   └── reference/
@@ -36,12 +46,28 @@ skill-set/
 │   │       ├── tools.md
 │   │       ├── workflows.md
 │   │       └── anti-patterns.md
-│   └── browser-automation/
-│       ├── SKILL.md
-│       └── templates/
-│           └── README.md
-└── agents/             # Isolated subagents for complex workflows
-    └── coderabbit-feedback.md
+│   ├── browser-automation/
+│   │   ├── SKILL.md
+│   │   ├── reference/
+│   │   │   └── TEMPLATES.md
+│   │   └── templates/            # 19 Playwright scripts
+│   ├── consulting-peer-llms/
+│   │   ├── SKILL.md
+│   │   └── reference/
+│   │       ├── cli-commands.md
+│   │       ├── prompt-template.md
+│   │       └── report-format.md
+│   └── using-skill-set/
+│       └── SKILL.md
+├── agents/                        # Isolated subagents
+│   └── coderabbit-feedback.md
+├── hooks/                         # Event handlers
+│   └── hooks.json                # SessionStart hook
+├── scripts/                       # Utility scripts
+│   ├── session-start.sh
+│   └── git-helpers.sh
+└── docs/                          # Documentation
+    └── plans/
 ```
 
 ### Design Patterns Used
@@ -51,6 +77,7 @@ skill-set/
 - **Context-aware**: Skills adapt to project language/conventions (e.g., Korean commit messages)
 - **Token efficiency**: Symbolic tools over text search, targeted reads over full file scans
 - **Language-agnostic templates**: Code examples in English with language detection for user-facing content
+- **Namespaced commands**: Prevents command collisions with organized directory structure
 
 ---
 

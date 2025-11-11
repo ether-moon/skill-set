@@ -1,142 +1,184 @@
 # skill-set
 
-Collection of independent productivity plugins for Claude Code. Each plugin can be installed separately based on your needs.
+Unified productivity plugin for Claude Code providing comprehensive development tools and automated workflows. Version 2.0 consolidates all features into a single, easy-to-install plugin.
 
 ## Installation
 
-Add this plugin marketplace to Claude Code:
+Add this plugin to Claude Code:
 
 ```bash
-/plugin marketplace add ether-moon/skill-set
+/plugin install skill-set
 ```
 
-### Core Plugin (Required)
+That's it! All features are now available in a single unified plugin.
 
-**Install `using-skill-set` first** - This plugin ensures Claude agents recognize and properly use all installed skill-set plugins:
+## What's New in v2.0
 
-```bash
-/plugin install using-skill-set
-```
+**Major architectural change**: All previously separate plugins are now unified into a single `skill-set` plugin.
 
-This core plugin:
-- Automatically detects installed skill-set plugins at session start
-- Ensures agents check for relevant plugins before any task
-- Prevents workflow bypassing and maintains consistency
+**Migration from v1.x**: If you previously installed individual plugins (using-skill-set, browser-automation, etc.), you can now uninstall them and install the unified plugin instead.
 
-Without this plugin, other skill-set plugins may not be recognized or used appropriately by the agent.
+See [CHANGELOG.md](CHANGELOG.md) for detailed migration notes.
 
-### Feature Plugins
+## Features
 
-Then install the plugins you need:
-
-```bash
-/plugin install browser-automation
-/plugin install consulting-peer-llms
-/plugin install managing-git-workflow
-/plugin install understanding-code-context
-/plugin install coderabbit-feedback
-```
-
-Or install all at once:
-
-```bash
-/plugin install using-skill-set browser-automation consulting-peer-llms managing-git-workflow understanding-code-context coderabbit-feedback
-```
-
-## Available Plugins
-
-### using-skill-set (Core)
-**Required** - Establishes mandatory workflows for finding and using skill-set plugins at session start.
-
-**Use when**: Automatically activated on every session start (startup, resume, clear, compact).
-
-**Features**:
-- Auto-detects installed skill-set plugins from `~/.claude/plugins/`
-- Enforces mandatory protocol to check for relevant plugins before tasks
-- Provides plugin descriptions and use case guidelines
-- Prevents rationalization and workflow bypassing
-
-This is the foundation plugin that makes all other skill-set plugins work effectively.
-
-### browser-automation
-Automates browser interactions using Playwright CLI and templates for screenshots, PDFs, form filling, and monitoring.
-
-**Use when**: Testing web pages, automating browser tasks, or when user mentions screenshots, web testing, form automation, or Playwright.
-
-**Features**:
-- Screenshot and PDF generation
-- Form filling and validation
-- Element interaction (click, hover, drag)
-- Console and network monitoring
-- 19 pre-built templates
-
-### consulting-peer-llms
-Execute peer reviews from other LLM tools (Gemini, Codex, Claude) in parallel and synthesize actionable insights.
-
-**Use when**: User explicitly requests review from other LLMs (e.g., "validate with codex", "get feedback from gemini").
-
-**Usage**:
-```bash
-# Auto-detect and use all installed CLIs
-/consulting-peer-llms:review
-
-# Use specific CLIs
-/consulting-peer-llms:review gemini codex
-```
-
-**Features**:
-- Dynamic CLI selection
-- Parallel LLM execution
-- Synthesized reports
-- Auto-detection of installed tools
-
-### managing-git-workflow
-Automates git commits, push, and PR creation with context-aware messages and ticket extraction.
-
+### Git Workflow Automation
 **Commands**:
-- `/managing-git-workflow:commit` - Create a git commit with context-aware messages
-- `/managing-git-workflow:push` - Push changes to remote (auto-commits if needed)
-- `/managing-git-workflow:pr` - Create a pull request (auto-push and commit if needed)
+- `/skill-set:git:commit` - Create context-aware git commits
+- `/skill-set:git:push` - Push changes to remote (auto-commits if needed)
+- `/skill-set:git:pr` - Create pull requests (auto-push and commit if needed)
 
-**Features**:
-- Language-aware commit messages
+**Capabilities**:
+- Language-aware commit messages (adapts to your project's language)
 - Automatic ticket number extraction from branch names
-- Context-aware PR descriptions
+- Context-aware PR descriptions with full change summaries
+- Git history analysis for consistent messaging
 
-### understanding-code-context
+### Code Context Understanding
 Efficient code exploration using LSP symbolic tools (Serena) and official documentation (Context7).
 
 **Use when**: Exploring codebases, finding implementations, understanding library usage, or tracing dependencies.
 
 **Features**:
-- Symbolic code navigation
-- Official documentation lookup
-- Efficient token usage
-- Memory-based learning
+- Symbolic code navigation (classes, methods, references)
+- Official documentation lookup via Context7
+- Token-efficient exploration (reads only what's needed)
+- Memory-based learning for recurring patterns
+- Anti-patterns guide to avoid common mistakes
 
-### coderabbit-feedback
+### Browser Automation
+Automates browser interactions using Playwright CLI with 19 pre-built templates.
+
+**Use when**: Testing web pages, automating browser tasks, capturing screenshots, generating PDFs, or filling forms.
+
+**Templates include**:
+- Screenshot and PDF generation
+- Form filling and validation
+- Element interaction (click, hover, drag, select)
+- Console and network monitoring
+- Dialog handling and file uploads
+- Navigation and wait conditions
+
+### Peer LLM Consulting
+Execute peer reviews from other LLM tools (Gemini, Codex, Claude) in parallel and synthesize actionable insights.
+
+**Command**:
+```bash
+# Auto-detect and use all installed CLIs
+/skill-set:consulting:review
+
+# Use specific CLIs
+/skill-set:consulting:review gemini codex
+```
+
+**Features**:
+- Dynamic CLI selection with auto-detection
+- Parallel LLM execution for faster feedback
+- Synthesized reports with actionable insights
+- Custom prompt templates for consistent reviews
+
+### CodeRabbit Feedback Processing
 Interactive CodeRabbit review processing with severity classification and verified completion workflow.
 
 **Command**:
-- `/coderabbit-feedback:coderabbit-feedback` - Process CodeRabbit review comments interactively
+```bash
+/skill-set:coderabbit:fix
+```
 
 **Features**:
-- Severity-based classification
-- Interactive issue discussion
-- Linear integration
-- Verified completion workflow
+- Automatic severity-based classification (CRITICAL, MAJOR, MINOR, OPTIONAL, IGNORE)
+- Interactive issue discussion before applying changes
+- Linear integration for issue tracking
+- Verified completion workflow with mandatory steps
+- Commit and PR comment generation
+
+### Session Initialization
+Automatically establishes workflows at session start to ensure proper skill usage.
+
+**Activates on**: Session startup, resume, clear, or compact
+
+**Features**:
+- Auto-detects available skills
+- Enforces skill usage protocols
+- Provides context-aware skill recommendations
+- Prevents workflow bypassing
 
 ## Usage
 
-Skills are automatically available after installing the respective plugin. Claude will use them when relevant to your task.
+Skills are automatically available after installing the plugin. Claude will use them when relevant to your task.
 
-You can explicitly invoke skills using:
+### Explicit Skill Invocation
+
+You can explicitly request skills:
 ```
-Use the [skill-name] skill to [task description]
+Use the managing-git-workflow skill to create a commit
+Use the understanding-code-context skill to explore this codebase
+Use the browser-automation skill to take a screenshot
 ```
 
-Or use the slash commands directly for workflows that support them.
+### Slash Commands
+
+Use namespaced commands directly:
+```bash
+/skill-set:git:commit
+/skill-set:git:push
+/skill-set:git:pr
+/skill-set:coderabbit:fix
+/skill-set:consulting:review
+```
+
+## Project Structure
+
+```
+skill-set/
+├── .claude-plugin/
+│   ├── plugin.json              # Plugin metadata
+│   └── marketplace.json         # Marketplace registration
+├── .mcp.json                    # MCP server definitions
+├── commands/                    # Namespaced slash commands
+│   ├── git/                     # Git workflow commands
+│   ├── coderabbit/              # CodeRabbit commands
+│   └── consulting/              # Peer review commands
+├── skills/                      # All skills
+│   ├── managing-git-workflow/
+│   ├── understanding-code-context/
+│   ├── browser-automation/
+│   ├── consulting-peer-llms/
+│   └── using-skill-set/
+├── agents/                      # Isolated subagents
+│   └── coderabbit-feedback.md
+├── hooks/                       # Event handlers
+│   └── hooks.json
+├── scripts/                     # Utility scripts
+└── docs/                        # Documentation
+```
+
+## Design Philosophy
+
+- **Progressive disclosure**: Core functionality in SKILL.md, details in reference files
+- **Context-aware**: Adapts to your project's language and conventions
+- **Token efficient**: Reads only necessary code using symbolic tools
+- **Namespaced**: Commands organized to prevent collisions
+- **Unified**: Single installation, consistent experience
+
+## Requirements
+
+- Claude Code (latest version recommended)
+- Git (for git workflow features)
+- Playwright CLI (for browser automation features, optional)
+- Peer LLM CLIs (for consulting features, optional):
+  - `gemini-cli` for Gemini
+  - `codex` for Codex
+  - Additional CLIs detected automatically
+
+## Contributing
+
+Contributions welcome! Please see [AGENTS.md](AGENTS.md) for development guidelines and best practices.
 
 ## License
 
 MIT
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for version history and migration guides.
