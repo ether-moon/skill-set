@@ -10,7 +10,24 @@ Add this plugin marketplace to Claude Code:
 /plugin marketplace add ether-moon/skill-set
 ```
 
-Then install individual plugins:
+### Core Plugin (Required)
+
+**Install `using-skill-set` first** - This plugin ensures Claude agents recognize and properly use all installed skill-set plugins:
+
+```bash
+/plugin install using-skill-set
+```
+
+This core plugin:
+- Automatically detects installed skill-set plugins at session start
+- Ensures agents check for relevant plugins before any task
+- Prevents workflow bypassing and maintains consistency
+
+Without this plugin, other skill-set plugins may not be recognized or used appropriately by the agent.
+
+### Feature Plugins
+
+Then install the plugins you need:
 
 ```bash
 /plugin install browser-automation
@@ -20,13 +37,26 @@ Then install individual plugins:
 /plugin install coderabbit-feedback
 ```
 
-Or install all plugins at once:
+Or install all at once:
 
 ```bash
-/plugin install browser-automation consulting-peer-llms managing-git-workflow understanding-code-context coderabbit-feedback
+/plugin install using-skill-set browser-automation consulting-peer-llms managing-git-workflow understanding-code-context coderabbit-feedback
 ```
 
 ## Available Plugins
+
+### using-skill-set (Core)
+**Required** - Establishes mandatory workflows for finding and using skill-set plugins at session start.
+
+**Use when**: Automatically activated on every session start (startup, resume, clear, compact).
+
+**Features**:
+- Auto-detects installed skill-set plugins from `~/.claude/plugins/`
+- Enforces mandatory protocol to check for relevant plugins before tasks
+- Provides plugin descriptions and use case guidelines
+- Prevents rationalization and workflow bypassing
+
+This is the foundation plugin that makes all other skill-set plugins work effectively.
 
 ### browser-automation
 Automates browser interactions using Playwright CLI and templates for screenshots, PDFs, form filling, and monitoring.
