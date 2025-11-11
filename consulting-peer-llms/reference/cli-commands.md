@@ -1,10 +1,10 @@
 # CLI Commands Reference
 
-Detailed information about executing Gemini and Codex CLI tools for peer review.
+Detailed information about executing peer LLM CLI tools for review. Supports dynamic CLI selection via command arguments.
 
-## Command Format
+## Supported CLIs
 
-Both CLIs accept prompts, but with different syntax:
+Each CLI has its own command syntax:
 
 ```bash
 # Gemini: positional argument (no subcommand needed)
@@ -12,11 +12,118 @@ gemini "your prompt text here"
 
 # Codex: requires exec subcommand
 codex exec "your prompt text here"
+
+# Claude: positional argument
+claude "your prompt text here"
+
+# Add more as needed
+```
+
+## Dynamic CLI Detection
+
+### Determine Target CLIs
+
+```bash
+# Parse command arguments
+REQUESTED_CLIS=("$@")
+
+if [ ${#REQUESTED_CLIS[@]} -eq 0 ]; then
+  # Auto-detect installed CLIs
+  AVAILABLE_CLIS=()
+  for cli in gemini codex claude; do
+    if command -v "$cli" &>/dev/null; then
+      AVAILABLE_CLIS+=("$cli")
+    fi
+  done
+
+  if [ ${#AVAILABLE_CLIS[@]} -eq 0 ]; then
+    echo "Error: No supported CLI tools found"
+    exit 1
+  fi
+
+  TARGET_CLIS=("${AVAILABLE_CLIS[@]}")
+else
+  # Use specified CLIs (validate they exist)
+  TARGET_CLIS=()
+  for cli in "${REQUESTED_CLIS[@]}"; do
+    if command -v "$cli" &>/dev/null; then
+      TARGET_CLIS+=("$cli")
+    else
+      echo "Warning: $cli not found, skipping"
+    fi
+  done
+
+  if [ ${#TARGET_CLIS[@]} -eq 0 ]; then
+    echo "Error: None of the requested CLIs are installed"
+    exit 1
+  fi
+fi
+
+echo "Using CLIs: ${TARGET_CLIS[*]}"
 ```
 
 ## Parallel Execution Pattern
 
-### Basic Pattern
+### Dynamic Parallel Execution
+
+```bash
+# Prepare result storage
+declare -A CLI_RESULTS
+declare -A CLI_PIDS
+declare -A CLI_FILES
+
+# Launch all target CLIs in parallel
+for cli in "${TARGET_CLIS[@]}"; do
+  OUTPUT_FILE="/tmp/${cli}-review.txt"
+  CLI_FILES[$cli]="$OUTPUT_FILE"
+
+  # Execute based on CLI type
+  case "$cli" in
+    gemini)
+      gemini "$PROMPT" > "$OUTPUT_FILE" 2>&1 &
+      ;;
+    codex)
+      codex exec "$PROMPT" > "$OUTPUT_FILE" 2>&1 &
+      ;;
+    claude)
+      claude "$PROMPT" > "$OUTPUT_FILE" 2>&1 &
+      ;;
+    *)
+      echo "Warning: Unknown CLI $cli, attempting generic execution"
+      "$cli" "$PROMPT" > "$OUTPUT_FILE" 2>&1 &
+      ;;
+  esac
+
+  CLI_PIDS[$cli]=$!
+done
+
+# Wait for all CLIs and collect results
+for cli in "${TARGET_CLIS[@]}"; do
+  wait ${CLI_PIDS[$cli]}
+  EXIT_CODE=$?
+  OUTPUT_FILE="${CLI_FILES[$cli]}"
+
+  if [ $EXIT_CODE -eq 0 ] && [ -s "$OUTPUT_FILE" ]; then
+    CLI_RESULTS[$cli]=$(cat "$OUTPUT_FILE")
+  else
+    CLI_RESULTS[$cli]="[${cli} CLI failed or returned empty response]"
+  fi
+done
+
+# Cleanup
+for cli in "${TARGET_CLIS[@]}"; do
+  rm -f "${CLI_FILES[$cli]}"
+done
+
+# Display results
+for cli in "${TARGET_CLIS[@]}"; do
+  echo "=== ${cli^} Review ==="
+  echo "${CLI_RESULTS[$cli]}"
+  echo ""
+done
+```
+
+### Legacy Static Pattern (for reference)
 
 ```bash
 # Execute both in background
@@ -464,7 +571,7 @@ export GEMINI_API_KEY="your-key"
 export CODEX_API_KEY="your-key"
 ```
 
-## Example: Complete Implementation
+## Example: Complete Dynamic Implementation
 
 ```bash
 #!/bin/bash
@@ -475,6 +582,43 @@ TIMEOUT=300s
 TEMP_DIR=$(mktemp -d)
 trap "rm -rf $TEMP_DIR" EXIT
 
+# Parse arguments to determine target CLIs
+REQUESTED_CLIS=("$@")
+
+if [ ${#REQUESTED_CLIS[@]} -eq 0 ]; then
+  # Auto-detect
+  TARGET_CLIS=()
+  for cli in gemini codex claude; do
+    if command -v "$cli" &>/dev/null; then
+      TARGET_CLIS+=("$cli")
+    fi
+  done
+
+  if [ ${#TARGET_CLIS[@]} -eq 0 ]; then
+    echo "Error: No supported CLI tools found"
+    exit 1
+  fi
+
+  echo "Auto-detected CLIs: ${TARGET_CLIS[*]}"
+else
+  # Use specified
+  TARGET_CLIS=()
+  for cli in "${REQUESTED_CLIS[@]}"; do
+    if command -v "$cli" &>/dev/null; then
+      TARGET_CLIS+=("$cli")
+    else
+      echo "Warning: $cli not found, skipping"
+    fi
+  done
+
+  if [ ${#TARGET_CLIS[@]} -eq 0 ]; then
+    echo "Error: None of requested CLIs are installed"
+    exit 1
+  fi
+
+  echo "Using specified CLIs: ${TARGET_CLIS[*]}"
+fi
+
 # Generate prompt
 PROMPT=$(cat <<'EOF'
 # Code Review Request
@@ -483,50 +627,78 @@ PROMPT=$(cat <<'EOF'
 EOF
 )
 
-# Execute with timeout and error handling
+# Execute all target CLIs in parallel
 echo "Executing peer LLM reviews in parallel..."
 
-timeout $TIMEOUT gemini "$PROMPT" > "$TEMP_DIR/gemini.txt" 2>&1 &
-GEMINI_PID=$!
+declare -A CLI_PIDS
+declare -A CLI_FILES
 
-timeout $TIMEOUT codex exec "$PROMPT" > "$TEMP_DIR/codex.txt" 2>&1 &
-CODEX_PID=$!
+for cli in "${TARGET_CLIS[@]}"; do
+  OUTPUT_FILE="$TEMP_DIR/${cli}.txt"
+  CLI_FILES[$cli]="$OUTPUT_FILE"
 
-# Wait and capture results
-wait $GEMINI_PID
-GEMINI_EXIT=$?
+  case "$cli" in
+    gemini)
+      timeout $TIMEOUT gemini "$PROMPT" > "$OUTPUT_FILE" 2>&1 &
+      ;;
+    codex)
+      timeout $TIMEOUT codex exec "$PROMPT" > "$OUTPUT_FILE" 2>&1 &
+      ;;
+    claude)
+      timeout $TIMEOUT claude "$PROMPT" > "$OUTPUT_FILE" 2>&1 &
+      ;;
+    *)
+      timeout $TIMEOUT "$cli" "$PROMPT" > "$OUTPUT_FILE" 2>&1 &
+      ;;
+  esac
 
-wait $CODEX_PID
-CODEX_EXIT=$?
+  CLI_PIDS[$cli]=$!
+done
 
-# Process results
-echo "=== Gemini Review ==="
-if [ $GEMINI_EXIT -eq 0 ] && [ -s "$TEMP_DIR/gemini.txt" ]; then
-    cat "$TEMP_DIR/gemini.txt"
-elif [ $GEMINI_EXIT -eq 124 ]; then
-    echo "[Gemini timed out after ${TIMEOUT}]"
-else
-    echo "[Gemini failed with exit code $GEMINI_EXIT]"
-fi
+# Wait and display results
+ALL_FAILED=true
 
-echo ""
-echo "=== Codex Review ==="
-if [ $CODEX_EXIT -eq 0 ] && [ -s "$TEMP_DIR/codex.txt" ]; then
-    cat "$TEMP_DIR/codex.txt"
-elif [ $CODEX_EXIT -eq 124 ]; then
-    echo "[Codex timed out after ${TIMEOUT}]"
-else
-    echo "[Codex failed with exit code $CODEX_EXIT]"
-fi
+for cli in "${TARGET_CLIS[@]}"; do
+  wait ${CLI_PIDS[$cli]}
+  EXIT_CODE=$?
+  OUTPUT_FILE="${CLI_FILES[$cli]}"
+
+  echo ""
+  echo "=== ${cli^} Review ==="
+
+  if [ $EXIT_CODE -eq 0 ] && [ -s "$OUTPUT_FILE" ]; then
+    cat "$OUTPUT_FILE"
+    ALL_FAILED=false
+  elif [ $EXIT_CODE -eq 124 ]; then
+    echo "[${cli} timed out after ${TIMEOUT}]"
+  else
+    echo "[${cli} failed with exit code $EXIT_CODE]"
+  fi
+done
 
 # Report overall status
-if [ $GEMINI_EXIT -ne 0 ] && [ $CODEX_EXIT -ne 0 ]; then
+if [ "$ALL_FAILED" = true ]; then
     echo ""
-    echo "ERROR: Both CLIs failed"
+    echo "ERROR: All CLIs failed"
     exit 1
 fi
 
 exit 0
+```
+
+**Usage examples:**
+```bash
+# Auto-detect all installed CLIs
+./review.sh
+
+# Use specific CLI
+./review.sh gemini
+
+# Use multiple CLIs
+./review.sh gemini codex
+
+# Use all three
+./review.sh gemini codex claude
 ```
 
 ## Integration with SKILL.md
