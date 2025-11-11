@@ -1,9 +1,9 @@
 ---
-name: reviewing-coderabbit-feedback
+name: coderabbit-feedback
 description: Use when CodeRabbit AI has posted review comments on a PR - interactively classify feedback by severity, discuss recommendations with user, apply agreed changes, and ensure mandatory commit and PR comment workflow with verification
 ---
 
-# Reviewing CodeRabbit Feedback
+# CodeRabbit Feedback
 
 ## Overview
 

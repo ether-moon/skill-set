@@ -9,6 +9,7 @@
 1. **managing-git-workflow**: Automates git operations (commit, push, PR) with context-aware message generation in the project's language and automatic ticket extraction from branch names
 2. **understanding-code-context**: Efficient code exploration using LSP symbolic tools (Serena) and official documentation (Context7) instead of text search
 3. **browser-automation**: Pre-built Playwright templates (19 scripts) for browser automation tasks without MCP server overhead
+4. **coderabbit-feedback**: Interactive CodeRabbit review processing with severity-based classification, user discussion, and verified completion workflow
 
 ### Project Structure
 
