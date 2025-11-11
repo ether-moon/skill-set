@@ -12,5 +12,7 @@
   "agents": [
     "./agents/coderabbit-feedback.md"
   ],
-  "hooks": "./hooks/hooks.json"
+  "hooks": [
+    "./hooks/hooks.json"
+  ]
 }
