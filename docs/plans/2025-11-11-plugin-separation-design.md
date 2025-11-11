@@ -178,17 +178,7 @@ coderabbit-feedback/
   ],
   "agents": [
     "./agents/coderabbit-feedback.md"
-  ],
-  "mcpServers": {
-    "linear": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "mcp-remote",
-        "https://mcp.linear.app/sse"
-      ]
-    }
-  }
+  ]
 }
 ```
 

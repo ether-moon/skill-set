@@ -5,34 +5,9 @@
   },
   "plugins": [
     {
-      "name": "using-skill-set",
-      "source": "./using-skill-set",
-      "description": "Establishes mandatory workflows for finding and using skill-set plugins at session start."
-    },
-    {
-      "name": "browser-automation",
-      "source": "./browser-automation",
-      "description": "Automates browser interactions using Playwright CLI and templates for screenshots, PDFs, form filling, and monitoring."
-    },
-    {
-      "name": "consulting-peer-llms",
-      "source": "./consulting-peer-llms",
-      "description": "Execute peer reviews from other LLM tools (Gemini, Codex) in parallel and synthesize actionable insights."
-    },
-    {
-      "name": "managing-git-workflow",
-      "source": "./managing-git-workflow",
-      "description": "Automates git commits, push, and PR creation with context-aware messages and ticket extraction."
-    },
-    {
-      "name": "understanding-code-context",
-      "source": "./understanding-code-context",
-      "description": "Efficient code exploration using LSP symbolic tools (Serena) and official documentation (Context7)."
-    },
-    {
-      "name": "coderabbit-feedback",
-      "source": "./coderabbit-feedback",
-      "description": "Interactive CodeRabbit review processing with severity classification and verified completion workflow."
+      "name": "skill-set",
+      "source": ".",
+      "description": "Comprehensive productivity skills and development tools for Claude Code, including git workflow automation, code context understanding, browser automation, peer LLM consulting, and CodeRabbit feedback processing."
     }
   ]
 }
