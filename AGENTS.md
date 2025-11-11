@@ -43,10 +43,78 @@ skill-set/
 - **Gerund naming**: All skills use verb+ing format (managing, understanding, browser-automation)
 - **Context-aware**: Skills adapt to project language/conventions (e.g., Korean commit messages)
 - **Token efficiency**: Symbolic tools over text search, targeted reads over full file scans
+- **Language-agnostic templates**: Code examples in English with language detection for user-facing content
 
 ---
 
 ## Skill Creation Guidance
+
+### Language Handling in Skills
+
+**IMPORTANT**: All skills must support multilingual usage with proper language detection.
+
+**Language Detection Priority:**
+1. **User's current messages** - Detect language from conversation context
+2. **Project documentation** - Check CLAUDE.md, README.md for language patterns
+3. **Git commit history** - Analyze recent commit messages (`git log --oneline -5`)
+4. **Default to English** - If no clear language indication
+
+**What to translate (use detected language):**
+- All conversational messages with user
+- Reports and summaries
+- PR comments and descriptions
+- Error messages and warnings
+- Status updates and prompts
+
+**What to keep in English (always):**
+- Code examples and snippets
+- Bash commands and scripts
+- File paths and directory names
+- Technical API calls and function names
+- Tool commands
+
+**Template Pattern:**
+```markdown
+## Example Interaction
+
+```
+[In user's language]
+
+Found 5 issues:
+- CRITICAL: 2 items
+- MAJOR: 3 items
+
+How would you like to proceed?
+- [1] Apply all changes
+- [2] Review individually
+```
+
+**Implementation Example:**
+```markdown
+## Language Detection
+
+**Detect user's language from conversation context:**
+- Check user's message language
+- Check project documentation language
+- Check recent git commit patterns
+- **Default to English if no clear indication**
+
+**Apply detected language to:**
+- All user-facing messages
+- Reports, comments, summaries
+- Error messages
+
+**Always keep in English:**
+- Code examples
+- Bash commands
+- File paths
+```
+
+**Why This Matters:**
+- Skills are used globally across different language contexts
+- User experience improves when communication matches their language
+- Code/technical content stays universal for consistency
+- Enables seamless collaboration in multilingual teams
 
 **Primary resource**: Use `superpowers:writing-skills` for the complete TDD-based skill creation methodology, including:
 - RED-GREEN-REFACTOR cycle for documentation
