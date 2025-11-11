@@ -5,6 +5,11 @@
   },
   "plugins": [
     {
+      "name": "using-skill-set",
+      "source": "./using-skill-set",
+      "description": "Establishes mandatory workflows for finding and using skill-set plugins at session start."
+    },
+    {
       "name": "browser-automation",
       "source": "./browser-automation",
       "description": "Automates browser interactions using Playwright CLI and templates for screenshots, PDFs, form filling, and monitoring."
