@@ -12,7 +12,7 @@ Push changes to remote repository, automatically committing if needed.
 ### 1. Check Current Status
 
 ```bash
-source .claude/skills/managing-git-workflow/scripts/git-helpers.sh
+source .claude/skills/managing-git-workflow/git-helpers.sh
 
 # Check for uncommitted changes and unpushed commits
 git status
@@ -103,7 +103,7 @@ git pull --rebase
 
 ```bash
 # Load helpers first
-source .claude/skills/managing-git-workflow/scripts/git-helpers.sh
+source .claude/skills/managing-git-workflow/git-helpers.sh
 
 # Available functions:
 has_uncommitted_changes  # Returns 0 if changes exist

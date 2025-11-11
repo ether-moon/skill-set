@@ -1,6 +1,6 @@
 #!/bin/bash
 # Git workflow helper functions
-# Source this file to use: source .claude/skills/managing-git-workflow/scripts/git-helpers.sh
+# Source this file to use: source .claude/skills/managing-git-workflow/git-helpers.sh
 
 # Check if in git repository
 # Returns: 0 if in repo, 1 if not

@@ -19,55 +19,53 @@
 ### Project Structure
 
 ```
-skill-set/                          # Unified plugin
-├── .claude-plugin/
-│   ├── plugin.json                # Plugin metadata
-│   └── marketplace.json           # Marketplace registration
-├── .mcp.json                      # MCP server definitions
-├── commands/                      # Namespaced slash commands
-│   ├── git/
-│   │   ├── commit.md             # /skill-set:git:commit
-│   │   ├── push.md               # /skill-set:git:push
-│   │   └── pr.md                 # /skill-set:git:pr
-│   ├── coderabbit/
-│   │   └── fix.md                # /skill-set:coderabbit:fix
-│   └── consulting/
-│       └── review.md             # /skill-set:consulting:review
-├── skills/                        # All skills in one location
-│   ├── managing-git-workflow/
-│   │   ├── SKILL.md
-│   │   └── reference/
-│   │       ├── commit.md
-│   │       ├── push.md
-│   │       └── pr.md
-│   ├── understanding-code-context/
-│   │   ├── SKILL.md
-│   │   └── reference/
-│   │       ├── tools.md
-│   │       ├── workflows.md
-│   │       └── anti-patterns.md
-│   ├── browser-automation/
-│   │   ├── SKILL.md
-│   │   ├── reference/
-│   │   │   └── TEMPLATES.md
-│   │   └── templates/            # 19 Playwright scripts
-│   ├── consulting-peer-llms/
-│   │   ├── SKILL.md
-│   │   └── reference/
-│   │       ├── cli-commands.md
-│   │       ├── prompt-template.md
-│   │       └── report-format.md
-│   └── using-skill-set/
-│       └── SKILL.md
-├── agents/                        # Isolated subagents
-│   └── coderabbit-feedback.md
-├── hooks/                         # Event handlers
-│   └── hooks.json                # SessionStart hook
-├── scripts/                       # Utility scripts
-│   ├── session-start.sh
-│   └── git-helpers.sh
-└── docs/                          # Documentation
-    └── plans/
+plugins/
+└── skill-set/                      # Unified plugin
+    ├── .claude-plugin/
+    │   ├── plugin.json            # Plugin metadata
+    │   └── marketplace.json       # Marketplace registration
+    ├── .mcp.json                  # MCP server definitions
+    ├── commands/                  # Namespaced slash commands
+    │   ├── git/
+    │   │   ├── commit.md         # /skill-set:git:commit
+    │   │   ├── push.md           # /skill-set:git:push
+    │   │   └── pr.md             # /skill-set:git:pr
+    │   ├── coderabbit/
+    │   │   └── fix.md            # /skill-set:coderabbit:fix
+    │   └── consulting/
+    │       └── review.md         # /skill-set:consulting:review
+    ├── skills/                    # All skills with integrated scripts
+    │   ├── managing-git-workflow/
+    │   │   ├── SKILL.md
+    │   │   ├── git-helpers.sh    # Utility script
+    │   │   └── reference/
+    │   │       ├── commit.md
+    │   │       ├── push.md
+    │   │       └── pr.md
+    │   ├── understanding-code-context/
+    │   │   ├── SKILL.md
+    │   │   └── reference/
+    │   │       ├── tools.md
+    │   │       ├── workflows.md
+    │   │       └── anti-patterns.md
+    │   ├── browser-automation/
+    │   │   ├── SKILL.md
+    │   │   ├── reference/
+    │   │   │   └── TEMPLATES.md
+    │   │   └── templates/        # 16 Playwright scripts
+    │   ├── consulting-peer-llms/
+    │   │   ├── SKILL.md
+    │   │   └── reference/
+    │   │       ├── cli-commands.md
+    │   │       ├── prompt-template.md
+    │   │       └── report-format.md
+    │   └── using-skill-set/
+    │       ├── SKILL.md
+    │       └── session-start.sh  # Session hook script
+    ├── agents/                    # Isolated subagents
+    │   └── coderabbit-feedback.md
+    └── hooks/                     # Event handlers
+        └── hooks.json            # SessionStart hook
 ```
 
 ### Design Patterns Used

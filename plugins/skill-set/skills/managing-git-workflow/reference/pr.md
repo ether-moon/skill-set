@@ -29,7 +29,7 @@ Create a pull request with auto-generated title and description, automatically p
 ### 1. Validate Branch Status
 
 ```bash
-source .claude/skills/managing-git-workflow/scripts/git-helpers.sh
+source .claude/skills/managing-git-workflow/git-helpers.sh
 
 # Check current branch
 if is_main_branch; then
@@ -186,7 +186,7 @@ git diff origin/master..HEAD
 
 ```bash
 # Load helpers first
-source .claude/skills/git-workflow/scripts/git-helpers.sh
+source .claude/skills/managing-git-workflow/git-helpers.sh
 
 # Available functions:
 is_main_branch()           # Returns 0 if on main/master

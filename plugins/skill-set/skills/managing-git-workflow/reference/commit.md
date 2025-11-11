@@ -53,7 +53,7 @@ git diff --cached --stat
 
 **Helper for ticket extraction:**
 ```bash
-source .claude/skills/managing-git-workflow/scripts/git-helpers.sh
+source .claude/skills/managing-git-workflow/git-helpers.sh
 extract_ticket_from_branch
 ```
 
