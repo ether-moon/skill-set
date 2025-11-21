@@ -5,6 +5,15 @@ All notable changes to the skill-set plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2025-11-21
+
+### Improved
+
+- **consulting-peer-llms**:
+  - **Optimization**: Embedded simplified prompt directly into `SKILL.md` for faster execution and reduced dependencies.
+  - **Reliability**: Increased default timeout to 10 minutes (600s) for all CLIs to handle slower models like Codex.
+  - **Simplicity**: Removed redundant CLI installation checks and simplified context gathering logic (using `origin/main` as base).
+
 ## [1.0.0] - 2025-11-11
 
 ### Changed

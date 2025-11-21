@@ -36,11 +36,6 @@ Use this skill when the user explicitly requests:
 - With arguments: Use only specified CLIs (e.g., `/review gemini codex`)
 - Without arguments: Auto-detect all installed CLIs and use them
 
-Verify availability:
-```bash
-which gemini codex claude
-```
-
 ## Quick Start
 
 **Minimal invocation:**
@@ -60,49 +55,18 @@ You:
 
 ### Step 0: Determine Target CLIs
 
-**Parse command arguments:**
-
-```bash
 # Arguments passed to /review command
 REQUESTED_CLIS=("$@")
 
 if [ ${#REQUESTED_CLIS[@]} -eq 0 ]; then
-  # No arguments - auto-detect installed CLIs
-  AVAILABLE_CLIS=()
-
-  for cli in gemini codex claude; do
-    if command -v "$cli" &>/dev/null; then
-      AVAILABLE_CLIS+=("$cli")
-    fi
-  done
-
-  if [ ${#AVAILABLE_CLIS[@]} -eq 0 ]; then
-    echo "Error: No supported CLI tools found. Install at least one of: gemini, codex, claude"
-    exit 1
-  fi
-
-  TARGET_CLIS=("${AVAILABLE_CLIS[@]}")
-  echo "Auto-detected CLIs: ${TARGET_CLIS[*]}"
+  # No arguments - default to standard set
+  TARGET_CLIS=("gemini" "codex" "claude")
+  echo "Using default CLIs: ${TARGET_CLIS[*]}"
 else
-  # Arguments provided - validate they exist
-  TARGET_CLIS=()
-
-  for cli in "${REQUESTED_CLIS[@]}"; do
-    if command -v "$cli" &>/dev/null; then
-      TARGET_CLIS+=("$cli")
-    else
-      echo "Warning: $cli not found, skipping"
-    fi
-  done
-
-  if [ ${#TARGET_CLIS[@]} -eq 0 ]; then
-    echo "Error: None of the requested CLIs are installed"
-    exit 1
-  fi
-
+  # Arguments provided - use specified CLIs
+  TARGET_CLIS=("${REQUESTED_CLIS[@]}")
   echo "Using specified CLIs: ${TARGET_CLIS[*]}"
 fi
-```
 
 **Key behaviors:**
 - No arguments → Use all installed CLIs
@@ -121,14 +85,11 @@ Gather comprehensive context from current session:
 **Code Changes:**
 ```bash
 # Get git information
-BASE_SHA=$(git rev-parse HEAD~1 2>/dev/null || git rev-parse origin/main 2>/dev/null || echo "N/A")
+BASE_SHA=$(git rev-parse origin/main 2>/dev/null || git rev-parse origin/master 2>/dev/null || echo "HEAD~1")
 CURRENT_SHA=$(git rev-parse HEAD)
 
-# Get changed files
-CHANGED_FILES=$(git diff --name-only $BASE_SHA..$CURRENT_SHA)
-
-# Get diff summary (not full diff - too verbose)
-DIFF_SUMMARY=$(git diff --stat $BASE_SHA..$CURRENT_SHA)
+# Note: We do not pass file lists or diffs explicitly.
+# Peer agents are expected to check `git status` or `git diff $BASE_SHA..$CURRENT_SHA` themselves.
 ```
 
 **Project Context:**
@@ -161,8 +122,26 @@ Run target CLIs simultaneously using bash background execution:
 
 ```bash
 # Generate full prompt
-PROMPT=$(cat <<'EOF'
-{Your structured review prompt}
+# NOTE: The agent executing this must replace {What Was Implemented} and {Requirements} with actual context.
+PROMPT=$(cat <<EOF
+# Code Review Request
+
+## Context
+- **Implemented**: {Extract from conversation context}
+- **Requirements**: {User's stated requirements}
+
+## Changes
+Please check the changes between **$BASE_SHA** and **$CURRENT_SHA** using your git tools (e.g., \`git diff $BASE_SHA..$CURRENT_SHA\`).
+
+## Review Focus
+Please evaluate:
+1. **Critical Issues**: Bugs, Security, Data Loss.
+2. **Code Quality**: Maintainability, Error Handling.
+3. **Architecture**: Design soundness, Scalability.
+
+## Output Constraints
+- **NO Thinking Process**: Do not include internal thinking or logs.
+- **Concise**: Focus on actionable feedback.
 EOF
 )
 
@@ -170,6 +149,9 @@ EOF
 declare -A CLI_RESULTS
 declare -A CLI_PIDS
 declare -A CLI_FILES
+
+# Timeout settings
+TIMEOUT="600s"        # 10 minutes for all CLIs
 
 # Launch all target CLIs in parallel
 for cli in "${TARGET_CLIS[@]}"; do
@@ -179,17 +161,17 @@ for cli in "${TARGET_CLIS[@]}"; do
   # Execute based on CLI type (each has different command syntax)
   case "$cli" in
     gemini)
-      gemini "$PROMPT" > "$OUTPUT_FILE" 2>&1 &
+      timeout "$TIMEOUT" gemini "$PROMPT" > "$OUTPUT_FILE" 2>/dev/null &
       ;;
     codex)
-      codex exec "$PROMPT" > "$OUTPUT_FILE" 2>&1 &
+      timeout "$TIMEOUT" codex exec "$PROMPT" > "$OUTPUT_FILE" 2>/dev/null &
       ;;
     claude)
-      claude "$PROMPT" > "$OUTPUT_FILE" 2>&1 &
+      timeout "$TIMEOUT" claude "$PROMPT" > "$OUTPUT_FILE" 2>/dev/null &
       ;;
     *)
       echo "Warning: Unknown CLI $cli, attempting generic execution"
-      "$cli" "$PROMPT" > "$OUTPUT_FILE" 2>&1 &
+      timeout "$TIMEOUT" "$cli" "$PROMPT" > "$OUTPUT_FILE" 2>/dev/null &
       ;;
   esac
 
@@ -323,26 +305,9 @@ Analyze all CLI responses and generate synthesized assessment.
 - Note failures in final report
 - Still provide synthesized assessment from available feedback
 
-**All CLIs fail:**
-- Report failure clearly
-- Show which CLIs were attempted
-- Suggest checking CLI installation:
-  ```bash
-  # Check which CLIs are available
-  for cli in gemini codex claude; do
-    if command -v "$cli" &>/dev/null; then
-      echo "$cli: installed"
-      "$cli" --version 2>&1 || echo "$cli: version check failed"
-    else
-      echo "$cli: not found"
-    fi
-  done
-  ```
 
-**No CLIs installed (auto-detect mode):**
-- Report clear error message
-- List supported CLI tools
-- Provide installation guidance
+
+
 
 **Timeout issues (exit code 124):**
 - Use 300s (5 minutes) timeout: `timeout 300s`
@@ -442,11 +407,6 @@ If you catch yourself doing these, STOP:
 - Different models have different strengths/weaknesses
 
 ## Troubleshooting
-
-**"gemini: command not found"**
-- Check installation: `which gemini`
-- Verify PATH includes CLI location
-- Install if missing
 
 **"Empty response from CLI"**
 - Check CLI can run: `gemini "test"`

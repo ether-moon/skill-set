@@ -38,20 +38,11 @@ Examples:
 Base SHA: {base_sha}
 Current SHA: {current_sha}
 
-### Modified Files
-{Output from: git diff --name-only $BASE..$CURRENT}
+## Changes
 
-### Change Summary
-{Output from: git diff --stat $BASE..$CURRENT}
-
-### Key Changes
-{Human-readable summary of major changes}
-
-Examples:
-- Added new AuthService class with token validation
-- Refactored DatabasePool to use connection reuse
-- Wrapped all API calls with timeout error handlers
-- Created MetricsChart component with real-time updates
+**Instruction for Peer Agent:**
+Please check the changes between `{base_sha}` and `{current_sha}` using your git tools (e.g., `git diff {base_sha}..{current_sha}` or `git status`).
+The user has not provided the file list explicitly, assuming you can access the repository.
 
 ## Review Focus Areas
 
@@ -230,36 +221,6 @@ Implemented JWT token-based user authentication system.
 User requested a secure login system with session management.
 ```
 
-**Japanese project:**
-```markdown
-# Code Review Request
-
-## Output Language
-
-Please provide your review in Japanese.
-
-## What Was Implemented
-
-JWT トークンベースのユーザー認証システムを実装しました。
-
-## Requirements/Plan
-
-ユーザーがセッション管理を含む安全なログインシステムを要求しました。
-```
-
-**English project (no language specification):**
-```markdown
-# Code Review Request
-
-## What Was Implemented
-
-Implemented user authentication with JWT tokens.
-
-## Requirements/Plan
-
-User requested secure login system with session management.
-```
-
 ## Customization Points
 
 You can adjust the prompt based on review type:
@@ -372,6 +333,13 @@ Please evaluate this work across these dimensions:
 4. **Strengths**: What was done well
 
 Be specific with file references (file:line) and explain impact.
+
+## Output Constraints
+
+Please strictly adhere to the following:
+1. **NO Thinking Process**: Do not include any internal thinking, reasoning traces, or `<thinking>` tags in the output.
+2. **NO System Logs**: Do not include any tool usage logs, MCP notifications, or system debug information.
+3. **Clean Output**: Provide ONLY the requested review content in the specified format.
 ```
 
 ## Best Practices

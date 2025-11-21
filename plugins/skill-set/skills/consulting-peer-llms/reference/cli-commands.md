@@ -28,38 +28,14 @@ claude "your prompt text here"
 REQUESTED_CLIS=("$@")
 
 if [ ${#REQUESTED_CLIS[@]} -eq 0 ]; then
-  # Auto-detect installed CLIs
-  AVAILABLE_CLIS=()
-  for cli in gemini codex claude; do
-    if command -v "$cli" &>/dev/null; then
-      AVAILABLE_CLIS+=("$cli")
-    fi
-  done
-
-  if [ ${#AVAILABLE_CLIS[@]} -eq 0 ]; then
-    echo "Error: No supported CLI tools found"
-    exit 1
-  fi
-
-  TARGET_CLIS=("${AVAILABLE_CLIS[@]}")
+  # No arguments - default to standard set
+  TARGET_CLIS=("gemini" "codex" "claude")
+  echo "Using default CLIs: ${TARGET_CLIS[*]}"
 else
-  # Use specified CLIs (validate they exist)
-  TARGET_CLIS=()
-  for cli in "${REQUESTED_CLIS[@]}"; do
-    if command -v "$cli" &>/dev/null; then
-      TARGET_CLIS+=("$cli")
-    else
-      echo "Warning: $cli not found, skipping"
-    fi
-  done
-
-  if [ ${#TARGET_CLIS[@]} -eq 0 ]; then
-    echo "Error: None of the requested CLIs are installed"
-    exit 1
-  fi
+  # Arguments provided - use specified CLIs
+  TARGET_CLIS=("${REQUESTED_CLIS[@]}")
+  echo "Using specified CLIs: ${TARGET_CLIS[*]}"
 fi
-
-echo "Using CLIs: ${TARGET_CLIS[*]}"
 ```
 
 ## Parallel Execution Pattern
@@ -295,13 +271,13 @@ fi
 
 ### Recommended Timeout
 
-**Use 300s (5 minutes) for all reviews:**
+**Use 600s (10 minutes) for all reviews:**
 ```bash
-# Fixed 300s timeout
-timeout 300s gemini "$PROMPT" > /tmp/gemini-review.txt 2>&1 &
+# Fixed 600s timeout
+timeout 600s gemini "$PROMPT" > /tmp/gemini-review.txt 2>/dev/null &
 GEMINI_PID=$!
 
-timeout 300s codex exec "$PROMPT" > /tmp/codex-review.txt 2>&1 &
+timeout 600s codex exec "$PROMPT" > /tmp/codex-review.txt 2>/dev/null &
 CODEX_PID=$!
 
 wait $GEMINI_PID
@@ -312,10 +288,10 @@ CODEX_EXIT=$?
 
 # Exit code 124 means timeout
 if [ $GEMINI_EXIT -eq 124 ]; then
-    echo "Gemini CLI timed out after 300 seconds" >&2
+    echo "Gemini CLI timed out after 600 seconds" >&2
 fi
 if [ $CODEX_EXIT -eq 124 ]; then
-    echo "Codex CLI timed out after 300 seconds" >&2
+    echo "Codex CLI timed out after 600 seconds" >&2
 fi
 ```
 
@@ -372,14 +348,14 @@ wait
 ### Capturing stdout and stderr
 
 ```bash
-# Both to same file
+# Both to same file (captures logs/errors - use for debugging)
 gemini "$PROMPT" > /tmp/output.txt 2>&1
 
-# Separate files
+# Separate files (clean output in stdout)
 gemini "$PROMPT" > /tmp/stdout.txt 2> /tmp/stderr.txt
 
-# Discard stderr
-gemini "$PROMPT" 2>/dev/null
+# Discard stderr (recommended for production/clean output)
+gemini "$PROMPT" > /tmp/output.txt 2>/dev/null
 ```
 
 ### Why Capture stderr
@@ -391,59 +367,7 @@ CLIs may output:
 
 Capturing stderr helps with debugging when things fail.
 
-## Verification Commands
 
-### Check CLI Availability
-
-```bash
-# Check if installed
-which gemini
-which codex
-
-# Check version
-gemini --version
-codex --version
-
-# Test basic execution
-gemini "test prompt" >/dev/null 2>&1 && echo "Gemini: OK" || echo "Gemini: FAIL"
-codex "test prompt" >/dev/null 2>&1 && echo "Codex: OK" || echo "Codex: FAIL"
-```
-
-### Pre-flight Check Script
-
-```bash
-#!/bin/bash
-
-check_cli() {
-    local cli_name=$1
-
-    if ! command -v $cli_name &> /dev/null; then
-        echo "ERROR: $cli_name not found in PATH"
-        return 1
-    fi
-
-    if ! $cli_name --version &> /dev/null; then
-        echo "WARNING: $cli_name found but --version failed"
-        return 2
-    fi
-
-    echo "OK: $cli_name is available"
-    return 0
-}
-
-check_cli gemini
-GEMINI_STATUS=$?
-
-check_cli codex
-CODEX_STATUS=$?
-
-if [ $GEMINI_STATUS -ne 0 ] && [ $CODEX_STATUS -ne 0 ]; then
-    echo "FATAL: Both CLIs unavailable"
-    exit 1
-elif [ $GEMINI_STATUS -ne 0 ] || [ $CODEX_STATUS -ne 0 ]; then
-    echo "WARNING: One CLI unavailable, will continue with available one"
-fi
-```
 
 ## Performance Optimization
 
@@ -519,31 +443,7 @@ trap cleanup EXIT
 
 ## Troubleshooting
 
-### "command not found"
 
-```bash
-# Check PATH
-echo $PATH
-
-# Find CLI location
-find / -name gemini 2>/dev/null
-find / -name codex 2>/dev/null
-
-# Add to PATH if needed
-export PATH=$PATH:/path/to/cli/directory
-```
-
-### "permission denied"
-
-```bash
-# Check permissions
-ls -l $(which gemini)
-ls -l $(which codex)
-
-# Make executable
-chmod +x /path/to/gemini
-chmod +x /path/to/codex
-```
 
 ### Empty Output
 
@@ -586,36 +486,12 @@ trap "rm -rf $TEMP_DIR" EXIT
 REQUESTED_CLIS=("$@")
 
 if [ ${#REQUESTED_CLIS[@]} -eq 0 ]; then
-  # Auto-detect
-  TARGET_CLIS=()
-  for cli in gemini codex claude; do
-    if command -v "$cli" &>/dev/null; then
-      TARGET_CLIS+=("$cli")
-    fi
-  done
-
-  if [ ${#TARGET_CLIS[@]} -eq 0 ]; then
-    echo "Error: No supported CLI tools found"
-    exit 1
-  fi
-
+  # No arguments - default to standard set
+  TARGET_CLIS=("gemini" "codex" "claude")
   echo "Auto-detected CLIs: ${TARGET_CLIS[*]}"
 else
-  # Use specified
-  TARGET_CLIS=()
-  for cli in "${REQUESTED_CLIS[@]}"; do
-    if command -v "$cli" &>/dev/null; then
-      TARGET_CLIS+=("$cli")
-    else
-      echo "Warning: $cli not found, skipping"
-    fi
-  done
-
-  if [ ${#TARGET_CLIS[@]} -eq 0 ]; then
-    echo "Error: None of requested CLIs are installed"
-    exit 1
-  fi
-
+  # Arguments provided - use specified
+  TARGET_CLIS=("${REQUESTED_CLIS[@]}")
   echo "Using specified CLIs: ${TARGET_CLIS[*]}"
 fi
 
