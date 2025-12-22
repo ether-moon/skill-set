@@ -154,7 +154,7 @@ coderabbit-feedback/
 ```json
 {
   "name": "understanding-code-context",
-  "description": "Efficient code exploration using LSP symbolic tools (Serena) and official documentation (Context7).",
+  "description": "Efficient code exploration using LSP symbolic tools and official documentation (Context7).",
   "version": "1.0.0",
   "author": {
     "name": "ether-moon"
@@ -211,7 +211,7 @@ Update `.claude-plugin/marketplace.json`:
     {
       "name": "understanding-code-context",
       "source": "./understanding-code-context",
-      "description": "Efficient code exploration using LSP symbolic tools (Serena) and official documentation (Context7)."
+      "description": "Efficient code exploration using LSP symbolic tools and official documentation (Context7)."
     },
     {
       "name": "coderabbit-feedback",

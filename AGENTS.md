@@ -8,7 +8,7 @@
 
 #### Skills
 1. **managing-git-workflow**: Automates git operations (commit, push, PR) with context-aware message generation in the project's language and automatic ticket extraction from branch names
-2. **understanding-code-context**: Efficient code exploration using LSP symbolic tools (Serena) and official documentation (Context7) instead of text search
+2. **understanding-code-context**: Find and read official documentation for external libraries and frameworks using Context7
 3. **browser-automation**: Pre-built Playwright templates (19 scripts) for browser automation tasks without MCP server overhead
 4. **consulting-peer-llms**: Execute peer reviews from other LLM tools (Gemini, Codex, Claude) in parallel and synthesize actionable insights
 5. **using-skill-set**: Establishes mandatory workflows for finding and using skill-set features at session start

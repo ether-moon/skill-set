@@ -1,129 +1,118 @@
 ---
 name: understanding-code-context
-description: Use when exploring codebases, finding implementations, understanding library usage, or tracing dependencies - leverages LSP symbolic tools (Serena) and official documentation (Context7) instead of text search and full file reading for efficient, accurate code comprehension
+description: Use when understanding external libraries, frameworks, or dependencies - provides workflows for finding and reading official documentation via Context7 instead of web search or source code reading
 ---
 
 # Understanding Code Context
 
 ## Overview
 
-**Core principle**: Use semantic understanding (LSP) and official documentation (Context7) instead of text search and file reading.
+**Core principle**: Use official documentation (Context7) to understand external libraries and frameworks instead of web search or reading source code.
 
-Text search finds strings. Symbolic tools find meaning.
-
-## MANDATORY FIRST STEPS
-
-**Before ANY code exploration, complete these steps IN ORDER:**
-
-1. `initial_instructions` (if not already read in this session)
-2. `activate_project` (if Serena not active for this project)
-3. `check_onboarding_performed`
-4. `list_memories`
-
-**No exceptions. No "can't activate Serena" excuses. Activate it.**
+This skill provides structured workflows for finding authoritative, version-specific documentation for external dependencies.
 
 ## When to Use
 
 Use this skill when:
-- Finding where a feature is implemented
-- Understanding external library/framework usage
-- Tracing symbol dependencies and references
-- Exploring unfamiliar codebase sections
-- Preparing for refactoring (impact analysis)
+- Understanding how an external library/framework works
+- Learning library concepts, patterns, and APIs
+- Finding official documentation for dependencies
+- Understanding library configuration and usage patterns
 
 Don't use for:
-- Simple file content reading (use Read directly)
-- Exact string replacement (use Edit/grep)
+- Exploring project code (use other tools)
+- Finding implementations in your codebase
+- Simple file content reading
 
-## Quick Tool Selection
+## Context7 Tool Usage
 
-| Priority | Tool | Use When |
-|----------|------|----------|
-| 1 | **Memory** | Check existing knowledge |
-| 2 | **Context7** | External lib/framework |
-| 3 | **Symbolic Tools** | Know symbol name |
-| 4 | **Pattern Search** | Don't know symbol name |
-| 5 | **Full File Read** | Last resort only |
+**Primary tool**: Context7 provides authoritative, version-specific documentation for external libraries.
 
-**Detailed tool descriptions and examples**: See [reference/tools.md](reference/tools.md)
+### Commands
 
-## Core Workflows
+```bash
+# Step 1: Find library ID
+resolve-library-id "library-name"
 
-This skill provides 4 workflows:
+# Step 2: Get documentation
+get-library-docs context7CompatibleLibraryID="/org/project"
+```
 
-1. **Finding Implementation** - Locate where features are implemented
-2. **Understanding External Library** - Learn how libraries work and are configured
-3. **Tracing Dependencies** - Find all usages of a symbol
-4. **Complex Analysis** - Analyze 3+ interconnected components
+### Search Strategy
 
-**Detailed workflow steps and examples**: See [reference/workflows.md](reference/workflows.md)
+When searching for library documentation, try multiple variations:
+
+1. **Exact package name**: `"importmap-rails"`
+2. **Framework + concept**: `"rails import maps"`
+3. **Organization/repo**: `"rails/importmap"`
+4. **Base name**: `"importmap"`
+
+**Important**: Try 2+ variations before using WebSearch. Context7 has official, version-specific documentation. WebSearch gives you blog posts and outdated StackOverflow.
+
+## Core Workflow
+
+**Understanding External Library:**
+
+```
+1. resolve-library-id "library-name"
+   - If not found: try variations (framework + concept, org/repo, base name)
+   - Try 2+ variations before giving up
+2. get-library-docs context7CompatibleLibraryID="/org/project"
+3. Read and understand official patterns, APIs, and concepts
+4. Apply understanding to project usage
+```
+
+**Example:**
+```markdown
+User: "Help me understand how importmap works and how to add a new library"
+
+You:
+1. resolve-library-id "importmap-rails"
+   - If not found: try "rails/importmap", "rails import maps", "importmap"
+2. get-library-docs context7CompatibleLibraryID="/rails/importmap"
+3. Understand: import maps spec, pin vs pin_all_from, CDN vs vendor
+4. Explain concepts and how to add a new library based on official docs
+```
 
 ## Red Flags - STOP Immediately
 
 If you catch yourself doing ANY of these, STOP and start over:
 
-- ❌ Using Grep before `find_symbol`
-- ❌ Using Read before `get_symbols_overview`
-- ❌ "Serena isn't activated" (activate it!)
-- ❌ "Context7 didn't work" after 1 try (try 2+ search terms!)
-- ❌ "This workflow doesn't apply" (yes it does!)
-- ❌ "WebSearch is faster" (it's less accurate!)
-- ❌ "I know how this lib works" (check docs anyway!)
-- ❌ "Just need to check one file" (use `get_symbols_overview` first!)
+- ❌ "Context7 didn't work" after 1 try (try 2+ search term variations!)
+- ❌ "WebSearch is faster" (it's less accurate and often outdated!)
+- ❌ "I know how this lib works" (check official docs anyway!)
+- ❌ Reading source code before checking Context7 docs
+- ❌ Using WebSearch before trying Context7 variations
 
-**All of these mean: STOP. Go back to Tool Selection Priority. Start over with correct tools.**
+**All of these mean: STOP. Try Context7 with multiple search variations first.**
 
-**Complete list of mistakes and anti-patterns**: See [reference/anti-patterns.md](reference/anti-patterns.md)
+## Anti-Patterns
 
-## Integration with Other MCPs
+**Common mistakes:**
 
-**Serena** (this skill's foundation):
-- `find_symbol`: Locate symbols by name path
-- `find_referencing_symbols`: Find all references (LSP-powered)
-- `get_symbols_overview`: Understand file structure before reading
-- `*_memory`: Persistent learning across sessions
+| Mistake | Fix |
+|---------|-----|
+| **WebSearch first** | Use Context7 with multiple search term variations |
+| **One search term only** | Try 2+ variations (exact name, framework+concept, org/repo, base name) |
+| **Reading source code** | Check Context7 official docs first |
+| **Assuming library behavior** | Official docs explain intent, best practices, and gotchas |
 
-**Context7** (external knowledge):
-- `resolve-library-id`: Find library documentation
-- `get-library-docs`: Get official patterns and APIs
-
-**Sequential** (complex analysis):
-- Use when 3+ interconnected components
-- Coordinates multiple MCPs systematically
-
-## Memory Usage
-
-**Start with existing knowledge:**
-- Always check `list_memories` before exploring
-- Read relevant memories to avoid redundant exploration
-
-**Memory writing is handled by general workflow patterns, not this skill.**
+**Why Context7 over WebSearch:**
+- Official, version-specific documentation
+- Authoritative patterns and APIs
+- Up-to-date information
+- Explains intent and best practices
 
 ## Quick Reference
 
-**Finding code:**
-```
-find_symbol name_path="ClassName/method_name" relative_path="app/models"
-```
-
-**Understanding structure:**
-```
-get_symbols_overview relative_path="app/models/user.rb"
-```
-
-**Finding usages:**
-```
-find_referencing_symbols name_path="ClassName" relative_path="app/models/class.rb"
-```
-
-**External library:**
-```
+**Find library documentation:**
+```bash
 resolve-library-id "library-name"
 get-library-docs context7CompatibleLibraryID="/org/project"
 ```
 
-**Check memory:**
-```
-list_memories
-read_memory memory_file_name="architecture-feature.md"
-```
+**Search term variations to try:**
+1. Exact package name: `"package-name"`
+2. Framework + concept: `"framework concept"`
+3. Organization/repo: `"org/repo"`
+4. Base name: `"basename"`

@@ -79,9 +79,9 @@ Automates git commits, push, and PR creation with context-aware messages and tic
 - `/managing-git-workflow:pr` - Create a pull request (auto-push and commit if needed)
 
 ### understanding-code-context
-**Use when**: Exploring codebases, finding implementations, understanding library usage, or tracing dependencies.
+**Use when**: Understanding external libraries, frameworks, or dependencies.
 
-Efficient code exploration using LSP symbolic tools (Serena) and official documentation (Context7).
+Find and read official documentation for external libraries and frameworks using Context7.
 
 ### coderabbit-feedback
 **Use when**: Processing CodeRabbit AI review comments on pull requests.

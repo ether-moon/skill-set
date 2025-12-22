@@ -1,216 +1,129 @@
-# Tool Selection and Usage
+# Context7 Tool Usage
 
-## Tool Selection Priority
+## Overview
 
-**Always follow this order:**
+Context7 provides authoritative, version-specific documentation for external libraries and frameworks. This is the primary and only tool used by this skill.
 
-| Priority | Tool | Use When | Example |
-|----------|------|----------|---------|
-| 1 | **Memory** | Check existing knowledge | `list_memories` → `read_memory` |
-| 2 | **Context7** | External lib/framework | `resolve-library-id "importmap-rails"` |
-| 3 | **Symbolic Tools** | Know symbol name | `find_symbol "UserBlock"` |
-| 4 | **Pattern Search** | Don't know symbol name | `search_for_pattern "block.*user"` |
-| 5 | **Full File Read** | Last resort only | `Read app/models/user.rb` |
+## Tool Commands
 
-## Tool Details
+### resolve-library-id
 
-### 1. Memory (Serena)
-
-**Purpose:** Leverage existing knowledge from previous sessions
+**Purpose:** Find the Context7-compatible library ID for a given library name.
 
 **When to use:**
-- ALWAYS at the start of exploration (`list_memories`)
-- Before deep diving into codebase
-- To avoid redundant exploration
+- First step when looking up any external library
+- Before calling `get-library-docs`
 
-**Commands:**
+**Command:**
 ```bash
-list_memories
-read_memory memory_file_name="architecture-feature.md"
+resolve-library-id "library-name"
 ```
 
-**Why first:** Saves time by reusing accumulated knowledge.
+**Search Strategy:**
+
+Try multiple variations in this order:
+
+1. **Exact package name**: `"importmap-rails"`
+2. **Framework + concept**: `"rails import maps"`
+3. **Organization/repo**: `"rails/importmap"`
+4. **Base name**: `"importmap"`
+
+**Important**: Try 2+ variations before giving up or using WebSearch.
+
+**Example:**
+```bash
+# Try 1: Exact name
+resolve-library-id "importmap-rails"
+
+# If not found, try 2: Framework + concept
+resolve-library-id "rails import maps"
+
+# If not found, try 3: Organization/repo
+resolve-library-id "rails/importmap"
+
+# If not found, try 4: Base name
+resolve-library-id "importmap"
+```
 
 ---
 
-### 2. Context7 (Official Documentation)
+### get-library-docs
 
-**Purpose:** Get authoritative, version-specific documentation for external libraries
+**Purpose:** Get official documentation for a library using its Context7-compatible library ID.
 
 **When to use:**
-- Any `import`, `require`, `gem`, external dependency
-- Understanding library concepts and patterns
-- Before reading project configuration files
+- After successfully resolving library ID with `resolve-library-id`
+- To understand library concepts, patterns, APIs, and best practices
 
-**Commands:**
+**Command:**
 ```bash
-resolve-library-id "importmap-rails"
+get-library-docs context7CompatibleLibraryID="/org/project"
+```
+
+**What you get:**
+- Official, version-specific documentation
+- Library concepts and architecture
+- API reference and patterns
+- Best practices and gotchas
+- Configuration examples
+
+**Example:**
+```bash
+# After resolve-library-id returns "/rails/importmap"
 get-library-docs context7CompatibleLibraryID="/rails/importmap"
 ```
 
-**Search strategy:**
-1. Exact name: `"importmap-rails"`
-2. Framework + concept: `"rails import maps"`
-3. Organization/repo: `"rails/importmap"`
-4. Base name: `"importmap"`
-
-Try 2+ variations before using WebSearch.
-
-**Why before code:** Official docs explain intent, best practices, and gotchas that code alone won't reveal.
-
 ---
 
-### 3. Symbolic Tools (Serena LSP)
+## Complete Workflow
 
-**Purpose:** Semantic code navigation using Language Server Protocol
+**Understanding an external library:**
 
-#### 3a. find_symbol
-
-**When to use:**
-- You know (or can guess) the symbol name
-- Finding classes, methods, functions by name
-
-**Examples:**
 ```bash
-# Exact match
-find_symbol name_path="UserBlock" substring_matching=False
+# Step 1: Find library ID (try multiple variations)
+resolve-library-id "library-name"
+# If not found, try variations:
+resolve-library-id "framework concept"
+resolve-library-id "org/repo"
+resolve-library-id "basename"
 
-# Fuzzy search
-find_symbol name_path="block" substring_matching=True
+# Step 2: Get documentation
+get-library-docs context7CompatibleLibraryID="/org/project"
 
-# With depth (get children)
-find_symbol name_path="UserBlock" depth=1 include_body=False
-
-# Read specific method
-find_symbol name_path="UserBlock/create" include_body=True
-```
-
-**Name path patterns:**
-- `"ClassName"` - Top-level class
-- `"ClassName/method"` - Method within class
-- `"/ClassName"` - Absolute path (top-level only)
-- `"method"` - Any method with that name (no ancestor restriction)
-
-#### 3b. get_symbols_overview
-
-**When to use:**
-- Before reading entire file
-- Understanding file structure
-- Finding what symbols exist in a file
-
-**Example:**
-```bash
-get_symbols_overview relative_path="app/models/user.rb"
-```
-
-**Returns:** Top-level symbols with metadata (kind, range, children count)
-
-**Why before Read:** Understand structure without loading full content.
-
-#### 3c. find_referencing_symbols
-
-**When to use:**
-- Finding all usages of a symbol
-- Understanding dependencies
-- Impact analysis before refactoring
-
-**Example:**
-```bash
-find_referencing_symbols name_path="UserBlock" relative_path="app/models/user_block.rb"
-```
-
-**Returns:** Referencing symbols WITH code snippets
-
-**Why powerful:** Context snippets often sufficient without reading full files.
-
----
-
-### 4. Pattern Search (Serena)
-
-**Purpose:** Flexible regex-based search when you don't know symbol names
-
-**When to use:**
-- Don't know exact symbol name
-- Searching for patterns across files
-- Non-code files (YAML, JSON, etc.)
-
-**Example:**
-```bash
-search_for_pattern substring_pattern="block.*user"
-                   restrict_search_to_code_files=True
-                   context_lines_before=2
-                   context_lines_after=2
-```
-
-**Options:**
-- `restrict_search_to_code_files=True` - Code files only (faster)
-- `restrict_search_to_code_files=False` - All files (including YAML, JSON)
-- `paths_include_glob="*.rb"` - Filter by file pattern
-- `relative_path="app/models"` - Restrict to directory
-
-**Why after symbolic tools:** Slower and less semantic than `find_symbol`.
-
----
-
-### 5. Full File Read
-
-**Purpose:** Read complete file contents
-
-**When to use (LAST RESORT):**
-- Small files (<100 lines)
-- Non-code files (README, config)
-- After all other approaches failed
-
-**Why last:** Most token-expensive. Use `get_symbols_overview` + targeted symbol reads instead.
-
----
-
-## Decision Tree
-
-```
-Need to understand code?
-├─ Is it external library/framework?
-│  └─ YES → Context7 (resolve-library-id + get-library-docs)
-│
-├─ Do I know the symbol name?
-│  ├─ YES → find_symbol
-│  └─ NO → Can I guess pattern?
-│     ├─ YES → search_for_pattern (code files only)
-│     └─ NO → get_symbols_overview first, then find_symbol
-│
-├─ Need to see all usages?
-│  └─ find_referencing_symbols
-│
-└─ Still unclear?
-   └─ Read specific symbol bodies (include_body=True)
-      └─ ONLY IF NECESSARY → Read full file
+# Step 3: Read and understand official patterns
+# Apply understanding to project usage
 ```
 
 ---
 
-## Common Tool Combinations
+## Why Context7 Over Alternatives
 
-### Exploring New Feature
-```bash
-1. list_memories
-2. find_symbol name_path="FeatureName" substring_matching=True
-3. find_referencing_symbols name_path="FeatureName" relative_path="..."
-4. get_symbols_overview relative_path="..." (for related files)
-```
+**Context7 advantages:**
+- ✅ Official, version-specific documentation
+- ✅ Authoritative patterns and APIs
+- ✅ Up-to-date information
+- ✅ Explains intent and best practices
+- ✅ No outdated blog posts or StackOverflow answers
 
-### Understanding Library Usage
-```bash
-1. resolve-library-id "library-name"
-2. get-library-docs context7CompatibleLibraryID="/org/project"
-3. find_file "config_file_name"
-4. get_symbols_overview relative_path="config/..."
-5. find_referencing_symbols (to see actual usage)
-```
+**WebSearch disadvantages:**
+- ❌ Often outdated information
+- ❌ Blog posts and tutorials (not official docs)
+- ❌ Version mismatches
+- ❌ Inconsistent quality
 
-### Impact Analysis
-```bash
-1. find_symbol name_path="ClassName"
-2. find_referencing_symbols name_path="ClassName" relative_path="..."
-3. Analyze snippets (often sufficient)
-4. Read specific symbol bodies only if snippets unclear
-```
+**Reading source code disadvantages:**
+- ❌ Time-consuming
+- ❌ Doesn't explain intent or best practices
+- ❌ May miss important concepts
+- ❌ Version-specific issues
+
+---
+
+## Common Mistakes
+
+| Mistake | Fix |
+|---------|-----|
+| **WebSearch first** | Use Context7 with multiple search term variations |
+| **One search term only** | Try 2+ variations before giving up |
+| **Reading source code** | Check Context7 official docs first |
+| **Assuming library behavior** | Official docs explain intent and best practices |

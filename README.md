@@ -27,16 +27,15 @@ That's it! All features are now available in a single unified plugin.
 - Git history analysis for consistent messaging
 
 ### Code Context Understanding
-Efficient code exploration using LSP symbolic tools (Serena) and official documentation (Context7).
+Find and read official documentation for external libraries and frameworks using Context7.
 
-**Use when**: Exploring codebases, finding implementations, understanding library usage, or tracing dependencies.
+**Use when**: Understanding external libraries, frameworks, or dependencies.
 
 **Features**:
-- Symbolic code navigation (classes, methods, references)
 - Official documentation lookup via Context7
-- Token-efficient exploration (reads only what's needed)
-- Memory-based learning for recurring patterns
-- Anti-patterns guide to avoid common mistakes
+- Multiple search term strategies for finding library docs
+- Version-specific authoritative documentation
+- Best practices and patterns from official sources
 
 ### Browser Automation
 Automates browser interactions using Playwright CLI with 19 pre-built templates.

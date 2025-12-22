@@ -5,6 +5,25 @@ All notable changes to the skill-set plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2025-01-10
+
+### Removed
+
+- **understanding-code-context**: Removed all non-Context7 functionality
+  - Removed Serena-specific dependencies and references
+  - Removed LSP symbolic tools usage
+  - Removed memory tools usage
+  - Removed code exploration workflows (finding implementations, tracing dependencies)
+  - Removed pattern search and file reading workflows
+
+### Changed
+
+- **understanding-code-context**: Refocused skill scope exclusively on Context7 library documentation
+  - Skill now only provides workflows for finding and reading official library documentation via Context7
+  - Updated all documentation to focus solely on Context7 usage
+  - Removed all references to code exploration, symbol finding, and dependency tracing
+  - Simplified to single workflow: understanding external libraries through official docs
+
 ## [1.0.1] - 2025-11-21
 
 ### Improved
