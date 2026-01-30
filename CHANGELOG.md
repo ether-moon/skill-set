@@ -5,6 +5,48 @@ All notable changes to the skill-set plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2025-01-30
+
+### Added
+
+- **writing-skills**: New skill for creating effective Claude skills
+  - Comprehensive guide integrating Anthropic's official best practices
+  - Reference files: structure, patterns, testing, troubleshooting, checklist
+  - Covers use case definition, success criteria, and workflow patterns
+
+- **allowed-tools**: Auto-permission support for skills
+  - `browser-automation`: npx, node, npm
+  - `consulting-peer-llms`: gemini, codex, claude, timeout
+  - `managing-git-workflow`: git, gh, source, bash
+
+### Changed
+
+- **consulting-peer-llms**: Major refactoring (456→160 lines)
+  - Extracted bash code to `scripts/peer-review.sh`
+  - Moved execution details to `reference/execution.md`
+  - Improved documentation structure
+
+- **using-skill-set**: Improved tone and clarity
+  - Removed aggressive/coercive language
+  - Unified terminology ("plugins" → "skills")
+  - More balanced guidance approach
+
+- **AGENTS.md**: Updated documentation
+  - Added writing-skills to Current Tools
+  - Changed recommended SKILL.md line limit to 200
+  - Added PDF guide reference
+
+### Improved
+
+- **browser-automation**: Added Troubleshooting section
+  - Playwright installation issues
+  - Browser not found errors
+  - Timeout and permission problems
+
+- **understanding-code-context**: Enhanced documentation
+  - Added Troubleshooting section
+  - Added explicit reference file links
+
 ## [1.0.2] - 2025-01-10
 
 ### Removed
@@ -89,4 +131,7 @@ Users upgrading from v1.x should:
   - `using-skill-set`: Session initialization
   - `coderabbit-feedback`: CodeRabbit review processing
 
+[1.1.0]: https://github.com/ether-moon/skill-set/releases/tag/v1.1.0
+[1.0.2]: https://github.com/ether-moon/skill-set/releases/tag/v1.0.2
+[1.0.1]: https://github.com/ether-moon/skill-set/releases/tag/v1.0.1
 [1.0.0]: https://github.com/ether-moon/skill-set/releases/tag/v1.0.0
