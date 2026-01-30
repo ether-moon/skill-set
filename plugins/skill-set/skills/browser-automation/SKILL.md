@@ -1,6 +1,7 @@
 ---
 name: browser-automation
 description: Automates browser interactions using Playwright CLI and templates - takes screenshots, generates PDFs, clicks elements, fills forms, monitors console/network. Use when testing web pages, automating browser tasks, or when user mentions screenshots, web testing, form automation, or Playwright
+allowed-tools: "Bash(npx:*) Bash(node:*) Bash(npm:*)"
 ---
 
 # Browser Automation
@@ -97,6 +98,68 @@ node $SKILL_DIR/templates/console-messages.js https://example.com
 - Never write inline Playwright code with `node -e` or heredocs
 
 **Note**: Output files are saved to `./tmp/playwright/` in the current project directory by default.
+
+## Troubleshooting
+
+### Playwright Installation Fails
+
+**"npm ERR! code EACCES"**
+- Permission issue with global install
+- Solution: Use `npx` prefix instead of global install, or fix npm permissions
+
+**"Playwright browsers not installed"**
+- Run: `npx playwright install chromium`
+- For all browsers: `npx playwright install`
+
+### Browser Not Found
+
+**"browserType.launch: Executable doesn't exist"**
+- Browsers not installed after Playwright installation
+- Solution: `npx playwright install chromium`
+
+**"Protocol error (Target.createTarget)"**
+- Browser crashed or didn't start properly
+- Solution: Close other browser instances, retry
+
+### Timeout Issues
+
+**"Timeout 30000ms exceeded"**
+- Page or element took too long to load
+- Solutions:
+  - Increase timeout in template
+  - Check network connectivity
+  - Verify URL is accessible
+
+**"Element not found"**
+- Selector doesn't match any element
+- Solutions:
+  - Verify selector in browser DevTools
+  - Wait for dynamic content to load
+  - Check for iframes
+
+### Permission Problems
+
+**"Navigation failed because page crashed"**
+- System resource limits
+- Solution: Close other applications, increase memory limits
+
+**"net::ERR_CERT_AUTHORITY_INVALID"**
+- SSL certificate issue
+- Solution: For testing only, add `--ignore-https-errors` flag
+
+### Common Fixes
+
+```bash
+# Reinstall Playwright
+npm uninstall playwright && npm install playwright
+npx playwright install
+
+# Check Playwright version
+npx playwright --version
+
+# Run with debug logging
+DEBUG=pw:api npx playwright screenshot https://example.com test.png
+```
 
 ## Documentation
 

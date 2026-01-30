@@ -116,3 +116,37 @@ get-library-docs context7CompatibleLibraryID="/org/project"
 2. Framework + concept: `"framework concept"`
 3. Organization/repo: `"org/repo"`
 4. Base name: `"basename"`
+
+## Troubleshooting
+
+### Context7 Connection Issues
+
+**"Context7 server not connected"**
+- Verify MCP server is running in Settings > Extensions
+- Reconnect Context7 if status shows disconnected
+- Check API key is valid
+
+**"No results found"**
+- Try multiple search term variations (see Quick Reference)
+- Check spelling of library name
+- Some libraries may not be indexed - fall back to WebSearch
+
+### Library Not Found
+
+**After trying multiple variations:**
+1. Check if library exists on npm/PyPI/etc.
+2. Use WebSearch as fallback for unindexed libraries
+3. Check the library's official documentation URL directly
+
+### Stale Documentation
+
+**"Documentation seems outdated"**
+- Context7 provides version-specific docs
+- Verify you're using the correct library ID
+- Check library's changelog for recent changes
+
+## See Also
+
+- [reference/tools.md](reference/tools.md) - Detailed tool documentation
+- [reference/workflows.md](reference/workflows.md) - Extended workflow patterns
+- [reference/anti-patterns.md](reference/anti-patterns.md) - Common mistakes to avoid

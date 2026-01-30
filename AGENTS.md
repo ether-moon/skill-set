@@ -11,7 +11,8 @@
 2. **understanding-code-context**: Find and read official documentation for external libraries and frameworks using Context7
 3. **browser-automation**: Pre-built Playwright templates (19 scripts) for browser automation tasks without MCP server overhead
 4. **consulting-peer-llms**: Execute peer reviews from other LLM tools (Gemini, Codex, Claude) in parallel and synthesize actionable insights
-5. **using-skill-set**: Establishes mandatory workflows for finding and using skill-set features at session start
+5. **using-skill-set**: Establishes workflows for discovering and using skill-set features at session start
+6. **writing-skills**: Guide for creating effective Claude skills with structured workflow, testing methodology, and troubleshooting
 
 #### Agents
 1. **coderabbit-feedback**: Interactive CodeRabbit review processing with severity-based classification, user discussion, and verified completion workflow. Runs as isolated subagent for better context management.
@@ -59,9 +60,17 @@ plugins/
     │   │       ├── cli-commands.md
     │   │       ├── prompt-template.md
     │   │       └── report-format.md
-    │   └── using-skill-set/
+    │   ├── using-skill-set/
+    │   │   ├── SKILL.md
+    │   │   └── session-start.sh  # Session hook script
+    │   └── writing-skills/
     │       ├── SKILL.md
-    │       └── session-start.sh  # Session hook script
+    │       └── reference/
+    │           ├── structure.md
+    │           ├── patterns.md
+    │           ├── testing.md
+    │           ├── troubleshooting.md
+    │           └── checklist.md
     ├── agents/                    # Isolated subagents
     │   └── coderabbit-feedback.md
     └── hooks/                     # Event handlers
@@ -70,12 +79,13 @@ plugins/
 
 ### Design Patterns Used
 
-- **Progressive disclosure**: Main SKILL.md stays under 500 lines, detailed content in reference files
-- **Gerund naming**: All skills use verb+ing format (managing, understanding, browser-automation)
+- **Progressive disclosure**: Main SKILL.md stays under 200 lines, detailed content in reference files
+- **Gerund naming**: All skills use verb+ing format (managing, understanding, writing)
 - **Context-aware**: Skills adapt to project language/conventions (e.g., Korean commit messages)
 - **Token efficiency**: Symbolic tools over text search, targeted reads over full file scans
 - **Language-agnostic templates**: Code examples in English with language detection for user-facing content
 - **Namespaced commands**: Prevents command collisions with organized directory structure
+- **Troubleshooting sections**: Each skill includes common issues and solutions
 
 ---
 
@@ -167,11 +177,12 @@ How would you like to proceed?
 - Code/technical content stays universal for consistency
 - Enables seamless collaboration in multilingual teams
 
-**Primary resource**: Use `superpowers:writing-skills` for the complete TDD-based skill creation methodology, including:
-- RED-GREEN-REFACTOR cycle for documentation
-- Testing with pressure scenarios and subagents
-- Bulletproofing against rationalization
-- Complete quality checklists
+**Primary resource**: Use the `writing-skills` skill for comprehensive skill creation guidance, including:
+- Use case definition and success criteria
+- File structure and frontmatter rules
+- Workflow patterns (5 common patterns)
+- Testing methodology (triggering, functional, performance)
+- Troubleshooting guide
 
 This document provides Anthropic's official best practices as complementary reference.
 
@@ -239,7 +250,7 @@ Create evaluations BEFORE extensive documentation to solve real problems rather 
 
 Work with one Claude instance to create Skills, test with other instances in real tasks. Observe behavior, gather insights, iterate based on actual usage patterns.
 
-**Note**: See `superpowers:writing-skills` for complete TDD-based testing methodology with pressure scenarios and subagents.
+**Note**: See `writing-skills` skill for complete testing methodology including triggering tests, functional tests, and performance comparison.
 
 ---
 
@@ -271,7 +282,8 @@ Without the server prefix, Claude may fail to locate the tool.
 
 ## Additional Resources
 
-- **Primary methodology**: Use `superpowers:writing-skills` skill for TDD-based skill creation
+- **Primary methodology**: Use `writing-skills` skill for comprehensive skill creation
 - [Anthropic Official Best Practices](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/best-practices)
 - [Skills Overview](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview)
+- [The Complete Guide to Building Skills for Claude](The-Complete-Guide-to-Building-Skill-for-Claude.pdf) - Anthropic's official PDF guide
 - [Project Repository](https://github.com/ether-moon/skill-set)

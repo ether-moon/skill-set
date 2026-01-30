@@ -1,6 +1,7 @@
 ---
 name: managing-git-workflow
 description: Automates git commits, push, and PR creation with context-aware messages and ticket extraction. Use when performing git operations, creating commits/PRs, or when user mentions git, GitHub, commit, push, or pull request.
+allowed-tools: "Bash(git:*) Bash(gh:*) Bash(source:*) Bash(bash:*)"
 ---
 
 # Managing Git Workflow
