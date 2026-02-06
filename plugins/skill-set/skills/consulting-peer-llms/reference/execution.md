@@ -52,7 +52,7 @@ declare -A CLI_RESULTS
 declare -A CLI_PIDS
 declare -A CLI_FILES
 
-TIMEOUT="600s"  # 10 minutes
+TIMEOUT="1200s"  # 20 minutes
 
 # Launch all target CLIs in parallel
 for cli in "${TARGET_CLIS[@]}"; do
@@ -61,13 +61,13 @@ for cli in "${TARGET_CLIS[@]}"; do
 
     case "$cli" in
         gemini)
-            timeout "$TIMEOUT" gemini "$PROMPT" > "$OUTPUT_FILE" 2>/dev/null &
+            timeout "$TIMEOUT" gemini -p "$PROMPT" > "$OUTPUT_FILE" 2>/dev/null &
             ;;
         codex)
             timeout "$TIMEOUT" codex exec "$PROMPT" > "$OUTPUT_FILE" 2>/dev/null &
             ;;
         claude)
-            timeout "$TIMEOUT" claude "$PROMPT" > "$OUTPUT_FILE" 2>/dev/null &
+            timeout "$TIMEOUT" claude -p "$PROMPT" > "$OUTPUT_FILE" 2>/dev/null &
             ;;
         *)
             timeout "$TIMEOUT" "$cli" "$PROMPT" > "$OUTPUT_FILE" 2>/dev/null &
@@ -203,18 +203,18 @@ Analyze all CLI responses and generate synthesized assessment.
 
 | CLI | Command | Notes |
 |-----|---------|-------|
-| gemini | `gemini "$PROMPT"` | Google Gemini CLI |
+| gemini | `gemini -p "$PROMPT"` | Google Gemini CLI |
 | codex | `codex exec "$PROMPT"` | OpenAI Codex CLI (uses `exec` subcommand) |
-| claude | `claude "$PROMPT"` | Anthropic Claude CLI |
+| claude | `claude -p "$PROMPT"` | Anthropic Claude CLI |
 
 ---
 
 ## Timeout Handling
 
 **Exit code 124** indicates timeout:
-- Default timeout: 600s (10 minutes)
+- Default timeout: 1200s (20 minutes)
 - Reduce prompt size if timing out frequently
-- Check CLI responsiveness: `time gemini "test"`
+- Check CLI responsiveness: `time gemini -p "test"`
 
 **No retries**: Keep execution fast and simple. If a CLI fails, proceed with others.
 

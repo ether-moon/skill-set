@@ -1,7 +1,7 @@
 ---
 name: consulting-peer-llms
 description: Use when user explicitly requests feedback from other LLM tools (Gemini, Codex) on current work - executes peer reviews in parallel and synthesizes responses into actionable insights
-allowed-tools: "Bash(gemini:*) Bash(codex:*) Bash(claude:*) Bash(timeout:*)"
+allowed-tools: "Bash(gemini:*) Bash(codex:*) Bash(claude:*) Bash(timeout:*) Bash(command:*) Bash(bash:*) Bash($SKILL_DIR:*)"
 ---
 
 # Consulting Peer LLMs
@@ -33,25 +33,8 @@ Get feedback from other LLM CLI tools (Gemini, Codex) on your current work. This
 - `claude` - Anthropic Claude CLI
 
 **Detection:**
-- With arguments: Use only specified CLIs (e.g., `/review gemini codex`)
-- Without arguments: Auto-detect all installed CLIs
-
-**Auto-allow 설정 (권장):**
-
-매번 bash 실행 동의 없이 사용하려면 `.claude/settings.local.json`에 추가:
-
-```json
-{
-  "permissions": {
-    "allow": [
-      "Bash(gemini:*)",
-      "Bash(codex:*)",
-      "Bash(claude:*)",
-      "Bash(timeout:*)"
-    ]
-  }
-}
-```
+- Auto-detect all installed CLIs via `command -v`
+- Use all available CLIs for comprehensive review
 
 ## Workflow
 
@@ -113,9 +96,7 @@ Show original responses first for transparency:
 ## Quick Reference
 
 **Commands:**
-- `/consulting-peer-llms:review` - Auto-detect all CLIs
-- `/consulting-peer-llms:review gemini` - Use Gemini only
-- `/consulting-peer-llms:review gemini codex` - Use both
+- `/consulting-peer-llms:review <requirements>` - Auto-detect all installed CLIs and review with the given requirements
 
 **Typical execution time:** 10-30 seconds (parallel)
 
@@ -140,7 +121,7 @@ Show original responses first for transparency:
 ## Troubleshooting
 
 **"Empty response from CLI"**
-- Check CLI can run: `gemini "test"`
+- Check CLI can run: `gemini -p "test"`
 - Verify API keys/auth
 - Check prompt isn't too long
 

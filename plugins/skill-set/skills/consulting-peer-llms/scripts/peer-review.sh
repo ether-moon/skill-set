@@ -8,7 +8,7 @@ set -e
 # Configuration
 # ============================================================================
 
-TIMEOUT="${TIMEOUT:-600s}"  # 10 minutes default timeout
+TIMEOUT="${TIMEOUT:-1200s}"  # 20 minutes default timeout
 
 # ============================================================================
 # CLI Detection and Selection
@@ -83,13 +83,13 @@ execute_cli() {
 
     case "$cli" in
         gemini)
-            timeout "$TIMEOUT" gemini "$prompt" > "$output_file" 2>/dev/null
+            timeout "$TIMEOUT" gemini -p "$prompt" > "$output_file" 2>/dev/null
             ;;
         codex)
             timeout "$TIMEOUT" codex exec "$prompt" > "$output_file" 2>/dev/null
             ;;
         claude)
-            timeout "$TIMEOUT" claude "$prompt" > "$output_file" 2>/dev/null
+            timeout "$TIMEOUT" claude -p "$prompt" > "$output_file" 2>/dev/null
             ;;
         *)
             # Generic execution for unknown CLIs

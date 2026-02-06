@@ -602,7 +602,7 @@ If both fail:
 
 Please check:
 - CLI installation: `which gemini codex`
-- CLI functionality: `gemini "test"`
+- CLI functionality: `gemini -p "test"`
 - API authentication if required
 
 Cannot proceed with peer review until CLIs are functional.
