@@ -4,6 +4,3 @@
 
 # Playwright output files
 tmp/playwright/
-skill-set/skills/browser-automation/node_modules/
-skill-set/skills/browser-automation/package.json
-skill-set/skills/browser-automation/package-lock.json

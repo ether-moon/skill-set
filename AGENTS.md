@@ -9,10 +9,9 @@
 #### Skills
 1. **managing-git-workflow**: Automates git operations (commit, push, PR) with context-aware message generation in the project's language and automatic ticket extraction from branch names
 2. **understanding-code-context**: Find and read official documentation for external libraries and frameworks using Context7
-3. **browser-automation**: Pre-built Playwright templates (19 scripts) for browser automation tasks without MCP server overhead
-4. **consulting-peer-llms**: Execute peer reviews from other LLM tools (Gemini, Codex, Claude) in parallel and synthesize actionable insights
-5. **using-skill-set**: Establishes workflows for discovering and using skill-set features at session start
-6. **writing-skills**: Guide for creating effective Claude skills with structured workflow, testing methodology, and troubleshooting
+3. **consulting-peer-llms**: Execute peer reviews from other LLM tools (Gemini, Codex, Claude) in parallel and synthesize actionable insights
+4. **using-skill-set**: Establishes workflows for discovering and using skill-set features at session start
+5. **writing-skills**: Guide for creating effective Claude skills with structured workflow, testing methodology, and troubleshooting
 
 #### Agents
 1. **coderabbit-feedback**: Interactive CodeRabbit review processing with severity-based classification, user discussion, and verified completion workflow. Runs as isolated subagent for better context management.
@@ -49,11 +48,6 @@ plugins/
     │   │       ├── tools.md
     │   │       ├── workflows.md
     │   │       └── anti-patterns.md
-    │   ├── browser-automation/
-    │   │   ├── SKILL.md
-    │   │   ├── reference/
-    │   │   │   └── TEMPLATES.md
-    │   │   └── templates/        # 16 Playwright scripts
     │   ├── consulting-peer-llms/
     │   │   ├── SKILL.md
     │   │   └── reference/

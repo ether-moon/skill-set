@@ -8,7 +8,6 @@ PLUGINS_DIR="${HOME}/.claude/plugins"
 
 # Define skill-set plugins to check
 declare -a SKILL_SET_PLUGINS=(
-  "browser-automation"
   "consulting-peer-llms"
   "managing-git-workflow"
   "understanding-code-context"

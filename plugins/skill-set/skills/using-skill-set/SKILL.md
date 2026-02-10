@@ -15,11 +15,6 @@ The following skills are currently installed:
 
 {{INSTALLED_PLUGINS}}
 
-### browser-automation
-**Use when**: Testing web pages, automating browser tasks, screenshots, web testing, form automation, Playwright.
-
-Automates browser interactions using Playwright CLI and templates.
-
 ### consulting-peer-llms
 **Use when**: User explicitly requests review from other LLMs (e.g., "validate with codex", "get feedback from gemini").
 
@@ -59,7 +54,6 @@ Guide for creating effective Claude skills with structured workflow.
 Before starting a task, consider if any installed skill applies:
 
 - Git operations? → Use `managing-git-workflow`
-- Browser testing? → Use `browser-automation`
 - External library docs? → Use `understanding-code-context`
 - Peer LLM review? → Use `consulting-peer-llms`
 - Creating skills? → Use `writing-skills`
@@ -93,7 +87,6 @@ If you catch yourself thinking these, check for relevant skills first:
 **Do check for skills** when:
 - Starting git operations
 - Working with external libraries
-- Automating browser tasks
 - Creating new skills
 
 **Don't force skill usage** when:
@@ -106,7 +99,6 @@ If you catch yourself thinking these, check for relevant skills first:
 | Task | Skill |
 |------|-------|
 | Git commit/push/PR | `managing-git-workflow` |
-| Browser automation | `browser-automation` |
 | External library docs | `understanding-code-context` |
 | Peer LLM review | `consulting-peer-llms` |
 | CodeRabbit feedback | `coderabbit-feedback` |

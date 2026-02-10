@@ -37,19 +37,6 @@ Find and read official documentation for external libraries and frameworks using
 - Version-specific authoritative documentation
 - Best practices and patterns from official sources
 
-### Browser Automation
-Automates browser interactions using Playwright CLI with 19 pre-built templates.
-
-**Use when**: Testing web pages, automating browser tasks, capturing screenshots, generating PDFs, or filling forms.
-
-**Templates include**:
-- Screenshot and PDF generation
-- Form filling and validation
-- Element interaction (click, hover, drag, select)
-- Console and network monitoring
-- Dialog handling and file uploads
-- Navigation and wait conditions
-
 ### Peer LLM Consulting
 Execute peer reviews from other LLM tools (Gemini, Codex, Claude) in parallel and synthesize actionable insights.
 
@@ -104,7 +91,7 @@ You can explicitly request skills:
 ```
 Use the managing-git-workflow skill to create a commit
 Use the understanding-code-context skill to explore this codebase
-Use the browser-automation skill to take a screenshot
+Use the consulting-peer-llms skill to get peer review feedback
 ```
 
 ### Slash Commands
@@ -139,10 +126,6 @@ plugins/
     │   ├── understanding-code-context/
     │   │   ├── SKILL.md
     │   │   └── reference/
-    │   ├── browser-automation/
-    │   │   ├── SKILL.md
-    │   │   ├── reference/
-    │   │   └── templates/       # 16 Playwright scripts
     │   ├── consulting-peer-llms/
     │   │   ├── SKILL.md
     │   │   └── reference/
@@ -167,7 +150,6 @@ plugins/
 
 - Claude Code (latest version recommended)
 - Git (for git workflow features)
-- Playwright CLI (for browser automation features, optional)
 - Peer LLM CLIs (for consulting features, optional):
   - `gemini-cli` for Gemini
   - `codex` for Codex

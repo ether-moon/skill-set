@@ -7,7 +7,7 @@
     {
       "name": "skill-set",
       "source": "./plugins/skill-set",
-      "description": "Comprehensive productivity skills and development tools for Claude Code, including git workflow automation, code context understanding, browser automation, peer LLM consulting, and CodeRabbit feedback processing."
+      "description": "Comprehensive productivity skills and development tools for Claude Code, including git workflow automation, code context understanding, peer LLM consulting, and CodeRabbit feedback processing."
     }
   ]
 }

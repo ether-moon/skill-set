@@ -5,6 +5,14 @@ All notable changes to the skill-set plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-02-10
+
+### Removed
+
+- **browser-automation**: Removed skill entirely — replaced by official [Playwright CLI](https://github.com/microsoft/playwright-cli)
+  - Deleted SKILL.md, reference/TEMPLATES.md, and all 16 template scripts
+  - Cleaned up all references across AGENTS.md, README.md, plugin.json, marketplace.json, using-skill-set, session-start.sh, .gitignore
+
 ## [1.2.1] - 2026-02-10
 
 ### Changed

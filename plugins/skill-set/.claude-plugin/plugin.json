@@ -1,7 +1,7 @@
 {
   "name": "skill-set",
-  "description": "Comprehensive productivity skills and development tools for Claude Code, including git workflow automation, code context understanding, browser automation, peer LLM consulting, and CodeRabbit feedback processing.",
-  "version": "1.2.1",
+  "description": "Comprehensive productivity skills and development tools for Claude Code, including git workflow automation, code context understanding, peer LLM consulting, and CodeRabbit feedback processing.",
+  "version": "1.3.0",
   "author": {
     "name": "ether-moon"
   },
