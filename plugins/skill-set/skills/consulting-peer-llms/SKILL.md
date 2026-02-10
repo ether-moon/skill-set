@@ -1,6 +1,6 @@
 ---
 name: consulting-peer-llms
-description: Use when user explicitly requests feedback from other LLM tools (Gemini, Codex) on current work - executes peer reviews in parallel and synthesizes responses into actionable insights
+description: Use when user explicitly requests feedback from other LLM tools (Gemini, Codex, Claude) on current work
 allowed-tools: "Bash(gemini:*) Bash(codex:*) Bash(claude:*) Bash(timeout:*) Bash(command:*) Bash(bash:*) Bash($SKILL_DIR:*)"
 ---
 
@@ -44,21 +44,13 @@ Get feedback from other LLM CLI tools (Gemini, Codex) on your current work. This
 - What was implemented (from conversation)
 - User's requirements and constraints
 
-**Code Changes:**
-```bash
-BASE_SHA=$(git rev-parse origin/main 2>/dev/null || echo "HEAD~1")
-CURRENT_SHA=$(git rev-parse HEAD)
-```
-
 ### Step 2: Generate Review Prompt
 
 Use structured prompt with these sections:
-1. Output language (if non-English detected)
-2. What was implemented
-3. Requirements/plan
-4. Changes (SHAs + file list + summary)
-5. Review focus areas
-6. Expected output format
+1. What was implemented
+2. Requirements/plan
+3. Instruction to compare current branch against `origin/main` (or `origin/master`)
+4. User's specific review requirements (if any, passed as-is)
 
 **Full template**: See [reference/prompt-template.md](reference/prompt-template.md)
 
@@ -66,7 +58,7 @@ Use structured prompt with these sections:
 
 Run target CLIs simultaneously and collect results.
 
-**Detailed execution**: See [reference/execution.md](reference/execution.md)
+**CLI commands**: See [reference/cli-commands.md](reference/cli-commands.md)
 
 ### Step 4: Present Raw Responses
 
@@ -85,20 +77,21 @@ Show original responses first for transparency:
 
 **Always synthesize** - even for single CLI responses.
 
-**Report structure**: See [reference/report-format.md](reference/report-format.md)
+**Synthesis principles:**
+1. Consolidate duplicates — same issue from multiple CLIs = one entry
+2. Filter for validity — skip suggestions irrelevant to current requirements
+3. Prioritize by impact — not by which/how many CLIs mentioned it
+4. Make actionable — concrete code fixes, not vague advice
+5. Remove noise — focus on essentials
 
-**Key sections:**
-- Critical Issues Requiring Immediate Attention
-- Architecture & Design Concerns
-- Code Quality Issues
-- Actionable Recommendations
+**Report example**: See [reference/report-format.md](reference/report-format.md)
 
 ## Quick Reference
 
 **Commands:**
 - `/consulting-peer-llms:review <requirements>` - Auto-detect all installed CLIs and review with the given requirements
 
-**Typical execution time:** 10-30 seconds (parallel)
+**Typical execution time:** 5-30 minutes (parallel)
 
 **Temp files:** `/tmp/{cli-name}-review.txt` (one per CLI)
 
@@ -108,7 +101,9 @@ Show original responses first for transparency:
 - Skipping raw response output
 - Just showing raw responses without synthesis
 - Skipping synthesis for single CLI
-- Including full git diff in prompt (use summary)
+- Passing diffs, file lists, SHAs, or file contents in the prompt (CLIs can use git directly)
+- Writing prompts to separate temp files instead of passing inline
+- Specifying model parameters (e.g., `--model`) — use each CLI's default model
 
 ## Error Handling
 
@@ -135,7 +130,6 @@ Show original responses first for transparency:
 
 ## See Also
 
-- [reference/prompt-template.md](reference/prompt-template.md) - Full prompt structure
-- [reference/cli-commands.md](reference/cli-commands.md) - CLI execution details
-- [reference/execution.md](reference/execution.md) - Parallel execution details
-- [reference/report-format.md](reference/report-format.md) - Report examples
+- [reference/prompt-template.md](reference/prompt-template.md) - Prompt structure
+- [reference/cli-commands.md](reference/cli-commands.md) - CLI commands and parallel execution
+- [reference/report-format.md](reference/report-format.md) - Report example

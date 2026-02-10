@@ -19,5 +19,11 @@ Use the consulting-peer-llms skill to execute peer LLM reviews.
 1. **Detect installed CLIs**: Run `command -v` to check for `gemini`, `codex`, `claude` and use all that are available
 2. **Determine review scope**:
    - If arguments provided: Use as review requirements
-   - If no arguments: Collect changes via `git diff origin/main...HEAD` (fallback to `origin/master`) and request a general code review of the current implementation
-3. **Execute the review workflow** from the consulting-peer-llms skill with the detected CLIs and determined scope
+   - If no arguments: Request a general code review of the current implementation
+3. **Build prompt and execute CLIs in parallel** from the consulting-peer-llms skill with the detected CLIs and determined scope
+
+## Constraints
+
+- **Do NOT pass diffs, SHAs, or file contents in the prompt**: Each CLI runs in the same repository and can use git directly. Simply instruct them to compare the current branch against `origin/main` (or `origin/master`).
+- **Do NOT write prompts to separate files**: Pass prompts directly inline to CLI commands. Writing prompt content to temp `.md` files is unnecessary overhead.
+- **Do NOT specify model parameters**: Use each CLI's default model. Do not pass flags like `--model` to any CLI.

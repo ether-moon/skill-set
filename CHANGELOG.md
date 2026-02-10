@@ -5,6 +5,20 @@ All notable changes to the skill-set plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-02-10
+
+### Changed
+
+- **consulting-peer-llms**: Streamlined skill and reference files (-83% token usage)
+  - Simplified prompt: CLIs query git diffs directly, no need to pass diffs/SHAs/file lists
+  - Removed output language/format specification from prompts (synthesizer handles it)
+  - Added constraints: no model specification, no prompt temp files
+  - Fixed CSO description (removed workflow summary per writing-skills guidelines)
+  - Deleted `execution.md` (duplicated cli-commands.md and SKILL.md)
+  - Reduced `cli-commands.md` from 612 to 53 lines
+  - Reduced `report-format.md` from 646 to 109 lines
+  - Moved synthesis principles inline to SKILL.md
+
 ## [1.2.0] - 2026-02-06
 
 ### Changed
@@ -143,6 +157,7 @@ Users upgrading from v1.x should:
   - `using-skill-set`: Session initialization
   - `coderabbit-feedback`: CodeRabbit review processing
 
+[1.2.1]: https://github.com/ether-moon/skill-set/releases/tag/v1.2.1
 [1.2.0]: https://github.com/ether-moon/skill-set/releases/tag/v1.2.0
 [1.1.0]: https://github.com/ether-moon/skill-set/releases/tag/v1.1.0
 [1.0.2]: https://github.com/ether-moon/skill-set/releases/tag/v1.0.2
