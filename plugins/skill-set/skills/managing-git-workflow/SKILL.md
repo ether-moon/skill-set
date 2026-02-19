@@ -1,7 +1,7 @@
 ---
 name: managing-git-workflow
 description: Automates git commits, push, and PR creation with context-aware messages and ticket extraction. Use when performing git operations, creating commits/PRs, or when user mentions git, GitHub, commit, push, or pull request.
-allowed-tools: "Bash(git:*) Bash(gh:*) Bash(source:*) Bash(bash:*)"
+allowed-tools: "Bash(git:*) Bash(gh:*)"
 ---
 
 # Managing Git Workflow
@@ -36,21 +36,16 @@ Automates git workflows for commit, push, and PR creation with context-aware mes
 - Extract ticket numbers from branch names for PR titles
 - Use descriptive, concrete names
 
-**Helper Scripts:**
-- Common git operations available in `git-helpers.sh`
-- Use `source` to load helpers when needed
+**All commands start with `git` or `gh`** to ensure compatibility with standard permission patterns (`Bash(git:*)`, `Bash(gh:*)`).
 
 ## Quick Reference
 
 ```bash
-# Load helper functions
-source $SKILL_DIR/git-helpers.sh
-
 # Check status
-has_uncommitted_changes  # returns 0 if true
-has_unpushed_commits     # returns 0 if true
-get_current_branch       # echoes branch name
-check_pr_exists          # returns 0 if PR exists
+git status --porcelain                    # empty = clean
+git rev-list --count @{u}..HEAD           # 0 = up to date
+git branch --show-current                 # current branch name
+gh pr list --head "$(git branch --show-current)" --json number --jq 'length'  # 0 = no PR
 ```
 
 ## Implementation

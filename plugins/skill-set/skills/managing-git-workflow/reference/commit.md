@@ -51,11 +51,12 @@ git diff --cached --stat
   - Examples: FMT-1234, FLEASVR-287, ABC-123
 - **Clarity:** Clearly describe what changed and why
 
-**Helper for ticket extraction:**
+**Ticket extraction from branch name:**
 ```bash
-source .claude/skills/managing-git-workflow/git-helpers.sh
-extract_ticket_from_branch
+git branch --show-current
 ```
+
+Parse the ticket number from the output (match patterns like `FMT-1234`, `FLEASVR-287`, `ABC-123`).
 
 **Message format examples:**
 ```

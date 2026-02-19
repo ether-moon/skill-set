@@ -14,7 +14,7 @@ Create a pull request with auto-generated title and description, automatically p
    - [6. Create Pull Request](#6-create-pull-request)
    - [7. Open in Browser](#7-open-in-browser)
 3. [Common Issues](#common-issues)
-4. [Helper Functions Reference](#helper-functions-reference)
+4. [Equivalent Direct Commands](#equivalent-direct-commands)
 5. [Workflow Integration](#workflow-integration)
 
 ## Prerequisites
@@ -29,14 +29,13 @@ Create a pull request with auto-generated title and description, automatically p
 ### 1. Validate Branch Status
 
 ```bash
-source .claude/skills/managing-git-workflow/git-helpers.sh
+# Check current branch - abort if on main/master
+git branch --show-current
+```
 
-# Check current branch
-if is_main_branch; then
-    echo "ERROR: Cannot create PR from main/master branch"
-    exit 1
-fi
+If the output is `main` or `master`, stop and inform user: "Cannot create PR from main/master branch."
 
+```bash
 # Check for uncommitted changes
 git status
 ```
@@ -60,25 +59,25 @@ Quick reference:
 ### 3. Check for Existing PR
 
 ```bash
-if check_pr_exists; then
-    pr_url=$(get_pr_url)
-    echo "PR already exists: $pr_url"
-    exit 0
-fi
+gh pr list --head "$(git branch --show-current)" --json number,url --jq '.[0]'
 ```
+
+If a PR already exists, output its URL and stop.
 
 ### 4. Analyze Commits and Changes
 
 ```bash
-# Get commits since diverged from master
+# Get commits since diverged from base branch
 git log --oneline origin/master..HEAD
 
 # Get change summary
 git diff --stat origin/master..HEAD
 
-# Extract ticket number from branch name
-ticket=$(extract_ticket_from_branch)
+# Get branch name to extract ticket number (e.g., FMT-1234, FLEASVR-287)
+git branch --show-current
 ```
+
+Parse the ticket number from the branch name output (e.g., `feature/FMT-1234-description` → `FMT-1234`).
 
 ### 5. Generate PR Title and Description
 
@@ -141,11 +140,7 @@ The command automatically uses current branch as head.
 ### 7. Open in Browser
 
 ```bash
-# Get PR URL from gh output
-pr_url=$(gh pr view --json url --jq .url)
-
-# Open in browser (macOS)
-open "$pr_url"
+gh pr view --web
 ```
 
 **Output to user:**
@@ -182,18 +177,23 @@ git diff --name-only origin/master..HEAD
 git diff origin/master..HEAD
 ```
 
-## Helper Functions Reference
+## Equivalent Direct Commands
 
 ```bash
-# Load helpers first
-source .claude/skills/managing-git-workflow/git-helpers.sh
+# Check if on main/master branch
+git branch --show-current                # compare output with "main"/"master"
 
-# Available functions:
-is_main_branch()           # Returns 0 if on main/master
-check_pr_exists()          # Returns 0 if PR exists for current branch
-get_pr_url()               # Echoes PR URL if exists
-extract_ticket_from_branch() # Echoes ticket number from branch name
-get_current_branch()       # Echoes current branch name
+# Check if PR exists for current branch
+gh pr list --head "$(git branch --show-current)" --json number --jq 'length'  # 0 = no PR
+
+# Get PR URL
+gh pr view --json url --jq .url
+
+# Extract ticket from branch name
+git branch --show-current                # parse ticket pattern (e.g., ABC-123) from output
+
+# Open PR in browser
+gh pr view --web
 ```
 
 ## Workflow Integration

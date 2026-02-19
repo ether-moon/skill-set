@@ -121,7 +121,6 @@ plugins/
     ├── skills/                  # All skills with integrated scripts
     │   ├── managing-git-workflow/
     │   │   ├── SKILL.md
-    │   │   ├── git-helpers.sh   # Utility script
     │   │   └── reference/
     │   ├── understanding-code-context/
     │   │   ├── SKILL.md

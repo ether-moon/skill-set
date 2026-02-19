@@ -37,7 +37,6 @@ plugins/
     ├── skills/                    # All skills with integrated scripts
     │   ├── managing-git-workflow/
     │   │   ├── SKILL.md
-    │   │   ├── git-helpers.sh    # Utility script
     │   │   └── reference/
     │   │       ├── commit.md
     │   │       ├── push.md

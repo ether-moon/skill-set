@@ -12,8 +12,6 @@ Push changes to remote repository, automatically committing if needed.
 ### 1. Check Current Status
 
 ```bash
-source .claude/skills/managing-git-workflow/git-helpers.sh
-
 # Check for uncommitted changes and unpushed commits
 git status
 ```
@@ -28,24 +26,19 @@ git status
 
 Quick reference:
 ```bash
-if has_uncommitted_changes; then
-    # Follow commit.md workflow:
-    # - git add -A
-    # - Analyze patterns (git log --oneline -10)
-    # - Generate message in project's language
-    # - git commit -m "message"
-fi
+# Check if uncommitted changes exist
+git status --porcelain
 ```
+
+If output is non-empty, follow commit.md workflow (git add, analyze, commit).
 
 ### 3. Check Branch Tracking Status
 
 ```bash
-if has_upstream; then
-    echo "Upstream tracking exists"
-else
-    echo "No upstream tracking - will set on push"
-fi
+git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null
 ```
+
+If command succeeds, upstream tracking exists. If it fails, will need `-u` flag on push.
 
 ### 4. Push to Remote
 
@@ -56,7 +49,7 @@ git push
 
 **If no upstream tracking:**
 ```bash
-git push -u origin $(get_current_branch)
+git push -u origin "$(git branch --show-current)"
 ```
 
 This sets up tracking for future pushes.
@@ -99,15 +92,18 @@ git pull --rebase
 **Issue:** Authentication failed
 **Fix:** User needs to configure git credentials or SSH keys. Not handled by this workflow.
 
-## Helper Functions Reference
+## Equivalent Direct Commands
 
 ```bash
-# Load helpers first
-source .claude/skills/managing-git-workflow/git-helpers.sh
+# Check for uncommitted changes (non-empty output = changes exist)
+git status --porcelain
 
-# Available functions:
-has_uncommitted_changes  # Returns 0 if changes exist
-has_unpushed_commits     # Returns 0 if unpushed commits exist
-get_current_branch       # Echoes branch name
-has_upstream             # Returns 0 if upstream tracking exists
+# Check for unpushed commits (>0 = unpushed)
+git rev-list --count @{u}..HEAD 2>/dev/null
+
+# Get current branch name
+git branch --show-current
+
+# Check upstream tracking (success = exists)
+git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null
 ```
