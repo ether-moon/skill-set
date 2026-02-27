@@ -1,6 +1,6 @@
 ---
 description: Create a git commit using the managing-git-workflow skill
-model: claude-haiku-4-5
+model: sonnet
 ---
 
 Use the managing-git-workflow skill to create a git commit with Korean commit messages and automatic ticket extraction.

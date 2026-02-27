@@ -1,6 +1,6 @@
 ---
 description: Push changes to remote using the managing-git-workflow skill
-model: claude-haiku-4-5
+model: sonnet
 ---
 
 Use the managing-git-workflow skill to push changes to remote repository with automatic commit if there are uncommitted changes.
