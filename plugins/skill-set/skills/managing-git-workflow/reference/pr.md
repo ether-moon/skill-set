@@ -1,21 +1,6 @@
 # Pull Request Workflow
 
-Create a pull request with auto-generated title and description, automatically pushing if needed.
-
-## Table of Contents
-
-1. [Prerequisites](#prerequisites)
-2. [Steps](#steps)
-   - [1. Validate Branch Status](#1-validate-branch-status)
-   - [2. Auto-Commit and Push if Needed](#2-auto-commit-and-push-if-needed)
-   - [3. Check for Existing PR](#3-check-for-existing-pr)
-   - [4. Analyze Commits and Changes](#4-analyze-commits-and-changes)
-   - [5. Generate PR Title and Description](#5-generate-pr-title-and-description)
-   - [6. Create Pull Request](#6-create-pull-request)
-   - [7. Open in Browser](#7-open-in-browser)
-3. [Common Issues](#common-issues)
-4. [Equivalent Direct Commands](#equivalent-direct-commands)
-5. [Workflow Integration](#workflow-integration)
+Create a pull request with auto-generated title and description, automatically committing and pushing if needed. Self-contained — no delegation to other workflows.
 
 ## Prerequisites
 
@@ -24,66 +9,102 @@ Create a pull request with auto-generated title and description, automatically p
 - Not on master/main branch
 - Changes to include in PR (committed, uncommitted, or pushed)
 
+## Call Summary
+
+| Step | Type | Bash Calls |
+|------|------|------------|
+| 1. Gather git context | read (git) | 1 |
+| 2. Check existing PR | read (gh) | 1 |
+| 3. Commit and push (if needed) | write (git) | 0~1 |
+| 4. Analyze PR scope | read (git) | 1 |
+| 5. Generate PR content | analysis | 0 |
+| 6. Create PR and open | write (gh) | 1 |
+| **Total** | | **4~5** |
+
 ## Steps
 
-### 1. Validate Branch Status
+### 1. Gather Git Context (1 Bash call)
+
+Collect all needed git information in a single call:
 
 ```bash
-# Check current branch - abort if on main/master
-git branch --show-current
+git branch --show-current; git status --porcelain; git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || echo "NO_UPSTREAM"; git log --oneline -10; git diff HEAD --stat
 ```
 
-If the output is `main` or `master`, stop and inform user: "Cannot create PR from main/master branch."
+**Parse the output into 5 sections:**
+1. **Branch** (`git branch --show-current`): Current branch name — abort if `main` or `master`
+2. **Status** (`git status --porcelain`): Uncommitted changes — empty means all committed
+3. **Upstream** (`git rev-parse ...`): Tracking branch or `NO_UPSTREAM`
+4. **Log** (`git log --oneline -10`): Recent commit patterns and style
+5. **Diff stat** (`git diff HEAD --stat`): Summary of uncommitted changes
+
+**Exit if:** Branch is `main` or `master` → Inform user: "Cannot create PR from main/master branch."
+
+**Extract ticket number** from branch name (match patterns like `FMT-1234`, `FLEASVR-287`, `ABC-123`).
+
+### 2. Check Existing PR (1 Bash call)
 
 ```bash
-# Check for uncommitted changes
-git status
+gh pr list --head "BRANCH_NAME" --json number,url --jq '.[0]'
 ```
 
-### 2. Auto-Commit and Push if Needed
+Replace `BRANCH_NAME` with the branch from step 1.
 
-**If uncommitted changes exist** OR **if commits not pushed:**
+**Exit if:** PR already exists → Output its URL and stop.
 
-**→ See `managing-git-workflow/reference/push.md` for complete push steps**
+### 3. Commit and Push if Needed (0~1 Bash call)
 
-Push workflow automatically handles:
-- Committing uncommitted changes (via `managing-git-workflow/reference/commit.md`)
-- Pushing to remote with upstream tracking
+**Skip this step** if status from step 1 is empty AND upstream exists (already pushed).
 
-Quick reference:
+If uncommitted changes exist, generate a commit message first:
+
+**Commit message rules:**
+- **Language:** Use language specified in project context, prompts, or documentation (default to English)
+- **Style:** Follow patterns from the log output in step 1
+- **Ticket numbers:** Include if extracted from branch name in step 1
+- **Clarity:** Clearly describe what changed and why
+
+Then execute the appropriate command:
+
+**Uncommitted changes + no upstream:**
 ```bash
-# This is handled by push.md, which handles commit.md
-# Just follow the push workflow if needed
+git add -A && git commit -m "$(cat <<'EOF'
+Generated commit message
+EOF
+)" && git push -u origin "$(git branch --show-current)"
 ```
 
-### 3. Check for Existing PR
+**Uncommitted changes + upstream exists:**
+```bash
+git add -A && git commit -m "$(cat <<'EOF'
+Generated commit message
+EOF
+)" && git push
+```
+
+**All committed + no upstream:**
+```bash
+git push -u origin "$(git branch --show-current)"
+```
+
+**All committed + upstream exists:**
+Skip — already pushed.
+
+### 4. Analyze PR Scope (1 Bash call)
+
+Get the full scope of changes for PR description:
 
 ```bash
-gh pr list --head "$(git branch --show-current)" --json number,url --jq '.[0]'
+git log --oneline origin/master..HEAD; git diff --stat origin/master..HEAD
 ```
 
-If a PR already exists, output its URL and stop.
+**Parse the output into 2 sections:**
+1. **Commits**: All commits since diverging from base branch
+2. **Change summary**: Files and lines changed
 
-### 4. Analyze Commits and Changes
+### 5. Generate PR Title and Description (no Bash call)
 
-```bash
-# Get commits since diverged from base branch
-git log --oneline origin/master..HEAD
-
-# Get change summary
-git diff --stat origin/master..HEAD
-
-# Get branch name to extract ticket number (e.g., FMT-1234, FLEASVR-287)
-git branch --show-current
-```
-
-Parse the ticket number from the branch name output (e.g., `feature/FMT-1234-description` → `FMT-1234`).
-
-### 5. Generate PR Title and Description
-
-**Language:** Use language specified in project context, prompts, or documentation
-- Check project docs, README, or existing PR patterns for language preference
-- If unspecified, default to English
+**Language:** Use language specified in project context, prompts, or documentation (default to English).
 
 **Title format:**
 ```
@@ -114,12 +135,10 @@ Feature summary
 - List specific changes from diff stat
 - Generate test checklist based on changes
 
-### 6. Create Pull Request
+### 6. Create PR and Open in Browser (1 Bash call)
 
 ```bash
-gh pr create \
-  --title "<generated_title>" \
-  --body "$(cat <<'EOF'
+gh pr create --title "Generated title" --body "$(cat <<'EOF'
 ## Summary
 - Summary of changes
 
@@ -129,19 +148,10 @@ gh pr create \
 ## Test Plan
 - [ ] Test item 1
 EOF
-)" \
-  --base master
+)" --base master && gh pr view --web
 ```
 
 **Important:** Use HEREDOC for PR body to handle multi-line content correctly.
-
-The command automatically uses current branch as head.
-
-### 7. Open in Browser
-
-```bash
-gh pr view --web
-```
 
 **Output to user:**
 - PR URL
@@ -150,7 +160,7 @@ gh pr view --web
 
 **Example output:**
 ```
-✓ Pull request created: https://github.com/owner/repo/pull/123
+Pull request created: https://github.com/owner/repo/pull/123
   Title: FLEASVR-287: Install Github spec kit
 
 Opening in browser...
@@ -165,47 +175,10 @@ Opening in browser...
 **Fix:** Install GitHub CLI: `brew install gh` (macOS) and authenticate with `gh auth login`
 
 **Issue:** "Pull request already exists"
-**Fix:** Automatically detected in step 3. Outputs existing PR URL instead.
+**Fix:** Automatically detected in step 2. Outputs existing PR URL instead.
 
 **Issue:** Can't determine appropriate PR description
-**Fix:** Analyze more context:
-```bash
-# Check files changed
-git diff --name-only origin/master..HEAD
+**Fix:** Analyze more context with `git diff --name-only origin/master..HEAD` or `git diff origin/master..HEAD`.
 
-# Check detailed changes
-git diff origin/master..HEAD
-```
-
-## Equivalent Direct Commands
-
-```bash
-# Check if on main/master branch
-git branch --show-current                # compare output with "main"/"master"
-
-# Check if PR exists for current branch
-gh pr list --head "$(git branch --show-current)" --json number --jq 'length'  # 0 = no PR
-
-# Get PR URL
-gh pr view --json url --jq .url
-
-# Extract ticket from branch name
-git branch --show-current                # parse ticket pattern (e.g., ABC-123) from output
-
-# Open PR in browser
-gh pr view --web
-```
-
-## Workflow Integration
-
-This workflow integrates the full stack:
-
-```
-pr.md
-  ↓ (if needed)
-push.md
-  ↓ (if needed)
-commit.md
-```
-
-Each level only executes if necessary, creating a seamless experience from uncommitted changes to published PR.
+**Issue:** Push rejected (diverged branches)
+**Fix:** Run `git pull --rebase` then retry step 3.

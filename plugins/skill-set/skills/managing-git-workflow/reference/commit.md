@@ -7,56 +7,46 @@ Create a commit with auto-generated message following project conventions and la
 - Changes to commit (staged or unstaged)
 - Access to git repository
 
+## Call Summary
+
+| Step | Type | Bash Calls |
+|------|------|------------|
+| 1. Gather context | read | 1 |
+| 2. Generate message | analysis | 0 |
+| 3. Commit | write | 1 |
+| **Total** | | **2** |
+
 ## Steps
 
-### 1. Check Current Status
+### 1. Gather Context (1 Bash call)
+
+Collect all needed information in a single call:
 
 ```bash
-git status
+git status --porcelain; git log --oneline -10; git diff HEAD --stat; git branch --show-current
 ```
 
-**Exit if:** No changes exist → Output appropriate message in project's language and stop
+**Parse the output into 4 sections:**
+1. **Status** (`git status --porcelain`): File changes — empty means nothing to commit
+2. **Log** (`git log --oneline -10`): Recent commit patterns and style
+3. **Diff stat** (`git diff HEAD --stat`): Summary of what changed (works before staging)
+4. **Branch** (`git branch --show-current`): Current branch name for ticket extraction
 
-### 2. Stage Changes
+**Exit if:** Status section is empty → Output appropriate message in project's language and stop.
 
-```bash
-git add -A
-```
+### 2. Generate Commit Message (no Bash call)
 
-Stages all changes (new files, modifications, deletions).
-
-### 3. Analyze Commit Patterns
-
-Run these commands to understand project conventions:
-
-```bash
-# Recent commit messages
-git log --oneline -10
-
-# Changed files
-git diff --cached --name-only
-
-# Change summary
-git diff --cached --stat
-```
-
-### 4. Generate Commit Message
+Using the gathered context, generate the commit message:
 
 **Rules:**
 - **Language:** Use language specified in project context, prompts, or documentation
   - Check project docs, README, or existing commit patterns for language preference
   - If unspecified, default to English
-- **Style:** Follow patterns from step 3
-- **Ticket numbers:** Include if detected in branch name or changes
-  - Examples: FMT-1234, FLEASVR-287, ABC-123
+- **Style:** Follow patterns from the log output in step 1
+- **Ticket numbers:** Include if detected in branch name
+  - Extract from branch name (match patterns like `FMT-1234`, `FLEASVR-287`, `ABC-123`)
+  - Example: `feature/FMT-1234-description` → `FMT-1234`
 - **Clarity:** Clearly describe what changed and why
-
-**Ticket extraction from branch name:**
-```bash
-git branch --show-current
-```
-
-Parse the ticket number from the output (match patterns like `FMT-1234`, `FLEASVR-287`, `ABC-123`).
 
 **Message format examples:**
 ```
@@ -65,22 +55,18 @@ FLEASVR-287: Install Github spec kit
 Fix bug: Resolve empty projectDir error
 ```
 
-### 5. Create Commit
+### 3. Stage and Commit (1 Bash call)
+
+Chain staging, commit, and verification in a single call:
 
 ```bash
-git commit -m "$(cat <<'EOF'
+git add -A && git commit -m "$(cat <<'EOF'
 Generated commit message
 EOF
-)"
+)" && git log --oneline -1
 ```
 
-**Important:** Use HEREDOC for multi-line messages or messages with special characters.
-
-### 6. Verify Success
-
-```bash
-git log --oneline -1
-```
+**Important:** Always use HEREDOC for messages with special characters or multi-line content.
 
 **Output to user:**
 - Commit hash (first 7 characters)
@@ -89,17 +75,17 @@ git log --oneline -1
 
 **Example output:**
 ```
-✓ Commit created: a1b2c3d FMT-1234: Improve user authentication logic
+Commit created: a1b2c3d FMT-1234: Improve user authentication logic
   3 files changed, 45 insertions(+), 12 deletions(-)
 ```
 
 ## Common Issues
 
 **Issue:** "No changes to commit"
-**Fix:** User may have already committed. Run `git status` to confirm.
+**Fix:** User may have already committed. Check status output from step 1.
 
 **Issue:** Commit message contains quotes or special characters
-**Fix:** Always use HEREDOC format shown in step 5.
+**Fix:** Always use HEREDOC format shown in step 3.
 
 **Issue:** Can't determine appropriate message style
 **Fix:** Analyze more commits with `git log --oneline -20` or ask user for guidance.

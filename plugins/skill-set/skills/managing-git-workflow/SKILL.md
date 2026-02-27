@@ -19,17 +19,19 @@ Automates git workflows for commit, push, and PR creation with context-aware mes
 
 ## Workflow Selection
 
-| Task | Reference Document | Auto-includes |
-|------|-------------------|---------------|
-| Commit only | `managing-git-workflow/reference/commit.md` | - |
+| Task | Reference Document | Handles internally |
+|------|------|---------------------|
+| Commit only | `managing-git-workflow/reference/commit.md` | — |
 | Push to remote | `managing-git-workflow/reference/push.md` | Commit (if uncommitted changes) |
-| Create PR | `managing-git-workflow/reference/pr.md` | Push + Commit (if needed) |
+| Create PR | `managing-git-workflow/reference/pr.md` | Commit + Push (if needed) |
+
+Each workflow is **self-contained** — no delegation between reference files. This eliminates duplicate state checks.
 
 ## Common Principles
 
 **Commit Messages:**
 - Use language specified in project context, prompts, or documentation (default to English if unspecified)
-- Follow existing project patterns (analyze with `git log --online -10`)
+- Follow existing project patterns (analyze with `git log --oneline -10`)
 - Include ticket numbers (FMT-XXXXX, FLEASVR-XXX, etc.) if found in branch name or changes
 
 **Branch Naming:**
@@ -37,6 +39,15 @@ Automates git workflows for commit, push, and PR creation with context-aware mes
 - Use descriptive, concrete names
 
 **All commands start with `git` or `gh`** to ensure compatibility with standard permission patterns (`Bash(git:*)`, `Bash(gh:*)`).
+
+### Bash Call Optimization
+
+- **Combine independent reads** with `;` separator in a single Bash call (e.g., `git status --porcelain; git log --oneline -10; git branch --show-current`)
+- **Chain sequential writes** with `&&` in a single Bash call (e.g., `git add -A && git commit -m "..." && git push`)
+- **Self-contained workflows**: Each workflow handles its own state checks inline — no delegation to other reference files
+- **Pre-staging analysis**: Use `git diff HEAD --stat` before staging to analyze changes without a separate `git add` call
+- **Inline verification**: Append verification to write calls (e.g., `git commit -m "..." && git log --oneline -1`)
+- **Separate `git` and `gh` commands**: Keep `git` and `gh` prefixed commands in separate Bash calls for `Bash(git:*)` / `Bash(gh:*)` pattern compatibility
 
 ## Quick Reference
 

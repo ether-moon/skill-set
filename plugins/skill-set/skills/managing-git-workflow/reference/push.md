@@ -1,109 +1,103 @@
 # Push Workflow
 
-Push changes to remote repository, automatically committing if needed.
+Push changes to remote repository, automatically committing if needed. Self-contained — no delegation to other workflows.
 
 ## Prerequisites
 
 - Git repository with remote configured
 - Changes to push (committed or uncommitted)
 
+## Call Summary
+
+| Step | Type | Bash Calls |
+|------|------|------------|
+| 1. Gather context | read | 1 |
+| 2. Generate message (if needed) | analysis | 0 |
+| 3. Commit and/or push | write | 1 |
+| **Total** | | **2** |
+
 ## Steps
 
-### 1. Check Current Status
+### 1. Gather Context (1 Bash call)
+
+Collect all needed information in a single call:
 
 ```bash
-# Check for uncommitted changes and unpushed commits
-git status
+git status --porcelain; git log --oneline -10; git diff HEAD --stat; git branch --show-current; git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || echo "NO_UPSTREAM"
 ```
 
-**Exit if:** No changes and branch is up to date → Output appropriate message in project's language and stop
+**Parse the output into 5 sections:**
+1. **Status** (`git status --porcelain`): Uncommitted changes — empty means all committed
+2. **Log** (`git log --oneline -10`): Recent commit patterns and style
+3. **Diff stat** (`git diff HEAD --stat`): Summary of uncommitted changes
+4. **Branch** (`git branch --show-current`): Current branch name for ticket extraction
+5. **Upstream** (`git rev-parse ...`): Tracking branch or `NO_UPSTREAM`
 
-### 2. Auto-Commit if Needed
+**Exit if:** Status is empty AND branch is up to date with upstream → Output appropriate message in project's language and stop.
 
-**If uncommitted changes exist**, follow the commit workflow:
+### 2. Generate Commit Message (no Bash call, only if uncommitted changes)
 
-**→ See `managing-git-workflow/reference/commit.md` for complete commit steps**
+If status from step 1 is non-empty, generate a commit message:
 
-Quick reference:
+**Rules:**
+- **Language:** Use language specified in project context, prompts, or documentation (default to English)
+- **Style:** Follow patterns from the log output in step 1
+- **Ticket numbers:** Extract from branch name (match patterns like `FMT-1234`, `FLEASVR-287`, `ABC-123`)
+- **Clarity:** Clearly describe what changed and why
+
+### 3. Commit and/or Push (1 Bash call)
+
+Choose the appropriate command based on state from step 1:
+
+**Case A: Uncommitted changes + no upstream**
 ```bash
-# Check if uncommitted changes exist
-git status --porcelain
+git add -A && git commit -m "$(cat <<'EOF'
+Generated commit message
+EOF
+)" && git push -u origin "$(git branch --show-current)" && git log --oneline -1
 ```
 
-If output is non-empty, follow commit.md workflow (git add, analyze, commit).
-
-### 3. Check Branch Tracking Status
-
+**Case B: Uncommitted changes + upstream exists**
 ```bash
-git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null
+git add -A && git commit -m "$(cat <<'EOF'
+Generated commit message
+EOF
+)" && git push && git log --oneline -1
 ```
 
-If command succeeds, upstream tracking exists. If it fails, will need `-u` flag on push.
-
-### 4. Push to Remote
-
-**If upstream exists:**
-```bash
-git push
-```
-
-**If no upstream tracking:**
+**Case C: All committed + no upstream**
 ```bash
 git push -u origin "$(git branch --show-current)"
 ```
 
-This sets up tracking for future pushes.
-
-### 5. Verify and Report
-
+**Case D: All committed + upstream exists**
 ```bash
-git status
+git push
 ```
 
 **Output to user:**
 - Success message with branch name
-- Number of commits pushed
-- Current branch status
+- Commit details (if committed in this step)
+- Push confirmation
 
 **Example output:**
 ```
-✓ Successfully pushed to origin/feature-branch
-  2 commits pushed
+Pushed to origin/feature-branch
+  Commit: a1b2c3d FMT-1234: Improve user authentication logic
   Branch is up to date with 'origin/feature-branch'
 ```
 
 ## Common Issues
 
 **Issue:** "No upstream tracking branch"
-**Fix:** Automatically handled in step 4 with `-u` flag.
+**Fix:** Automatically handled with `-u` flag in Cases A and C.
 
 **Issue:** Push rejected (diverged branches)
 **Fix:**
 ```bash
-# Check status
-git status
-
-# If behind, pull first
 git pull --rebase
-
-# Then retry push
 ```
+Then retry the push step.
 
 **Issue:** Authentication failed
 **Fix:** User needs to configure git credentials or SSH keys. Not handled by this workflow.
-
-## Equivalent Direct Commands
-
-```bash
-# Check for uncommitted changes (non-empty output = changes exist)
-git status --porcelain
-
-# Check for unpushed commits (>0 = unpushed)
-git rev-list --count @{u}..HEAD 2>/dev/null
-
-# Get current branch name
-git branch --show-current
-
-# Check upstream tracking (success = exists)
-git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null
-```
