@@ -47,7 +47,7 @@ Interactive CodeRabbit review processing with severity classification and verifi
 
 Guides writing and revision with four core principles: concreteness, transcreation, steel man argumentation, and brevity.
 
-### writing-skills
+### creating-skills
 **Use when**: Creating, improving, or reviewing skills; learning skill best practices.
 
 Guide for creating effective Claude skills with structured workflow.
@@ -62,7 +62,7 @@ Before starting a task, consider if any installed skill applies:
 - External library docs? → Use `understanding-code-context`
 - Peer LLM review? → Use `consulting-peer-llms`
 - Writing/revising prose? → Use `writing-clear-prose`
-- Creating skills? → Use `writing-skills`
+- Creating skills? → Use `creating-skills`
 
 ### 2. Load and Follow the Skill
 
@@ -109,4 +109,4 @@ If you catch yourself thinking these, check for relevant skills first:
 | Peer LLM review | `consulting-peer-llms` |
 | CodeRabbit feedback | `coderabbit-feedback` |
 | Writing/revising prose | `writing-clear-prose` |
-| Creating skills | `writing-skills` |
+| Creating skills | `creating-skills` |

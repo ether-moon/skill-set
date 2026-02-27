@@ -11,7 +11,7 @@
 2. **understanding-code-context**: Find and read official documentation for external libraries and frameworks using Context7
 3. **consulting-peer-llms**: Execute peer reviews from other LLM tools (Gemini, Codex, Claude) in parallel and synthesize actionable insights
 4. **using-skill-set**: Establishes workflows for discovering and using skill-set features at session start
-5. **writing-skills**: Guide for creating effective Claude skills with structured workflow, testing methodology, and troubleshooting
+5. **creating-skills**: Guide for creating effective Claude skills with structured workflow, testing methodology, and troubleshooting
 6. **executing-ralph-loop**: Sets up Ralph Wiggum external bash loop infrastructure for executing implementation plans with fresh context per iteration
 7. **writing-clear-prose**: Guides writing and revision of explanatory text, persuasive proposals, and technical documents with 4 core principles
 8. **guarding-agent-directives**: Guards agent directive files against bloat by verifying additions through strict criteria while preserving user authority
@@ -61,7 +61,7 @@ plugins/
     │   ├── using-skill-set/
     │   │   ├── SKILL.md
     │   │   └── session-start.sh  # Session hook script
-    │   ├── writing-skills/
+    │   ├── creating-skills/
     │   │   ├── SKILL.md
     │   │   └── reference/
     │   │       ├── structure.md
@@ -191,7 +191,7 @@ How would you like to proceed?
 - Code/technical content stays universal for consistency
 - Enables seamless collaboration in multilingual teams
 
-**Primary resource**: Use the `writing-skills` skill for comprehensive skill creation guidance, including:
+**Primary resource**: Use the `creating-skills` skill for comprehensive skill creation guidance, including:
 - Use case definition and success criteria
 - File structure and frontmatter rules
 - Workflow patterns (5 common patterns)
@@ -204,7 +204,7 @@ This document provides Anthropic's official best practices as complementary refe
 
 ## Anthropic Official Best Practices
 
-### Core Principles Not in writing-skills
+### Core Principles Not in creating-skills
 
 #### Appropriate Freedom Levels
 
@@ -264,7 +264,7 @@ Create evaluations BEFORE extensive documentation to solve real problems rather 
 
 Work with one Claude instance to create Skills, test with other instances in real tasks. Observe behavior, gather insights, iterate based on actual usage patterns.
 
-**Note**: See `writing-skills` skill for complete testing methodology including triggering tests, functional tests, and performance comparison.
+**Note**: See `creating-skills` skill for complete testing methodology including triggering tests, functional tests, and performance comparison.
 
 ---
 
@@ -296,7 +296,7 @@ Without the server prefix, Claude may fail to locate the tool.
 
 ## Additional Resources
 
-- **Primary methodology**: Use `writing-skills` skill for comprehensive skill creation
+- **Primary methodology**: Use `creating-skills` skill for comprehensive skill creation
 - [Anthropic Official Best Practices](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/best-practices)
 - [Skills Overview](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview)
 - [The Complete Guide to Building Skills for Claude](The-Complete-Guide-to-Building-Skill-for-Claude.pdf) - Anthropic's official PDF guide

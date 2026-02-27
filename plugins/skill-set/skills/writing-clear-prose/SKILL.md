@@ -29,7 +29,7 @@ Both workflows apply four core principles: concreteness, transcreation, steel ma
 - Creative fiction, poetry, or marketing copy
 - Daily communication (email, Slack, chat)
 - Commit messages → `managing-git-workflow`
-- Skill creation → `writing-skills`
+- Skill creation → `creating-skills`
 - Code comments or docstrings (too short for this workflow)
 
 ## Workflow Selection

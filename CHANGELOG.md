@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Simplified prompt: CLIs query git diffs directly, no need to pass diffs/SHAs/file lists
   - Removed output language/format specification from prompts (synthesizer handles it)
   - Added constraints: no model specification, no prompt temp files
-  - Fixed CSO description (removed workflow summary per writing-skills guidelines)
+  - Fixed CSO description (removed workflow summary per creating-skills guidelines)
   - Deleted `execution.md` (duplicated cli-commands.md and SKILL.md)
   - Reduced `cli-commands.md` from 612 to 53 lines
   - Reduced `report-format.md` from 646 to 109 lines
@@ -43,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **writing-skills**: New skill for creating effective Claude skills
+- **creating-skills**: New skill for creating effective Claude skills
   - Comprehensive guide integrating Anthropic's official best practices
   - Reference files: structure, patterns, testing, troubleshooting, checklist
   - Covers use case definition, success criteria, and workflow patterns
@@ -66,7 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - More balanced guidance approach
 
 - **AGENTS.md**: Updated documentation
-  - Added writing-skills to Current Tools
+  - Added creating-skills to Current Tools
   - Changed recommended SKILL.md line limit to 200
   - Added PDF guide reference
 

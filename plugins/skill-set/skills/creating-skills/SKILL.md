@@ -1,9 +1,9 @@
 ---
-name: writing-skills
+name: creating-skills
 description: Guide for creating effective Claude skills. Use when user wants to create, improve, or review a skill, mentions "SKILL.md", "skill creation", "skill development", or asks about skill best practices and structure.
 ---
 
-# Writing Skills
+# Creating Skills
 
 ## Overview
 
