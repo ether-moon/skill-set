@@ -14,6 +14,7 @@
 5. **writing-skills**: Guide for creating effective Claude skills with structured workflow, testing methodology, and troubleshooting
 6. **executing-ralph-loop**: Sets up Ralph Wiggum external bash loop infrastructure for executing implementation plans with fresh context per iteration
 7. **writing-clear-prose**: Guides writing and revision of explanatory text, persuasive proposals, and technical documents with 4 core principles
+8. **guarding-agent-directives**: Guards agent directive files against bloat by verifying additions through strict criteria while preserving user authority
 
 #### Agents
 1. **coderabbit-feedback**: Interactive CodeRabbit review processing with severity-based classification, user discussion, and verified completion workflow. Runs as isolated subagent for better context management.
@@ -73,13 +74,17 @@ plugins/
     │   │   └── templates/
     │   │       ├── loop.sh        # Bash loop template
     │   │       └── PROMPT_build.md # Build prompt template
-    │   └── writing-clear-prose/
+    │   ├── writing-clear-prose/
+    │   │   ├── SKILL.md
+    │   │   └── reference/
+    │   │       ├── principles.md
+    │   │       ├── anti-patterns.md
+    │   │       ├── drafting.md
+    │   │       └── revising.md
+    │   └── guarding-agent-directives/
     │       ├── SKILL.md
     │       └── reference/
-    │           ├── principles.md
-    │           ├── anti-patterns.md
-    │           ├── drafting.md
-    │           └── revising.md
+    │           └── verification.md
     ├── agents/                    # Isolated subagents
     │   └── coderabbit-feedback.md
     └── hooks/                     # Event handlers
