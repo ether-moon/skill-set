@@ -5,6 +5,32 @@ All notable changes to the skill-set plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-02-27
+
+### Added
+
+- **executing-ralph-loop**: New skill for external bash loop implementation
+  - Sets up Ralph Wiggum loop infrastructure for executing implementation plans with fresh context per iteration
+  - Includes bash loop template and build prompt template
+
+- **guarding-agent-directives**: New skill for strict directive file management
+  - Guards agent directive files (CLAUDE.md, AGENTS.md) against bloat
+  - Verifies additions through strict criteria while preserving user authority
+
+- **writing-clear-prose**: New skill for non-fiction prose drafting and revision
+  - Guides writing and revision of explanatory text, persuasive proposals, and technical documents
+  - 4 core principles with reference files for principles, anti-patterns, drafting, and revising
+
+### Changed
+
+- **creating-skills**: Renamed from `writing-skills` for clarity and consistency with gerund naming convention
+
+### Improved
+
+- **managing-git-workflow**: Optimized Bash calls by combining reads and chaining writes for better performance
+
+- **git commands**: Changed model from `haiku` to `sonnet` for commit, push, and PR commands
+
 ## [1.3.0] - 2026-02-10
 
 ### Removed
@@ -165,6 +191,9 @@ Users upgrading from v1.x should:
   - `using-skill-set`: Session initialization
   - `coderabbit-feedback`: CodeRabbit review processing
 
+[1.4.0]: https://github.com/ether-moon/skill-set/releases/tag/v1.4.0
+[1.3.1]: https://github.com/ether-moon/skill-set/releases/tag/v1.3.1
+[1.3.0]: https://github.com/ether-moon/skill-set/releases/tag/v1.3.0
 [1.2.1]: https://github.com/ether-moon/skill-set/releases/tag/v1.2.1
 [1.2.0]: https://github.com/ether-moon/skill-set/releases/tag/v1.2.0
 [1.1.0]: https://github.com/ether-moon/skill-set/releases/tag/v1.1.0
