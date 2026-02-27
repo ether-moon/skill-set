@@ -12,6 +12,8 @@
 3. **consulting-peer-llms**: Execute peer reviews from other LLM tools (Gemini, Codex, Claude) in parallel and synthesize actionable insights
 4. **using-skill-set**: Establishes workflows for discovering and using skill-set features at session start
 5. **writing-skills**: Guide for creating effective Claude skills with structured workflow, testing methodology, and troubleshooting
+6. **executing-ralph-loop**: Sets up Ralph Wiggum external bash loop infrastructure for executing implementation plans with fresh context per iteration
+7. **writing-clear-prose**: Guides writing and revision of explanatory text, persuasive proposals, and technical documents with 4 core principles
 
 #### Agents
 1. **coderabbit-feedback**: Interactive CodeRabbit review processing with severity-based classification, user discussion, and verified completion workflow. Runs as isolated subagent for better context management.
@@ -32,8 +34,10 @@ plugins/
     │   │   └── pr.md             # /skill-set:git:pr
     │   ├── coderabbit/
     │   │   └── fix.md            # /skill-set:coderabbit:fix
-    │   └── consulting/
-    │       └── review.md         # /skill-set:consulting:review
+    │   ├── consulting/
+    │   │   └── review.md         # /skill-set:consulting:review
+    │   └── ralph/
+    │       └── loop.md           # /skill-set:ralph:loop
     ├── skills/                    # All skills with integrated scripts
     │   ├── managing-git-workflow/
     │   │   ├── SKILL.md
@@ -56,14 +60,26 @@ plugins/
     │   ├── using-skill-set/
     │   │   ├── SKILL.md
     │   │   └── session-start.sh  # Session hook script
-    │   └── writing-skills/
+    │   ├── writing-skills/
+    │   │   ├── SKILL.md
+    │   │   └── reference/
+    │   │       ├── structure.md
+    │   │       ├── patterns.md
+    │   │       ├── testing.md
+    │   │       ├── troubleshooting.md
+    │   │       └── checklist.md
+    │   ├── executing-ralph-loop/
+    │   │   ├── SKILL.md
+    │   │   └── templates/
+    │   │       ├── loop.sh        # Bash loop template
+    │   │       └── PROMPT_build.md # Build prompt template
+    │   └── writing-clear-prose/
     │       ├── SKILL.md
     │       └── reference/
-    │           ├── structure.md
-    │           ├── patterns.md
-    │           ├── testing.md
-    │           ├── troubleshooting.md
-    │           └── checklist.md
+    │           ├── principles.md
+    │           ├── anti-patterns.md
+    │           ├── drafting.md
+    │           └── revising.md
     ├── agents/                    # Isolated subagents
     │   └── coderabbit-feedback.md
     └── hooks/                     # Event handlers
