@@ -5,6 +5,16 @@ All notable changes to the skill-set plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-03-03
+
+### Changed
+
+- **executing-ralph-loop**: Changed from setup-only to direct execution via Task subagents
+  - Each iteration spawns a fresh subagent (no context rot)
+  - Plan file on disk as single source of truth
+  - Automatic circuit breaker (3 consecutive iterations with no progress)
+  - No files generated into project (prompt constructed in memory)
+
 ## [1.4.0] - 2026-02-27
 
 ### Added
@@ -191,6 +201,7 @@ Users upgrading from v1.x should:
   - `using-skill-set`: Session initialization
   - `coderabbit-feedback`: CodeRabbit review processing
 
+[1.4.1]: https://github.com/ether-moon/skill-set/releases/tag/v1.4.1
 [1.4.0]: https://github.com/ether-moon/skill-set/releases/tag/v1.4.0
 [1.3.1]: https://github.com/ether-moon/skill-set/releases/tag/v1.3.1
 [1.3.0]: https://github.com/ether-moon/skill-set/releases/tag/v1.3.0
