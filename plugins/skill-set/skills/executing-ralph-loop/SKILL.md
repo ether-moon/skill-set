@@ -2,8 +2,7 @@
 name: executing-ralph-loop
 description: >
   Use when user mentions "ralph loop", "ralph wiggum", wants to execute a plan with fresh context
-  per iteration, or requests automated plan implementation. Triggers on "ralph loop", "ralph 실행",
-  "plan을 ralph로", "계획대로 구현", "implement the plan" with ralph/loop context.
+  per iteration, or requests automated plan implementation.
 ---
 
 # Executing Ralph Loop
@@ -19,7 +18,7 @@ Executes an implementation plan via Geoffrey Huntley's Ralph Wiggum technique: a
 ## When to Use
 
 - User has a plan file and wants to execute it via ralph loop
-- User mentions "ralph loop", "ralph wiggum", "ralph 실행"
+- User mentions "ralph loop", "ralph wiggum"
 - User wants automated plan execution with fresh context per iteration
 - Plan exists as any markdown file with implementation steps
 
