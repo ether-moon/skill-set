@@ -1,8 +1,8 @@
 ---
 name: executing-ralph-loop
 description: >
-  Use when user mentions "ralph loop", "ralph wiggum", wants to execute a plan with fresh context
-  per iteration, or requests automated plan implementation.
+  Use when user explicitly mentions "ralph loop", "ralph wiggum", or "ralph" in the context of
+  executing an implementation plan with fresh context per iteration.
 ---
 
 # Executing Ralph Loop
@@ -17,14 +17,13 @@ Executes an implementation plan via Geoffrey Huntley's Ralph Wiggum technique: a
 
 ## When to Use
 
-- User has a plan file and wants to execute it via ralph loop
+- User explicitly mentions "ralph" in the context of plan execution
 - User mentions "ralph loop", "ralph wiggum"
-- User wants automated plan execution with fresh context per iteration
 - Plan exists as any markdown file with implementation steps
 
 **When NOT to use:**
+- User asks to "implement the plan" without mentioning "ralph" → use other execution skills
 - No plan exists yet → guide user to create a plan first (any markdown with clear implementation steps)
-- Plan exists but lacks clear task boundaries or acceptance criteria → suggest reinforcing the plan before loop setup
 
 ## Workflow
 
@@ -38,7 +37,16 @@ Search in priority order:
 
 If not found, ask user for the path. If no plan exists, guide to plan creation first.
 
-### Step 2: Ensure Task Checkboxes
+### Step 2: Validate and Reinforce Plan
+
+Assess the plan for ralph loop readiness. A good plan has:
+- Clear, independently executable tasks (each completable in one iteration)
+- Concrete acceptance criteria or verification commands per task
+- Specific file paths, function names, or code references where relevant
+
+**If the plan lacks task boundaries or acceptance criteria:** Reinforce the plan before proceeding. Add missing details (file paths, test expectations, concrete steps) and show the preview to the user for confirmation. Do NOT skip this — vague tasks cause stuck iterations.
+
+Then ensure checkbox format:
 
 Count `- [ ]` / `- [x]` / `* [ ]` / `* [x]` patterns in the plan file.
 
