@@ -42,18 +42,28 @@ Execute peer reviews from other LLM tools (Gemini, Codex, Claude) in parallel an
 
 **Command**:
 ```bash
-# Auto-detect and use all installed CLIs
 /skill-set:consulting:review
-
-# Use specific CLIs
-/skill-set:consulting:review gemini codex
 ```
 
 **Features**:
 - Dynamic CLI selection with auto-detection
 - Parallel LLM execution for faster feedback
 - Synthesized reports with actionable insights
-- Custom prompt templates for consistent reviews
+
+### Ralph Loop Execution
+Execute implementation plans with fresh context per iteration via Task subagents.
+
+**Command**:
+```bash
+/skill-set:ralph-loop:execute
+/skill-set:ralph-loop:execute plans/feature-plan.md
+```
+
+**Features**:
+- Fresh subagent per iteration (no context rot)
+- Plan file on disk as single source of truth
+- Automatic circuit breaker (3 consecutive stuck iterations)
+- Plan validation and reinforcement before execution
 
 ### CodeRabbit Feedback Processing
 Interactive CodeRabbit review processing with severity classification and verified completion workflow.
@@ -66,41 +76,31 @@ Interactive CodeRabbit review processing with severity classification and verifi
 **Features**:
 - Automatic severity-based classification (CRITICAL, MAJOR, MINOR, OPTIONAL, IGNORE)
 - Interactive issue discussion before applying changes
-- Linear integration for issue tracking
 - Verified completion workflow with mandatory steps
-- Commit and PR comment generation
+
+### Skill Creation Guide
+Comprehensive guide for creating effective Claude skills with structured workflow and testing methodology.
+
+### Writing Clear Prose
+Guides writing and revision of explanatory text, persuasive proposals, and technical documents with 4 core principles.
+
+### Guarding Agent Directives
+Guards agent directive files (CLAUDE.md, AGENTS.md) against bloat by verifying additions through strict criteria.
 
 ### Session Initialization
 Automatically establishes workflows at session start to ensure proper skill usage.
-
-**Activates on**: Session startup, resume, clear, or compact
-
-**Features**:
-- Auto-detects available skills
-- Enforces skill usage protocols
-- Provides context-aware skill recommendations
-- Prevents workflow bypassing
 
 ## Usage
 
 Skills are automatically available after installing the plugin. Claude will use them when relevant to your task.
 
-### Explicit Skill Invocation
-
-You can explicitly request skills:
-```
-Use the managing-git-workflow skill to create a commit
-Use the understanding-code-context skill to explore this codebase
-Use the consulting-peer-llms skill to get peer review feedback
-```
-
 ### Slash Commands
 
-Use namespaced commands directly:
 ```bash
 /skill-set:git:commit
 /skill-set:git:push
 /skill-set:git:pr
+/skill-set:ralph-loop:execute
 /skill-set:coderabbit:fix
 /skill-set:consulting:review
 ```
@@ -109,31 +109,28 @@ Use namespaced commands directly:
 
 ```
 plugins/
-└── skill-set/                   # Unified plugin
+└── skill-set/
     ├── .claude-plugin/
-    │   ├── plugin.json          # Plugin metadata
-    │   └── marketplace.json     # Marketplace registration
-    ├── .mcp.json                # MCP server definitions
-    ├── commands/                # Namespaced slash commands
-    │   ├── git/                 # Git workflow commands
-    │   ├── coderabbit/          # CodeRabbit commands
-    │   └── consulting/          # Peer review commands
-    ├── skills/                  # All skills with integrated scripts
+    │   ├── plugin.json
+    │   └── marketplace.json
+    ├── .mcp.json
+    ├── commands/
+    │   ├── git/                    # commit, push, pr
+    │   ├── ralph-loop/             # execute
+    │   ├── coderabbit/             # fix
+    │   └── consulting/             # review
+    ├── skills/
     │   ├── managing-git-workflow/
-    │   │   ├── SKILL.md
-    │   │   └── reference/
     │   ├── understanding-code-context/
-    │   │   ├── SKILL.md
-    │   │   └── reference/
     │   ├── consulting-peer-llms/
-    │   │   ├── SKILL.md
-    │   │   └── reference/
+    │   ├── executing-ralph-loop/
+    │   ├── creating-skills/
+    │   ├── writing-clear-prose/
+    │   ├── guarding-agent-directives/
     │   └── using-skill-set/
-    │       ├── SKILL.md
-    │       └── session-start.sh # Session hook script
-    ├── agents/                  # Isolated subagents
+    ├── agents/
     │   └── coderabbit-feedback.md
-    └── hooks/                   # Event handlers
+    └── hooks/
         └── hooks.json
 ```
 
