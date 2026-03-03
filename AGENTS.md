@@ -12,7 +12,7 @@
 3. **consulting-peer-llms**: Execute peer reviews from other LLM tools (Gemini, Codex, Claude) in parallel and synthesize actionable insights
 4. **using-skill-set**: Establishes workflows for discovering and using skill-set features at session start
 5. **creating-skills**: Guide for creating effective Claude skills with structured workflow, testing methodology, and troubleshooting
-6. **executing-ralph-loop**: Sets up Ralph Wiggum external bash loop infrastructure for executing implementation plans with fresh context per iteration
+6. **executing-ralph-loop**: Executes implementation plans via Ralph Wiggum loop with Task subagents — fresh context per iteration, plan file as state, automatic circuit breaker
 7. **writing-clear-prose**: Guides writing and revision of explanatory text, persuasive proposals, and technical documents with 4 core principles
 8. **guarding-agent-directives**: Guards agent directive files against bloat by verifying additions through strict criteria while preserving user authority
 
@@ -37,8 +37,8 @@ plugins/
     │   │   └── fix.md            # /skill-set:coderabbit:fix
     │   ├── consulting/
     │   │   └── review.md         # /skill-set:consulting:review
-    │   └── ralph/
-    │       └── loop.md           # /skill-set:ralph:loop
+    │   └── ralph-loop/
+    │       └── execute.md        # /skill-set:ralph-loop:execute
     ├── skills/                    # All skills with integrated scripts
     │   ├── managing-git-workflow/
     │   │   ├── SKILL.md
@@ -72,8 +72,8 @@ plugins/
     │   ├── executing-ralph-loop/
     │   │   ├── SKILL.md
     │   │   └── templates/
-    │   │       ├── loop.sh        # Bash loop template
-    │   │       └── PROMPT_build.md # Build prompt template
+    │   │       ├── loop.sh        # Bash loop reference template
+    │   │       └── PROMPT_build.md # Iteration prompt template
     │   ├── writing-clear-prose/
     │   │   ├── SKILL.md
     │   │   └── reference/

@@ -2,6 +2,10 @@
 # Ralph Loop — external bash loop with fresh context per iteration
 # Based on Geoffrey Huntley's Ralph Wiggum technique
 #
+# REFERENCE ONLY: This template is kept for documentation purposes.
+# The executing-ralph-loop skill now executes loops directly via Task subagents.
+# This script serves as reference for users who prefer external bash execution.
+#
 # Usage: ./ralph/loop.sh [max_iterations]
 #   ./ralph/loop.sh          # unlimited (Ctrl+C to stop)
 #   ./ralph/loop.sh 20       # max 20 iterations
