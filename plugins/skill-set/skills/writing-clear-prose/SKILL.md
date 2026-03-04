@@ -97,6 +97,7 @@ If you catch yourself doing any of these, stop and correct:
 | Hedging every claim ("might possibly perhaps") | One hedge maximum per claim |
 | Using different terms for the same concept | Pick one term, use it consistently |
 | Ignoring counter-arguments in persuasive text | Steel man the strongest objection |
+| Drawing diagrams as ASCII art | Use Mermaid or equivalent markup-based format (see `reference/drafting.md`) |
 
 ## Quick Reference
 
