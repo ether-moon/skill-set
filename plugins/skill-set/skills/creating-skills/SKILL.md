@@ -1,6 +1,6 @@
 ---
 name: creating-skills
-description: Guide for creating effective Claude skills. Use when user wants to create, improve, or review a skill, mentions "SKILL.md", "skill creation", "skill development", or asks about skill best practices and structure.
+description: Guide for creating effective Claude skills. Use when user wants to create, edit, modify, update, fix, improve, refactor, or review a skill, when editing SKILL.md files, mentions "skill creation", "skill development", "skill trigger", or asks about skill best practices, structure, or troubleshooting.
 ---
 
 # Creating Skills
