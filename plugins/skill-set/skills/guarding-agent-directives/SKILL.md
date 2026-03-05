@@ -107,6 +107,8 @@ If found, suggest removal or modification. If nothing to remove, proceed — wel
 
 ### Step 5: Apply
 
+**Write all directive content in English.** English consumes fewer tokens and is the language LLMs perform best in.
+
 Write the content. Present the exact diff to user for final confirmation. Modify file only after approval.
 
 ## Red Flags - STOP Immediately

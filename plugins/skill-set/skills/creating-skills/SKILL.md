@@ -85,6 +85,8 @@ description: What it does. Use when user [specific triggers].
 
 ### Step 5: Write Instructions
 
+**Write all skill content in English.** English consumes fewer tokens and is the language LLMs perform best in. User-facing runtime output (messages, reports) should adapt to the user's language, but SKILL.md, reference files, and code examples must stay in English.
+
 **Keep SKILL.md focused** (under 200 lines recommended):
 - Core workflow and essential steps
 - Links to reference files for details
