@@ -3,26 +3,40 @@
 # Based on Geoffrey Huntley's Ralph Wiggum technique
 #
 # REFERENCE ONLY: This template is kept for documentation purposes.
-# The executing-ralph-loop skill now executes loops directly via Task subagents.
+# The ralph skill now executes loops directly via Task subagents.
 # This script serves as reference for users who prefer external bash execution.
 #
-# Usage: ./ralph/loop.sh [max_iterations]
-#   ./ralph/loop.sh          # unlimited (Ctrl+C to stop)
-#   ./ralph/loop.sh 20       # max 20 iterations
+# Usage: ./loop.sh [plan|max_iterations]
+#   ./loop.sh              # build mode, unlimited (Ctrl+C to stop)
+#   ./loop.sh 20           # build mode, max 20 iterations
+#   ./loop.sh plan         # plan mode, unlimited
 
 set -euo pipefail
 
-MAX_ITERATIONS=${1:-0}
+# Parse arguments
+if [ "${1:-}" = "plan" ]; then
+    MODE="plan"
+    PROMPT_FILE="{{PROMPT_PLAN_FILE}}"
+    MAX_ITERATIONS=${2:-0}
+elif [[ "${1:-}" =~ ^[0-9]+$ ]]; then
+    MODE="build"
+    PROMPT_FILE="{{PROMPT_BUILD_FILE}}"
+    MAX_ITERATIONS=$1
+else
+    MODE="build"
+    PROMPT_FILE="{{PROMPT_BUILD_FILE}}"
+    MAX_ITERATIONS=0
+fi
+
 ITERATION=0
 STUCK_COUNT=0
-PREV_REMAINING=0
-PROMPT_FILE="ralph/PROMPT_build.md"
 PLAN_FILE="{{PLAN_FILE}}"
 MODEL="{{MODEL}}"
 CURRENT_BRANCH=$(git branch --show-current)
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "Ralph Loop"
+echo "   Mode:   $MODE"
 echo "   Branch: $CURRENT_BRANCH"
 echo "   Plan:   $PLAN_FILE"
 echo "   Model:  $MODEL"
@@ -32,9 +46,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 # Pre-flight checks
 command -v claude >/dev/null 2>&1 || { echo "ERROR: claude CLI not found in PATH"; exit 1; }
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "ERROR: not inside a git repository"; exit 1; }
-for f in "$PROMPT_FILE" "$PLAN_FILE"; do
-    [ -f "$f" ] || { echo "ERROR: $f not found"; exit 1; }
-done
+[ -f "$PROMPT_FILE" ] || { echo "ERROR: $PROMPT_FILE not found"; exit 1; }
 
 while true; do
     # Check iteration limit
@@ -42,21 +54,15 @@ while true; do
         echo "Reached max iterations: $MAX_ITERATIONS"; break
     fi
 
-    # Count tasks (anchored to line-start checkbox pattern)
-    REMAINING=$(grep -c '^[[:space:]]*[-*][[:space:]]\[ \]' "$PLAN_FILE" 2>/dev/null || echo 0)
-    BLOCKED=$(grep -c '^[[:space:]]*[-*][[:space:]]\[!\]' "$PLAN_FILE" 2>/dev/null || echo 0)
-    DONE=$(grep -c '^[[:space:]]*[-*][[:space:]]\[x\]' "$PLAN_FILE" 2>/dev/null || echo 0)
-
-    if [ "$REMAINING" -eq 0 ]; then
-        echo "All tasks complete! ($DONE done, $BLOCKED blocked)"
-        break
-    fi
-
     ITERATION=$((ITERATION + 1))
     echo ""
     echo "==========================================="
-    echo "  Iteration $ITERATION — $REMAINING remaining, $DONE done, $BLOCKED blocked"
+    echo "  Iteration $ITERATION"
     echo "==========================================="
+
+    # Save current HEAD for progress detection
+    PREV_HEAD=$(git rev-parse HEAD 2>/dev/null || echo "none")
+    PREV_PLAN_HASH=$(md5sum "$PLAN_FILE" 2>/dev/null | cut -d' ' -f1 || echo "none")
 
     # Run Claude with fresh context
     cat "$PROMPT_FILE" | claude -p \
@@ -64,34 +70,30 @@ while true; do
         --model "$MODEL" \
         --verbose
 
-    # Circuit breaker: detect no progress
-    NEW_REMAINING=$(grep -c '^[[:space:]]*[-*][[:space:]]\[ \]' "$PLAN_FILE" 2>/dev/null || echo 0)
-    if [ "$ITERATION" -gt 1 ] && [ "$NEW_REMAINING" -eq "$PREV_REMAINING" ]; then
+    # Circuit breaker: detect no progress via git commits and plan changes
+    CURR_HEAD=$(git rev-parse HEAD 2>/dev/null || echo "none")
+    CURR_PLAN_HASH=$(md5sum "$PLAN_FILE" 2>/dev/null | cut -d' ' -f1 || echo "none")
+
+    if [ "$CURR_HEAD" = "$PREV_HEAD" ] && [ "$CURR_PLAN_HASH" = "$PREV_PLAN_HASH" ]; then
         STUCK_COUNT=$((STUCK_COUNT + 1))
         echo "  Warning: No progress detected ($STUCK_COUNT consecutive)"
         if [ "$STUCK_COUNT" -ge 3 ]; then
             echo "STUCK: No progress for 3 consecutive iterations. Stopping."
-            echo "Review the plan and blocked tasks, then restart."
+            echo "Review the plan, then restart."
             break
         fi
     else
         STUCK_COUNT=0
     fi
-    PREV_REMAINING=$NEW_REMAINING
 
     # Brief cooldown for API rate limits
     sleep 2
 done
 
-# Recompute final stats
-REMAINING=$(grep -c '^[[:space:]]*[-*][[:space:]]\[ \]' "$PLAN_FILE" 2>/dev/null || echo 0)
-BLOCKED=$(grep -c '^[[:space:]]*[-*][[:space:]]\[!\]' "$PLAN_FILE" 2>/dev/null || echo 0)
-DONE=$(grep -c '^[[:space:]]*[-*][[:space:]]\[x\]' "$PLAN_FILE" 2>/dev/null || echo 0)
-
 echo ""
 echo "========================================"
-echo "  Completed $ITERATION iterations"
-echo "  Done:    $DONE"
-echo "  Blocked: $BLOCKED"
-echo "  Remaining: $REMAINING"
+echo "  Ralph Loop Complete"
+echo "  Mode:       $MODE"
+echo "  Iterations: $ITERATION"
+echo "  Plan:       $PLAN_FILE"
 echo "========================================"

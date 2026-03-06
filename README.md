@@ -50,20 +50,24 @@ Execute peer reviews from other LLM tools (Gemini, Codex, Claude) in parallel an
 - Parallel LLM execution for faster feedback
 - Synthesized reports with actionable insights
 
-### Ralph Loop Execution
-Execute implementation plans with fresh context per iteration via Task subagents.
+### Ralph Loop
+Plan and execute implementation work with fresh context per iteration via Task subagents.
 
-**Command**:
+**Commands**:
 ```bash
-/skill-set:ralph-loop:execute
-/skill-set:ralph-loop:execute plans/feature-plan.md
+/skill-set:ralph:plan
+/skill-set:ralph:plan docs/plans/feature-design.md
+/skill-set:ralph:execute
+/skill-set:ralph:execute tmp/ralph/2026-03-06-1430/plan.md
 ```
 
 **Features**:
+- Two modes: PLANNING (generate plans) and BUILDING (implement from plans)
 - Fresh subagent per iteration (no context rot)
 - Plan file on disk as single source of truth
-- Automatic circuit breaker (3 consecutive stuck iterations)
-- Plan validation and reinforcement before execution
+- Git commit-based progress tracking
+- Auto-planning fallback (execute without a plan → auto-creates one)
+- DONE condition negotiation before loop starts
 
 ### CodeRabbit Feedback Processing
 Interactive CodeRabbit review processing with severity classification and verified completion workflow.
@@ -100,7 +104,8 @@ Skills are automatically available after installing the plugin. Claude will use 
 /skill-set:git:commit
 /skill-set:git:push
 /skill-set:git:pr
-/skill-set:ralph-loop:execute
+/skill-set:ralph:plan
+/skill-set:ralph:execute
 /skill-set:coderabbit:fix
 /skill-set:consulting:review
 ```
@@ -111,19 +116,18 @@ Skills are automatically available after installing the plugin. Claude will use 
 plugins/
 └── skill-set/
     ├── .claude-plugin/
-    │   ├── plugin.json
-    │   └── marketplace.json
+    │   └── plugin.json
     ├── .mcp.json
     ├── commands/
     │   ├── git/                    # commit, push, pr
-    │   ├── ralph-loop/             # execute
+    │   ├── ralph/                  # plan, execute
     │   ├── coderabbit/             # fix
     │   └── consulting/             # review
     ├── skills/
     │   ├── managing-git-workflow/
     │   ├── understanding-code-context/
     │   ├── consulting-peer-llms/
-    │   ├── executing-ralph-loop/
+    │   ├── ralph/
     │   ├── creating-skills/
     │   ├── writing-clear-prose/
     │   ├── guarding-agent-directives/

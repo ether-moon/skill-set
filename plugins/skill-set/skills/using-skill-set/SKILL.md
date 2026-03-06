@@ -35,6 +35,15 @@ Automates git commits, push, and PR creation with context-aware messages and tic
 
 Find and read official documentation using Context7.
 
+### ralph
+**Use when**: Planning or executing implementation work with fresh context per iteration. User mentions "ralph", "ralph loop", or "ralph wiggum".
+
+Plans and executes via Ralph Wiggum loop — two modes (PLANNING/BUILDING), fresh subagent per iteration, plan file as single source of truth.
+
+**Commands**:
+- `/skill-set:ralph:plan` - Generate a Ralph-ready plan from any input
+- `/skill-set:ralph:execute` - Execute a plan (auto-plans if none exists)
+
 ### coderabbit-feedback
 **Use when**: Processing CodeRabbit AI review comments on pull requests.
 
@@ -61,6 +70,7 @@ Before starting a task, consider if any installed skill applies:
 - Git operations? → Use `managing-git-workflow`
 - External library docs? → Use `understanding-code-context`
 - Peer LLM review? → Use `consulting-peer-llms`
+- Ralph loop execution? → Use `ralph`
 - Writing/revising prose? → Use `writing-clear-prose`
 - Creating skills? → Use `creating-skills`
 
@@ -93,6 +103,7 @@ If you catch yourself thinking these, check for relevant skills first:
 **Do check for skills** when:
 - Starting git operations
 - Working with external libraries
+- Planning or executing implementation loops
 - Creating new skills
 
 **Don't force skill usage** when:
@@ -107,6 +118,7 @@ If you catch yourself thinking these, check for relevant skills first:
 | Git commit/push/PR | `managing-git-workflow` |
 | External library docs | `understanding-code-context` |
 | Peer LLM review | `consulting-peer-llms` |
+| Plan/execute with fresh context | `ralph` |
 | CodeRabbit feedback | `coderabbit-feedback` |
 | Writing/revising prose | `writing-clear-prose` |
 | Creating skills | `creating-skills` |

@@ -12,7 +12,7 @@
 3. **consulting-peer-llms**: Execute peer reviews from other LLM tools (Gemini, Codex, Claude) in parallel and synthesize actionable insights
 4. **using-skill-set**: Establishes workflows for discovering and using skill-set features at session start
 5. **creating-skills**: Guide for creating effective Claude skills with structured workflow, testing methodology, and troubleshooting
-6. **executing-ralph-loop**: Executes implementation plans via Ralph Wiggum loop with Task subagents — fresh context per iteration, plan file as state, automatic circuit breaker
+6. **ralph**: Plans and executes implementation work via Ralph Wiggum loop with Task subagents — two modes (PLANNING/BUILDING), fresh context per iteration, plan file as state, git commit-based progress tracking
 7. **writing-clear-prose**: Guides writing and revision of explanatory text, persuasive proposals, and technical documents with 4 core principles
 8. **guarding-agent-directives**: Guards agent directive files against bloat by verifying additions through strict criteria while preserving user authority
 
@@ -37,8 +37,9 @@ plugins/
     │   │   └── fix.md            # /skill-set:coderabbit:fix
     │   ├── consulting/
     │   │   └── review.md         # /skill-set:consulting:review
-    │   └── ralph-loop/
-    │       └── execute.md        # /skill-set:ralph-loop:execute
+    │   └── ralph/
+    │       ├── plan.md           # /skill-set:ralph:plan
+    │       └── execute.md        # /skill-set:ralph:execute
     ├── skills/                    # All skills with integrated scripts
     │   ├── managing-git-workflow/
     │   │   ├── SKILL.md
@@ -69,11 +70,14 @@ plugins/
     │   │       ├── testing.md
     │   │       ├── troubleshooting.md
     │   │       └── checklist.md
-    │   ├── executing-ralph-loop/
+    │   ├── ralph/
     │   │   ├── SKILL.md
-    │   │   └── templates/
-    │   │       ├── loop.sh        # Bash loop reference template
-    │   │       └── PROMPT_build.md # Iteration prompt template
+    │   │   ├── templates/
+    │   │   │   ├── PROMPT_plan.md  # Planning mode prompt template
+    │   │   │   ├── PROMPT_build.md # Building mode prompt template
+    │   │   │   └── loop.sh        # Bash loop reference template
+    │   │   └── reference/
+    │   │       └── plan-quality.md # Ralph-ready plan criteria
     │   ├── writing-clear-prose/
     │   │   ├── SKILL.md
     │   │   └── reference/
