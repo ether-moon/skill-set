@@ -110,20 +110,26 @@ while true:
   3. iteration += 1
      Report: "Iteration {iteration} — {remaining} remaining, {done} done, {blocked} blocked"
 
-  4. Spawn Task subagent:
+  4. Save current HEAD: prev_head = `git rev-parse HEAD`
+
+  5. Spawn Task subagent:
      - subagent_type: "general-purpose"
      - prompt: the constructed prompt from Step 5
      - description: "Ralph iteration {iteration}"
 
-  5. Wait for subagent completion
+  6. Wait for subagent completion
 
-  6. Re-read plan file → count new_remaining
-     If iteration > 1 AND new_remaining == prev_remaining:
+  7. Re-read plan file → count new_remaining
+     Check: curr_head = `git rev-parse HEAD`
+     has_new_commits = (curr_head != prev_head)
+
+     If new_remaining == prev_remaining AND NOT has_new_commits:
        stuck_count += 1
        Report: "Warning: No progress detected ({stuck_count} consecutive)"
        If stuck_count >= 3:
-         Report: "STUCK: No progress for 3 consecutive iterations. Stopping."
-         break
+         Ask user: "No progress for {stuck_count} consecutive iterations. Continue or stop?"
+         If user says continue → stuck_count = 0, continue loop
+         If user says stop → break
      Else:
        stuck_count = 0
      prev_remaining = new_remaining
