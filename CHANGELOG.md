@@ -5,6 +5,23 @@ All notable changes to the skill-set plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-03-06
+
+### Added
+
+- **ralph**: New PLANNING mode with `PROMPT_plan.md` for generating Ralph-ready plans from any input
+- **ralph**: New `/skill-set:ralph:plan` command
+- **ralph**: DONE condition negotiation step — propose and confirm observable termination criterion before loop starts
+- **ralph**: `reference/plan-quality.md` defining Ralph-ready plan criteria (Concrete, Independent, Verifiable, Scoped)
+
+### Changed
+
+- **ralph**: Renamed from `executing-ralph-loop` to `ralph` (skill, commands, directory)
+- **ralph**: Replaced checkbox-based progress tracking with git commit + plan file hash tracking
+- **ralph**: Plans stored at `tmp/ralph/{YYYY-MM-DD-HHmm}/plan.md` (session-scoped, temporary)
+- **ralph**: `/skill-set:ralph:execute` auto-enters PLANNING mode if no valid plan exists
+- **using-skill-set**: Updated skill registry and quick reference for ralph
+
 ## [1.4.3] - 2026-03-05
 
 ### Improved
