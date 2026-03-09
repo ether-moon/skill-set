@@ -1,6 +1,7 @@
 #!/bin/bash
 # Peer Review Script for consulting-peer-llms skill
 # Executes multiple LLM CLI tools in parallel and collects results
+# Compatible with Bash 3.2+ (macOS default) and Linux
 
 set -e
 
@@ -10,6 +11,32 @@ set -e
 
 TIMEOUT="${TIMEOUT:-1200s}"  # 20 minutes default timeout
 
+# Resolve timeout command: timeout (Linux) or gtimeout (macOS via coreutils)
+TIMEOUT_CMD=""
+if command -v timeout &> /dev/null; then
+    TIMEOUT_CMD="timeout"
+elif command -v gtimeout &> /dev/null; then
+    TIMEOUT_CMD="gtimeout"
+fi
+
+# ============================================================================
+# Helpers
+# ============================================================================
+
+# Portable uppercase
+to_upper() {
+    echo "$1" | tr '[:lower:]' '[:upper:]'
+}
+
+# Run a command with timeout if available, otherwise run directly
+run_cmd() {
+    if [ -n "$TIMEOUT_CMD" ]; then
+        "$TIMEOUT_CMD" "$TIMEOUT" "$@"
+    else
+        "$@"
+    fi
+}
+
 # ============================================================================
 # CLI Detection and Selection
 # ============================================================================
@@ -18,7 +45,7 @@ TIMEOUT="${TIMEOUT:-1200s}"  # 20 minutes default timeout
 # If no arguments, returns all installed CLIs from default set
 get_target_clis() {
     local requested_clis=("$@")
-    local default_clis=("gemini" "codex" "claude")
+    local default_clis=("gemini" "codex")
     local target_clis=()
 
     if [ ${#requested_clis[@]} -eq 0 ]; then
@@ -43,34 +70,6 @@ get_target_clis() {
 }
 
 # ============================================================================
-# Git Context
-# ============================================================================
-
-# Get base SHA for comparison
-get_base_sha() {
-    git rev-parse origin/main 2>/dev/null || \
-    git rev-parse origin/master 2>/dev/null || \
-    echo "HEAD~1"
-}
-
-# Get current SHA
-get_current_sha() {
-    git rev-parse HEAD
-}
-
-# Get changed files summary
-get_changes_summary() {
-    local base_sha="$1"
-    local current_sha="$2"
-
-    echo "Changed files:"
-    git diff --name-only "$base_sha..$current_sha" 2>/dev/null || echo "(no changes)"
-    echo ""
-    echo "Change summary:"
-    git diff --stat "$base_sha..$current_sha" 2>/dev/null || echo "(no stats)"
-}
-
-# ============================================================================
 # CLI Execution
 # ============================================================================
 
@@ -82,69 +81,61 @@ execute_cli() {
     local output_file="$3"
 
     case "$cli" in
-        gemini)
-            timeout "$TIMEOUT" gemini -p "$prompt" > "$output_file" 2>/dev/null
-            ;;
-        codex)
-            timeout "$TIMEOUT" codex exec "$prompt" > "$output_file" 2>/dev/null
-            ;;
-        claude)
-            timeout "$TIMEOUT" claude -p "$prompt" > "$output_file" 2>/dev/null
-            ;;
-        *)
-            # Generic execution for unknown CLIs
-            timeout "$TIMEOUT" "$cli" "$prompt" > "$output_file" 2>/dev/null
-            ;;
+        gemini)  run_cmd gemini -p "$prompt" > "$output_file" 2>/dev/null ;;
+        codex)   run_cmd codex exec "$prompt" > "$output_file" 2>/dev/null ;;
+        *)       run_cmd "$cli" "$prompt" > "$output_file" 2>/dev/null ;;
     esac
 }
 
 # Execute all CLIs in parallel
 # Usage: execute_all_clis <prompt> <cli1> [cli2] ...
-# Returns: Associative array of results via temp files
 execute_all_clis() {
     local prompt="$1"
     shift
     local clis=("$@")
-
-    declare -A pids
-    declare -A files
+    local pids=()
+    local files=()
 
     # Launch all CLIs in parallel
     for cli in "${clis[@]}"; do
         local output_file="/tmp/${cli}-review-$$.txt"
-        files[$cli]="$output_file"
+        files+=("$output_file")
 
         execute_cli "$cli" "$prompt" "$output_file" &
-        pids[$cli]=$!
+        pids+=($!)
     done
 
     # Wait and collect results
+    local i=0
     for cli in "${clis[@]}"; do
-        local pid="${pids[$cli]}"
-        local output_file="${files[$cli]}"
+        local pid="${pids[$i]}"
+        local output_file="${files[$i]}"
+        local cli_upper
+        cli_upper=$(to_upper "$cli")
 
         if wait "$pid"; then
             if [ -s "$output_file" ]; then
-                echo "=== ${cli^^} REVIEW ==="
+                echo "=== ${cli_upper} REVIEW ==="
                 cat "$output_file"
                 echo ""
-                echo "=== END ${cli^^} REVIEW ==="
+                echo "=== END ${cli_upper} REVIEW ==="
                 echo ""
             else
-                echo "=== ${cli^^} REVIEW ==="
+                echo "=== ${cli_upper} REVIEW ==="
                 echo "[Empty response from $cli]"
-                echo "=== END ${cli^^} REVIEW ==="
+                echo "=== END ${cli_upper} REVIEW ==="
                 echo ""
             fi
         else
-            echo "=== ${cli^^} REVIEW ==="
+            echo "=== ${cli_upper} REVIEW ==="
             echo "[$cli CLI failed or timed out]"
-            echo "=== END ${cli^^} REVIEW ==="
+            echo "=== END ${cli_upper} REVIEW ==="
             echo ""
         fi
 
         # Cleanup
         rm -f "$output_file"
+        i=$((i + 1))
     done
 }
 
@@ -155,7 +146,7 @@ execute_all_clis() {
 # Check which CLIs are available
 check_available_clis() {
     echo "Checking available CLI tools..."
-    local default_clis=("gemini" "codex" "claude")
+    local default_clis=("gemini" "codex")
 
     for cli in "${default_clis[@]}"; do
         if command -v "$cli" &> /dev/null; then
@@ -164,6 +155,12 @@ check_available_clis() {
             echo "  $cli: not found"
         fi
     done
+
+    if [ -n "$TIMEOUT_CMD" ]; then
+        echo "  timeout: $TIMEOUT_CMD"
+    else
+        echo "  timeout: not found (CLIs will run without timeout)"
+    fi
 }
 
 # Print usage
@@ -172,12 +169,10 @@ usage() {
     echo ""
     echo "Commands:"
     echo "  check     - Check which CLI tools are available"
-    echo "  context   - Get git context (base SHA, current SHA, changes)"
     echo "  execute   - Execute review with specified CLIs"
     echo ""
     echo "Examples:"
     echo "  peer-review.sh check"
-    echo "  peer-review.sh context"
     echo "  peer-review.sh execute 'Review prompt here' gemini codex"
 }
 
@@ -185,14 +180,6 @@ usage() {
 case "${1:-}" in
     check)
         check_available_clis
-        ;;
-    context)
-        base=$(get_base_sha)
-        current=$(get_current_sha)
-        echo "Base SHA: $base"
-        echo "Current SHA: $current"
-        echo ""
-        get_changes_summary "$base" "$current"
         ;;
     execute)
         shift

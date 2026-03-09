@@ -1,7 +1,7 @@
 ---
 name: consulting-peer-llms
-description: Use when user explicitly requests feedback from other LLM tools (Gemini, Codex, Claude) on current work
-allowed-tools: "Bash(gemini:*) Bash(codex:*) Bash(claude:*) Bash(timeout:*) Bash(command:*) Bash(bash:*) Bash($SKILL_DIR:*)"
+description: Use when user explicitly requests feedback from other LLM tools (Gemini, Codex) on current work
+allowed-tools: "Bash(gemini:*) Bash(codex:*) Bash(timeout:*) Bash(command:*) Bash(bash:*) Bash($SKILL_DIR:*)"
 ---
 
 # Consulting Peer LLMs
@@ -30,7 +30,6 @@ Get feedback from other LLM CLI tools (Gemini, Codex) on your current work. This
 **Supported CLI tools:**
 - `gemini` - Google Gemini CLI
 - `codex` - OpenAI Codex CLI
-- `claude` - Anthropic Claude CLI
 
 **Detection:**
 - Auto-detect all installed CLIs via `command -v`
@@ -38,29 +37,53 @@ Get feedback from other LLM CLI tools (Gemini, Codex) on your current work. This
 
 ## Workflow
 
-### Step 1: Collect Context
+### Step 1: Build Minimal Prompt
 
-**Work Summary:**
-- What was implemented (from conversation)
-- User's requirements and constraints
+**Prompt minimalism principle**: CLIs run in the same repository. They can `git diff`, `git log`, and read any file. Never duplicate what they can discover themselves.
 
-### Step 2: Generate Review Prompt
+**Bare prompt** (no context available — e.g., slash command without arguments):
+```
+Review all changes on the current branch vs origin/main.
+Use git diff origin/main...HEAD and read files directly.
+```
 
-Use structured prompt with these sections:
-1. What was implemented
-2. Requirements/plan
-3. Instruction to compare current branch against `origin/main` (or `origin/master`)
-4. User's specific review requirements (if any, passed as-is)
+**With conversation context** (agent knows what was implemented):
+```
+Review all changes on the current branch vs origin/main.
+Use git diff origin/main...HEAD and read files directly.
+{1-2 sentence summary of what was implemented and why}
+```
+
+**With explicit review focus** (user specifies files or areas):
+```
+Review all changes on the current branch vs origin/main.
+Use git diff origin/main...HEAD and read files directly.
+{1-2 sentence summary, if available}
+Focus on: {user's specific requirements — paths or areas only if user explicitly asked}
+```
+
+**What goes in the prompt:**
+- Instruction to use git for changes (always)
+- 1-2 sentence summary of intent (only if known from conversation — never gather it)
+- User's review focus (if any, passed as-is)
+
+**What NEVER goes in the prompt:**
+- File contents or code snippets
+- Git diffs, stats, or change summaries
+- File lists or directory structures
+- SHAs or commit messages
+- Path references (unless user explicitly asked to focus on specific files)
+- Summaries derived by reading git log or files (if no conversation context, omit the summary)
 
 **Full template**: See [reference/prompt-template.md](reference/prompt-template.md)
 
-### Step 3: Execute in Parallel
+### Step 2: Execute in Parallel
 
 Run target CLIs simultaneously and collect results.
 
 **CLI commands**: See [reference/cli-commands.md](reference/cli-commands.md)
 
-### Step 4: Present Raw Responses
+### Step 3: Present Raw Responses
 
 Show original responses first for transparency:
 
@@ -73,7 +96,7 @@ Show original responses first for transparency:
 ---
 ```
 
-### Step 5: Synthesize Final Report
+### Step 4: Synthesize Final Report
 
 **Always synthesize** - even for single CLI responses.
 
@@ -101,7 +124,9 @@ Show original responses first for transparency:
 - Skipping raw response output
 - Just showing raw responses without synthesis
 - Skipping synthesis for single CLI
-- Passing diffs, file lists, SHAs, or file contents in the prompt (CLIs can use git directly)
+- Passing file contents, diffs, file lists, SHAs, or change summaries in the prompt
+- Passing file paths or references unless user explicitly requested focus on specific files
+- Building the prompt by reading files or running git commands to embed results
 - Writing prompts to separate temp files instead of passing inline
 - Specifying model parameters (e.g., `--model`) — use each CLI's default model
 
@@ -115,12 +140,15 @@ Show original responses first for transparency:
 
 ## Troubleshooting
 
+**"codex failed" or "profile not found"**
+- `codex -p` is `--profile`, NOT prompt. Always use `codex exec "prompt"`
+
 **"Empty response from CLI"**
-- Check CLI can run: `gemini -p "test"`
+- Check CLI can run: `gemini -p "test"` or `codex exec "test"`
 - Verify API keys/auth
 - Check prompt isn't too long
 
-**"Both CLIs failed"**
+**"All CLIs failed"**
 - Run diagnostics: `gemini --version && codex --version`
 - Check network connectivity
 

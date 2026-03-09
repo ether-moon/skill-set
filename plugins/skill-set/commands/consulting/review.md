@@ -1,6 +1,6 @@
 ---
 description: Execute peer LLM reviews using the consulting-peer-llms skill
-allowed-tools: "Bash(gemini:*) Bash(codex:*) Bash(claude:*) Bash(timeout:*) Bash(command:*) Bash(bash:*) Bash($SKILL_DIR:*)"
+allowed-tools: "Bash(gemini:*) Bash(codex:*) Bash(timeout:*) Bash(command:*) Bash(bash:*) Bash($SKILL_DIR:*)"
 ---
 
 Use the consulting-peer-llms skill to execute peer LLM reviews.
@@ -16,7 +16,7 @@ Use the consulting-peer-llms skill to execute peer LLM reviews.
 
 ## Execution
 
-1. **Detect installed CLIs**: Run `command -v` to check for `gemini`, `codex`, `claude` and use all that are available
+1. **Detect installed CLIs**: Run `command -v` to check for `gemini`, `codex` and use all that are available
 2. **Determine review scope**:
    - If arguments provided: Use as review requirements
    - If no arguments: Request a general code review of the current implementation

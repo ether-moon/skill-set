@@ -4,7 +4,8 @@
 
 - **No model specification**: Do not pass `--model` or equivalent flags. Use each CLI's default model.
 - **No prompt files**: Pass prompts directly inline to CLI commands. Do not write prompts to temp files.
-- **No diffs or SHAs in prompt**: CLIs run in the same repository. Instruct them to compare the current branch against `origin/main` (or `origin/master`).
+- **No embedded context**: Do not read files, run git commands, or gather any data to embed in the prompt. CLIs run in the same repository — they read git state and files themselves.
+- **Minimal prompts**: The prompt contains only: (1) instruction to review current branch vs origin/main, (2) 1-2 sentence intent summary, (3) user's review focus if explicitly requested. Nothing else.
 
 ## Supported CLIs
 
@@ -12,41 +13,56 @@
 
 | CLI | Command | Notes |
 |-----|---------|-------|
-| gemini | `gemini -p "prompt"` | Without `-p`, enters interactive mode |
-| codex | `codex exec "prompt"` | Alias: `codex e "prompt"` |
-| claude | `claude -p "prompt"` | Without `-p`, enters interactive REPL |
+| gemini | `gemini -p "prompt"` | `-p` = prompt. Without it, enters interactive mode |
+| codex | `codex exec "prompt"` | `exec` subcommand runs one-shot. **`-p` is NOT prompt — it's `--profile`** |
+
+**Excluded CLIs:**
+- `claude` — invoking `claude` CLI from within a Claude session fails
+
+**Common mistakes:**
+- `codex -p "prompt"` → **WRONG** — `-p` is `--profile`, not prompt. Use `codex exec "prompt"`
+- `codex "prompt"` → **WRONG** — enters interactive mode. Use `codex exec "prompt"`
 
 ## Parallel Execution
 
 ```bash
+# Bash 3.2+ compatible (macOS + Linux)
 TIMEOUT="1200s"
-declare -A CLI_PIDS CLI_FILES
+TIMEOUT_CMD=""
+command -v timeout &>/dev/null && TIMEOUT_CMD="timeout"
+command -v gtimeout &>/dev/null && TIMEOUT_CMD="gtimeout"
+
+run_cmd() {
+  if [ -n "$TIMEOUT_CMD" ]; then "$TIMEOUT_CMD" "$TIMEOUT" "$@"; else "$@"; fi
+}
+
+TARGET_CLIS=("gemini" "codex")
+PIDS=()
+FILES=()
 
 for cli in "${TARGET_CLIS[@]}"; do
-  OUTPUT_FILE="/tmp/${cli}-review.txt"
-  CLI_FILES[$cli]="$OUTPUT_FILE"
-
+  OUTPUT_FILE="/tmp/${cli}-review-$$.txt"
+  FILES+=("$OUTPUT_FILE")
   case "$cli" in
-    gemini)  timeout $TIMEOUT gemini -p "$PROMPT" > "$OUTPUT_FILE" 2>/dev/null & ;;
-    codex)   timeout $TIMEOUT codex exec "$PROMPT" > "$OUTPUT_FILE" 2>/dev/null & ;;
-    claude)  timeout $TIMEOUT claude -p "$PROMPT" > "$OUTPUT_FILE" 2>/dev/null & ;;
+    gemini)  run_cmd gemini -p "$PROMPT" > "$OUTPUT_FILE" 2>/dev/null & ;;
+    codex)   run_cmd codex exec "$PROMPT" > "$OUTPUT_FILE" 2>/dev/null & ;;
   esac
-  CLI_PIDS[$cli]=$!
+  PIDS+=($!)
 done
 
 # Collect results
+i=0
 for cli in "${TARGET_CLIS[@]}"; do
-  wait ${CLI_PIDS[$cli]}
-  EXIT_CODE=$?
-  if [ $EXIT_CODE -eq 0 ] && [ -s "${CLI_FILES[$cli]}" ]; then
-    cat "${CLI_FILES[$cli]}"
-  elif [ $EXIT_CODE -eq 124 ]; then
-    echo "[${cli} timed out]"
+  if wait "${PIDS[$i]}" && [ -s "${FILES[$i]}" ]; then
+    cat "${FILES[$i]}"
   else
-    echo "[${cli} failed with exit code $EXIT_CODE]"
+    echo "[$cli failed or timed out]"
   fi
-  rm -f "${CLI_FILES[$cli]}"
+  rm -f "${FILES[$i]}"
+  i=$((i + 1))
 done
 ```
 
-**Timeout**: 1200s (20 minutes). Exit code 124 = timeout.
+**Timeout**: 1200s (20 minutes). Uses `timeout` (Linux) or `gtimeout` (macOS via coreutils). Without either, CLIs run without timeout.
+
+**Compatibility**: Bash 3.2+ — no associative arrays (`declare -A`), no `${var^^}`. Uses indexed arrays and `tr` for uppercase.

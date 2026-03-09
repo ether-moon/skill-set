@@ -2,107 +2,130 @@
 
 This template is based on the superpowers:code-reviewer prompt structure, adapted for peer LLM consultation.
 
-## Full Template
+## Core Principle
+
+**CLIs share the same repository.** They can run `git diff`, `git log`, and read any file. The prompt should tell them *what to do* and *why*, not *what the code looks like*.
+
+## Prompt Tiers
+
+### Tier 1: Bare (no context — e.g., slash command without arguments)
+
+Use when there is no conversation context and no user-specified focus. Do NOT read git log or files to fabricate a summary.
 
 ```markdown
 # Code Review Request
 
-## What Was Implemented
+Review all changes on the current branch compared to `origin/main` (or `origin/master`).
+Use `git diff origin/main...HEAD` to see the full diff and read files directly from the repository.
+```
 
-{Extract from conversation context}
+### Tier 2: With context (conversation provides what was implemented)
 
-Examples:
-- "Implemented user authentication with JWT tokens"
-- "Refactored database connection pooling logic"
-- "Added error handling for API timeout scenarios"
-- "Created new React component for data visualization"
+Use when the conversation naturally provides context about what was built.
 
-## Requirements/Plan
+```markdown
+# Code Review Request
 
-{User's stated requirements or problem to solve}
+Review all changes on the current branch compared to `origin/main` (or `origin/master`).
+Use `git diff origin/main...HEAD` to see the full diff and read files directly from the repository.
 
-Examples:
-- "User requested secure login system with session management"
-- "Need to improve database performance under high load"
-- "Fix production bug where timeouts crash the service"
-- "Display real-time metrics in dashboard UI"
+## Context
 
-## Changes
+{1-2 sentence summary of what was implemented and why — from conversation only}
+```
 
-Please compare the current branch against `origin/main` (or `origin/master`) using git to review all changes.
-Use commands like `git diff origin/main...HEAD` to see the full diff.
+### Tier 3: With review focus (user specifies areas)
 
-{If user provided specific review requirements, add:}
+Use when user explicitly asks to focus on specific files or aspects.
+
+```markdown
+# Code Review Request
+
+Review all changes on the current branch compared to `origin/main` (or `origin/master`).
+Use `git diff origin/main...HEAD` to see the full diff and read files directly from the repository.
+
+{If context available from conversation:}
+## Context
+
+{1-2 sentence summary}
+
 ## Review Focus
 
 {User's specific requirements, passed as-is}
-{End conditional section}
-
 ```
 
 ## Template Variables
 
-When generating the prompt, replace these placeholders:
+| Variable | Source | Required |
+|----------|--------|----------|
+| `{context}` | Conversation (never gathered from git/files) | No — omit if unknown |
+| `{review_focus}` | User's explicit request | No — omit if not specified |
 
-| Variable | Source | Example |
-|----------|--------|---------|
-| `{what_implemented}` | Conversation analysis | "Implemented JWT authentication" |
-| `{requirements}` | User's stated goal | "User requested secure login system" |
+## What Belongs in the Prompt
 
-**Note:** Do not include SHAs, file lists, diffs, or change summaries — peer CLIs use git directly to compare the current branch against `origin/main`.
+| Include | Exclude |
+|---------|---------|
+| 1-2 sentence intent summary | File contents or code snippets |
+| Instruction to use git | Git diffs, stats, or logs |
+| User's review focus (if any) | File lists or directory trees |
+| | SHAs or commit messages |
+| | Path references (unless user explicitly asked) |
+| | Change summaries or descriptions |
 
+**Key rule**: If a CLI can discover it by running a command in the repo, don't put it in the prompt.
 
-## Context Optimization
+## Examples
 
-### What to Include in Prompt
-
-**Essential:**
-- Clear statement of what was built
-- Why it was built (requirements)
-- Instruction to compare current branch against `origin/main` (CLIs query git directly)
-
-**Useful:**
-- Programming language and framework
-- Key design decisions from conversation
-- Constraints mentioned by user
-
-### What to Exclude from Prompt
-
-- File lists, git diff output, change summaries (CLIs query these themselves)
-- Entire file contents
-- Complete conversation history
-- Unrelated project context
-
-**Rule of thumb:** Keep total prompt under 4000 tokens for best results.
-
-
-## Example: Complete Prompt
+### Bare (slash command, no arguments)
 
 ```markdown
 # Code Review Request
 
-## What Was Implemented
-
-Implemented JWT token-based user authentication system. Includes login, logout, and token refresh functionality.
-
-## Requirements/Plan
-
-User requested the following:
-- Secure login/logout functionality
-- JWT token-based session management
-- Automatic token refresh
-- Permission validation middleware
-
-## Changes
-
-Please compare the current branch against `origin/main` (or `origin/master`) using git to review all changes.
-Use commands like `git diff origin/main...HEAD` to see the full diff.
+Review all changes on the current branch compared to `origin/main`.
+Use `git diff origin/main...HEAD` to see the full diff and read files directly from the repository.
 ```
+
+### With conversation context
+
+```markdown
+# Code Review Request
+
+Review all changes on the current branch compared to `origin/main`.
+Use `git diff origin/main...HEAD` to see the full diff and read files directly from the repository.
+
+## Context
+
+Added JWT token-based authentication replacing the previous session system.
+```
+
+### With focus
+
+```markdown
+# Code Review Request
+
+Review all changes on the current branch compared to `origin/main`.
+Use `git diff origin/main...HEAD` to see the full diff and read files directly from the repository.
+
+## Review Focus
+
+Check thread safety of the connection pool under concurrent access.
+```
+
+## Anti-Patterns
+
+These are common mistakes — if you catch yourself doing any of these, stop and simplify:
+
+| Anti-Pattern | Fix |
+|---|---|
+| Running `git diff` and embedding output in prompt | Just tell CLI to run `git diff` itself |
+| Reading files and pasting contents into prompt | Tell CLI to read files if needed |
+| Listing changed files in the prompt | CLI discovers this via `git diff --name-only` |
+| Including commit messages or SHAs | CLI runs `git log` itself |
+| Adding paths "for context" when not explicitly requested | Omit — CLI explores the repo |
 
 ## Best Practices
 
-1. **Keep it focused**: Don't include everything, just what's relevant
-2. **Be specific**: Implementation details and requirements, not raw diffs
-3. **Structure clearly**: Use markdown headers for easy parsing
-4. **Prioritize context**: Implementation details > historical context
-5. **Optimize length**: Target 2000-4000 tokens for best results
+1. **Start minimal**: Use Tier 1 by default, add focus only when user asks
+2. **Summarize intent, not implementation**: "Added auth" not "Added login.js, auth.js, middleware.js..."
+3. **Trust the CLI**: It has full repo access — don't hand-hold
+4. **Keep under 500 tokens**: Shorter prompts produce more focused reviews
