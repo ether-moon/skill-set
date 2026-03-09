@@ -44,13 +44,6 @@ Plans and executes via Ralph Wiggum loop — two modes (PLANNING/BUILDING), fres
 - `/skill-set:ralph:plan` - Generate a Ralph-ready plan from any input
 - `/skill-set:ralph:execute` - Execute a plan (auto-plans if none exists)
 
-### coderabbit-feedback
-**Use when**: Processing CodeRabbit AI review comments on pull requests.
-
-Interactive CodeRabbit review processing with severity classification and verified completion.
-
-**Command**: `/skill-set:coderabbit:fix`
-
 ### writing-clear-prose
 **Use when**: Writing, drafting, revising, editing, or proofreading prose, proposals, reports, or technical documents.
 
@@ -125,7 +118,6 @@ If you catch yourself thinking these, check for relevant skills first:
 | External library docs | `understanding-code-context` |
 | Peer LLM review | `consulting-peer-llms` |
 | Plan/execute with fresh context | `ralph` |
-| CodeRabbit feedback | `coderabbit-feedback` |
 | Writing/revising prose | `writing-clear-prose` |
 | Creating skills | `creating-skills` |
 | Modifying directive files | `guarding-agent-directives` |
