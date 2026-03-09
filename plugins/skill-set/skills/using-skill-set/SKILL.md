@@ -61,6 +61,11 @@ Guides writing and revision with four core principles: concreteness, transcreati
 
 Guide for creating effective Claude skills with structured workflow.
 
+### guarding-agent-directives
+**Use when**: Adding, modifying, or reviewing content in CLAUDE.md, AGENTS.md, or their referenced documents. Also applies when any agent autonomously attempts to modify these files.
+
+Guards directive files against bloat by verifying additions through 5 strict criteria while preserving user authority.
+
 ## How to Use Skills
 
 ### 1. Check for Relevant Skills
@@ -73,6 +78,7 @@ Before starting a task, consider if any installed skill applies:
 - Ralph loop execution? → Use `ralph`
 - Writing/revising prose? → Use `writing-clear-prose`
 - Creating skills? → Use `creating-skills`
+- Modifying CLAUDE.md/AGENTS.md? → Use `guarding-agent-directives`
 
 ### 2. Load and Follow the Skill
 
@@ -122,3 +128,4 @@ If you catch yourself thinking these, check for relevant skills first:
 | CodeRabbit feedback | `coderabbit-feedback` |
 | Writing/revising prose | `writing-clear-prose` |
 | Creating skills | `creating-skills` |
+| Modifying directive files | `guarding-agent-directives` |
