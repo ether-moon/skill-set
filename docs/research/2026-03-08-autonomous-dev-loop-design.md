@@ -38,6 +38,7 @@ An **autonomous product development loop** — not just "an implementation agent
 3. **Separate validation execution from validation interpretation.** One agent runs tests/browsers/screenshots; reviewers consume the same evidence. This prevents browser session collisions and duplicate test processes.
 4. **Artifacts over opinions.** Every decision must land in a log file. Every validation must produce an evidence bundle. Every spec change must update the PRD.
 5. **Narrow human gates, wide auto-proceed.** The team autonomously handles reversible/local choices; only irreversible or product-meaning changes reach the human.
+6. **Human gates are non-blocking by default.** When a decision requires human approval, the team does NOT stop all work. It continues progressing on unrelated tasks while the gated item waits. Only truly blocking dependencies (where no other work can proceed without the answer) cause a full halt.
 
 ### Design Tradeoff Rationale
 
@@ -248,7 +249,8 @@ DISCOVER ──► SPEC_DRAFT ──► SPEC_HARDEN ──► BUILD_PLAN ──�
 
 #### HUMAN_GATE
 - **Trigger**: `product_level_change` or irreversible/high-blast-radius decisions
-- **Activity**: Lead compiles impact report → asks user → waits
+- **Activity**: Lead compiles impact report → asks user → enters non-blocking wait
+- **Non-blocking principle**: The gated item is parked, but the team continues working on all unrelated tasks. Only when the gated decision is a true upstream dependency for ALL remaining work does the loop fully halt.
 - **Resume**: User approval → SPEC_HARDEN or BUILD_PLAN
 
 #### DONE
@@ -293,7 +295,8 @@ Team Lead ──► User (Human)
 ```
 - Major PRD revision proposals
 - "Redesign the entire UI concept" recommendations
-- Lead compiles impact analysis report → submits to user → enters WAIT state
+- Lead compiles impact analysis report → submits to user → enters **non-blocking wait**
+- **Non-blocking**: The gated item is parked, but the team continues all unrelated work. Full halt only when the gated decision blocks ALL remaining tasks.
 - **Critical**: Subagents cannot ask the user directly (SDK limitation: `AskUserQuestion` unavailable in Task-spawned subagents). All human-facing queries MUST route through Lead.
 
 ---
@@ -488,7 +491,10 @@ docs/orchestration/
     "Allow guest checkout",
     "Defer checkout and collect email only"
   ],
-  "default_if_no_response": "block_further_progress",
+  "blocking": false,
+  "blocked_work_items": ["FE-022"],
+  "unblocked_work_items": ["BE-011", "FE-019", "API-005"],
+  "default_if_no_response": "continue_unblocked_work",
   "linked_escalations": ["ESC-009"]
 }
 ```
@@ -522,6 +528,12 @@ PROHIBITIONS:
 ESCALATION RULE:
 If a subordinate needs user input, they MUST escalate to you. You are the
 sole channel to the human. Use AskUserQuestion only through your own context.
+
+HUMAN GATE RULE:
+When you open a human gate, do NOT halt all work. Park the gated item and
+continue driving all tasks that are not blocked by the pending decision.
+Only enter full halt when the gated decision is an upstream dependency for
+ALL remaining work items.
 
 DIRECT IMPLEMENTATION EXCEPTION:
 Only fix code yourself when ALL executors are idle AND only a single trivial
@@ -749,6 +761,7 @@ This keeps **3–5 active roles** at any given moment, aligned with official rec
 6. **Subordinates never ask the human directly.** All user-facing queries route through Lead. (SDK constraint: `AskUserQuestion` unavailable in Task-spawned subagents.)
 7. **Lead delegates before implementing.** Direct implementation is the exception, not the rule.
 8. **Human gates are narrow; auto-proceed is wide.** Use the three-test criteria (irreversibility, blast radius, product meaning), not vague percentage thresholds.
+9. **Human gates are non-blocking.** Park the gated item, continue all unrelated work. Full halt only when the pending decision blocks every remaining task.
 
 ---
 
