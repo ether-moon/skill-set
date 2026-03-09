@@ -19,6 +19,7 @@ Replace vague claims with specific, observable details. Abstract language feels 
 - Can someone verify this claim with a measurement?
 - Would two readers picture the same thing?
 - Does this sentence survive "compared to what?"
+- Has a specific, unusual detail been replaced with a generic positive description? (over-smooth tone)
 
 **Sources**: Orwell's "Politics and the English Language" — "Never use a metaphor, simile or other figure of speech which you are used to seeing in print." Strunk & White Rule 12 — "Use definite, specific, concrete language."
 

@@ -91,13 +91,19 @@ If you catch yourself doing any of these, stop and correct:
 | Red Flag | Fix |
 |---|---|
 | Starting with background the reader already knows | Start where the reader's knowledge ends |
-| Using "robust", "comprehensive", "leverage" | Use concrete language (see `reference/anti-patterns.md`) |
+| Using "robust", "leverage", "delve", "tapestry" | Use concrete language (see `reference/anti-patterns.md`) |
 | Writing abstract claims without examples | Add a specific data point or measurement |
+| Ending a sentence with "-ing" filler ("highlighting its importance") | Delete the -ing phrase or replace with concrete evidence |
+| Using "It's not X — it's Y" structure | State the point directly; limit to 1 per document at most |
+| Summarizing at every level (paragraph, section, document) | One summary per document, at the top |
+| Every bullet starts with **bold label** | Vary bullet structure |
 | Skipping structure review, going straight to style | Always revise structure before style |
 | Hedging every claim ("might possibly perhaps") | One hedge maximum per claim |
 | Using different terms for the same concept | Pick one term, use it consistently |
 | Ignoring counter-arguments in persuasive text | Steel man the strongest objection |
 | Drawing diagrams as ASCII art | Use Mermaid or equivalent markup-based format (see `reference/drafting.md`) |
+
+Full anti-pattern catalog with sentence, tone, structural, and formatting patterns: `reference/anti-patterns.md`
 
 ## Quick Reference
 
@@ -126,6 +132,6 @@ If you catch yourself doing any of these, stop and correct:
 ## See Also
 
 - [reference/principles.md](reference/principles.md) — Full principle details with sourcing and examples
-- [reference/anti-patterns.md](reference/anti-patterns.md) — AI cliches, drafting and revision mistakes
+- [reference/anti-patterns.md](reference/anti-patterns.md) — AI vocabulary, sentence/tone/structural/formatting patterns, drafting and revision mistakes
 - [reference/drafting.md](reference/drafting.md) — Step-by-step drafting workflow with templates
 - [reference/revising.md](reference/revising.md) — 4-pass revision checklist

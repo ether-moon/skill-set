@@ -12,6 +12,9 @@ Check the document's skeleton before touching any prose.
 - [ ] **No orphan sections**: Every section connects to the document's stated purpose
 - [ ] **Progressive disclosure**: Title + headers tell the full story; body adds depth
 - [ ] **Lead not buried**: The conclusion or recommendation appears early, not at the end
+- [ ] **No fractal summaries**: Summaries appear once (at the top), not repeated per section
+- [ ] **No one-point dilution**: Each section adds new information, not a restatement of a previous point
+- [ ] **Paragraph variety**: Paragraphs vary in length and internal structure — not all identical
 
 **Action**: Move, merge, or delete sections. Don't rewrite prose yet.
 
@@ -33,13 +36,16 @@ Ensure every sentence communicates unambiguously to a context-zero reader.
 Polish prose after structure and clarity are solid.
 
 - [ ] **Active voice**: Default to active; passive only when the actor is unknown or irrelevant
-- [ ] **No AI cliches**: Check against the cliche list in `anti-patterns.md`
+- [ ] **No AI cliches**: Check against vocabulary and phrase lists in `anti-patterns.md`
+- [ ] **No -ing filler**: Delete trailing participle phrases that add no evidence ("highlighting its importance")
+- [ ] **No negative parallelism**: Remove "It's not X — it's Y" patterns; state the point directly
 - [ ] **Brevity applied**: Every sentence earns its place; no filler words or phrases
 - [ ] **One idea per sentence**: Break compound sentences making multiple claims
 - [ ] **Consistent tone**: Formal or informal throughout — no register shifts
 - [ ] **Hedging minimal**: One hedge per claim maximum ("might", "could", "potentially")
+- [ ] **No stakes inflation**: Claims of importance backed by evidence, not assertion
 
-**Action**: Cut words, activate verbs, remove cliches. Aim for 10-20% word count reduction.
+**Action**: Cut words, activate verbs, remove cliches and AI sentence patterns. Aim for 10-20% word count reduction.
 
 ## Pass 4: Consistency
 
@@ -47,6 +53,8 @@ Final polish for mechanical correctness.
 
 - [ ] **Terminology consistent**: Same concept uses same term throughout (no synonym drift)
 - [ ] **Formatting consistent**: Headers, lists, code blocks follow the same pattern
+- [ ] **No bold-first bullet pattern**: Not every bullet starts with a bolded phrase
+- [ ] **Em dashes limited**: 2-3 per piece maximum; prefer commas or parentheses
 - [ ] **References valid**: All links, citations, and cross-references point to real targets
 - [ ] **Numbers consistent**: Units, precision, and formatting match throughout
 - [ ] **Tone consistent**: No unexpected shifts between sections
