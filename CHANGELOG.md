@@ -5,6 +5,21 @@ All notable changes to the skill-set plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.2] - 2026-03-09
+
+### Changed
+
+- **consulting-peer-llms**: Enforce minimal prompts — CLIs read git/files directly
+  - 3-tier prompt system (bare/context/focus) replacing verbose template
+  - Removed claude CLI support (fails within Claude session)
+  - Fixed codex CLI usage (`-p` is `--profile`, not prompt)
+  - Bash 3.2+ compatible script (macOS + Linux): removed `declare -A`, `${var^^}`, added `gtimeout` fallback
+
+### Improved
+
+- **writing-clear-prose**: Expanded anti-patterns with AI writing tropes
+- **using-skill-set**: Removed coderabbit-feedback from skill registry
+
 ## [1.5.1] - 2026-03-09
 
 ### Fixed
@@ -244,6 +259,7 @@ Users upgrading from v1.x should:
   - `using-skill-set`: Session initialization
   - `coderabbit-feedback`: CodeRabbit review processing
 
+[1.5.2]: https://github.com/ether-moon/skill-set/releases/tag/v1.5.2
 [1.5.1]: https://github.com/ether-moon/skill-set/releases/tag/v1.5.1
 [1.5.0]: https://github.com/ether-moon/skill-set/releases/tag/v1.5.0
 [1.4.3]: https://github.com/ether-moon/skill-set/releases/tag/v1.4.3
