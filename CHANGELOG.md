@@ -5,6 +5,19 @@ All notable changes to the skill-set plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-03-09
+
+### Fixed
+
+- **ralph**: Corrected from imperative task queue to declarative spec + gap analysis model
+  - Build prompt: gap analysis against acceptance criteria instead of executing tasks
+  - Plan prompt: generate acceptance criteria instead of task lists
+  - Renamed plan-quality.md to spec-quality.md with updated quality criteria
+
+### Added
+
+- **using-skill-set**: Registered `guarding-agent-directives` in skill discovery flow
+
 ## [1.5.0] - 2026-03-06
 
 ### Added
@@ -231,6 +244,8 @@ Users upgrading from v1.x should:
   - `using-skill-set`: Session initialization
   - `coderabbit-feedback`: CodeRabbit review processing
 
+[1.5.1]: https://github.com/ether-moon/skill-set/releases/tag/v1.5.1
+[1.5.0]: https://github.com/ether-moon/skill-set/releases/tag/v1.5.0
 [1.4.3]: https://github.com/ether-moon/skill-set/releases/tag/v1.4.3
 [1.4.2]: https://github.com/ether-moon/skill-set/releases/tag/v1.4.2
 [1.4.1]: https://github.com/ether-moon/skill-set/releases/tag/v1.4.1
