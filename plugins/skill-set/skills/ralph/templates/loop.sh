@@ -30,7 +30,7 @@ fi
 
 ITERATION=0
 STUCK_COUNT=0
-PLAN_FILE="{{PLAN_FILE}}"
+SPEC_FILE="{{SPEC_FILE}}"
 MODEL="{{MODEL}}"
 CURRENT_BRANCH=$(git branch --show-current)
 
@@ -38,7 +38,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "Ralph Loop"
 echo "   Mode:   $MODE"
 echo "   Branch: $CURRENT_BRANCH"
-echo "   Plan:   $PLAN_FILE"
+echo "   Spec:   $SPEC_FILE"
 echo "   Model:  $MODEL"
 [ "$MAX_ITERATIONS" -gt 0 ] && echo "   Max:    $MAX_ITERATIONS iterations"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -62,7 +62,7 @@ while true; do
 
     # Save current HEAD for progress detection
     PREV_HEAD=$(git rev-parse HEAD 2>/dev/null || echo "none")
-    PREV_PLAN_HASH=$(md5sum "$PLAN_FILE" 2>/dev/null | cut -d' ' -f1 || echo "none")
+    PREV_SPEC_HASH=$(md5sum "$SPEC_FILE" 2>/dev/null | cut -d' ' -f1 || echo "none")
 
     # Run Claude with fresh context
     cat "$PROMPT_FILE" | claude -p \
@@ -70,16 +70,16 @@ while true; do
         --model "$MODEL" \
         --verbose
 
-    # Circuit breaker: detect no progress via git commits and plan changes
+    # Circuit breaker: detect no progress via git commits and spec changes
     CURR_HEAD=$(git rev-parse HEAD 2>/dev/null || echo "none")
-    CURR_PLAN_HASH=$(md5sum "$PLAN_FILE" 2>/dev/null | cut -d' ' -f1 || echo "none")
+    CURR_SPEC_HASH=$(md5sum "$SPEC_FILE" 2>/dev/null | cut -d' ' -f1 || echo "none")
 
-    if [ "$CURR_HEAD" = "$PREV_HEAD" ] && [ "$CURR_PLAN_HASH" = "$PREV_PLAN_HASH" ]; then
+    if [ "$CURR_HEAD" = "$PREV_HEAD" ] && [ "$CURR_SPEC_HASH" = "$PREV_SPEC_HASH" ]; then
         STUCK_COUNT=$((STUCK_COUNT + 1))
         echo "  Warning: No progress detected ($STUCK_COUNT consecutive)"
         if [ "$STUCK_COUNT" -ge 3 ]; then
             echo "STUCK: No progress for 3 consecutive iterations. Stopping."
-            echo "Review the plan, then restart."
+            echo "Review the spec, then restart."
             break
         fi
     else
@@ -95,5 +95,5 @@ echo "========================================"
 echo "  Ralph Loop Complete"
 echo "  Mode:       $MODE"
 echo "  Iterations: $ITERATION"
-echo "  Plan:       $PLAN_FILE"
+echo "  Spec:       $SPEC_FILE"
 echo "========================================"

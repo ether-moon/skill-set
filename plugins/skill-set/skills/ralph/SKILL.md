@@ -9,9 +9,9 @@ description: >
 
 ## Overview
 
-Plans and executes implementation work via Geoffrey Huntley's Ralph Wiggum technique: a **loop where each iteration spawns a fresh Task subagent**. Two modes share one loop mechanism — PLANNING generates a plan, BUILDING implements from it.
+Plans and executes implementation work via Geoffrey Huntley's Ralph Wiggum technique: a **loop where each iteration spawns a fresh Task subagent**. Two modes share one loop mechanism — PLANNING generates a declarative spec, BUILDING performs gap analysis and implements toward it.
 
-**Core philosophy:** Disk is memory. Each iteration gets fresh context. Plan file on disk is the single source of truth. No context rot.
+**Core philosophy:** Disk is memory. Each iteration gets fresh context. Spec file on disk is the single source of truth — a declarative description of the desired end state. Each build iteration performs gap analysis to autonomously determine what to do next. No context rot.
 
 **Prompt templates:** Located in `templates/` relative to this SKILL.md file.
 
@@ -27,8 +27,8 @@ Plans and executes implementation work via Geoffrey Huntley's Ralph Wiggum techn
 
 | Mode | Command | Prompt | Purpose |
 |------|---------|--------|---------|
-| PLANNING | `/skill-set:ralph:plan` | `PROMPT_plan.md` | Generate/refine a Ralph-ready plan |
-| BUILDING | `/skill-set:ralph:execute` | `PROMPT_build.md` | Implement from plan, one task per iteration |
+| PLANNING | `/skill-set:ralph:plan` | `PROMPT_plan.md` | Generate/refine a declarative spec |
+| BUILDING | `/skill-set:ralph:execute` | `PROMPT_build.md` | Gap analysis + implement, one gap per iteration |
 
 Both modes share loop infrastructure: iteration control, circuit breaker, fresh context per subagent, progress tracking.
 
@@ -39,8 +39,8 @@ Both modes share loop infrastructure: iteration control, circuit breaker, fresh 
 | Condition | Mode |
 |-----------|------|
 | User invokes `/skill-set:ralph:plan` | PLANNING |
-| User invokes `/skill-set:ralph:execute` + valid plan exists | BUILDING |
-| User invokes `/skill-set:ralph:execute` + no valid plan | PLANNING first, then BUILDING |
+| User invokes `/skill-set:ralph:execute` + valid spec exists | BUILDING |
+| User invokes `/skill-set:ralph:execute` + no valid spec | PLANNING first, then BUILDING |
 
 ### Step 2: Detect Project Environment
 
@@ -56,20 +56,21 @@ Check for AGENTS.md or CLAUDE.md at project root.
 - **Missing:** Offer to create minimal AGENTS.md from Step 2 detection results.
 - **User declines creation:** Remove all `{{AGENTS_FILE}}` references from the constructed prompt.
 
-### Step 4: Prepare Plan File
+### Step 4: Prepare Spec File
 
-Create session directory and plan file path:
+Create session directory and spec file path:
 
 ```
-tmp/ralph/{YYYY-MM-DD-HHmm}/plan.md
+tmp/ralph/{YYYY-MM-DD-HHmm}/spec.md
 ```
 
 - **PLANNING mode:** This is the output destination.
-- **BUILDING mode:** Search for existing plan in priority order:
+- **BUILDING mode:** Search for existing spec in priority order:
   1. Path explicitly provided by user
-  2. Most recent `tmp/ralph/*/plan.md`
-  3. Root `*plan*` or `*PLAN*` files
-  4. If not found → enter PLANNING mode first
+  2. Most recent `tmp/ralph/*/spec.md`
+  3. Most recent `tmp/ralph/*/plan.md` (backward compatibility)
+  4. Root `*spec*` or `*plan*` files
+  5. If not found → enter PLANNING mode first
 
 Ensure `tmp/` is in the target project's `.gitignore`.
 
@@ -77,7 +78,7 @@ Ensure `tmp/` is in the target project's `.gitignore`.
 
 Read the appropriate template from `templates/`. Substitute:
 - `{{AGENTS_FILE}}` → `AGENTS.md` or `CLAUDE.md` (whichever exists; remove referencing lines if neither exists)
-- `{{PLAN_FILE}}` → plan file path
+- `{{SPEC_FILE}}` → spec file path
 - `{{TEST_CMD}}` → detected test command from Step 2
 - `{{SOURCE_DOC}}` → input document path (PLANNING only; remove the `0b.` orient line if no source document provided)
 
@@ -90,13 +91,13 @@ Hold the constructed prompt in memory. Do NOT write files into the project.
 The DONE condition defines when the loop should terminate. It must be **observable and unambiguous** — something the loop controller or the subagent can evaluate without subjective judgment.
 
 Examples of good DONE conditions:
-- "All tasks in the plan are marked as completed"
-- "The test suite passes and all planned endpoints are implemented"
-- "3 features (auth, dashboard, API) are implemented and tested"
-- "The plan file contains no remaining actionable items"
+- "All acceptance criteria verified as met"
+- "The test suite passes and all acceptance criteria are satisfied"
+- "3 features (auth, dashboard, API) are implemented and all criteria met"
+- "The spec's acceptance criteria section has no unmet items"
 
 **Workflow:**
-1. Analyze the plan (or stated goals for PLANNING mode)
+1. Analyze the spec (or stated goals for PLANNING mode)
 2. Propose a DONE condition to the user
 3. User confirms or adjusts
 4. Include the confirmed DONE condition in the loop's completion check
@@ -117,7 +118,7 @@ while iteration < max_iterations:
      Report: "Iteration {iteration}"
 
   2. Save: prev_head = `git rev-parse HEAD`
-     Save: prev_plan_hash = hash of plan file
+     Save: prev_spec_hash = hash of spec file
 
   3. Spawn Task subagent:
      - subagent_type: "general-purpose"
@@ -128,9 +129,9 @@ while iteration < max_iterations:
 
   5. Check progress:
      curr_head = `git rev-parse HEAD`
-     curr_plan_hash = hash of plan file
+     curr_spec_hash = hash of spec file
 
-     progress = (curr_head != prev_head) OR (curr_plan_hash != prev_plan_hash)
+     progress = (curr_head != prev_head) OR (curr_spec_hash != prev_spec_hash)
 
      If NOT progress:
        stuck_count += 1
@@ -153,7 +154,7 @@ while iteration < max_iterations:
 - Subagent has access to all tools (general-purpose agent).
 
 **PLANNING → BUILDING transition:**
-When PLANNING completes within `/skill-set:ralph:execute`, report the generated plan to user, ask for confirmation, then propose DONE condition and transition to BUILDING mode.
+When PLANNING completes within `/skill-set:ralph:execute`, report the generated spec to user, ask for confirmation, then propose DONE condition and transition to BUILDING mode.
 
 ### Step 8: Report Results
 
@@ -164,30 +165,30 @@ Display final summary (adapt to user's language):
 Ralph Loop Complete
   Mode:       {PLANNING | BUILDING}
   Iterations: {iteration}
-  Plan:       {plan_file_path}
+  Spec:       {spec_file_path}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
 If incomplete, suggest next steps:
-- Review the plan and re-run
+- Review the spec and re-run
 - Refine input and re-plan
 
 ## Progress Tracking
 
-**New commits OR plan file modifications count as progress.** Both modes use the same metric.
+**New commits OR spec file modifications count as progress.** Both modes use the same metric.
 
 - New git commit = progress
-- Plan file changed (hash differs) = progress
+- Spec file changed (hash differs) = progress
 - Neither changed = no progress
 - Stuck: 3 consecutive iterations with no progress → ask user
 
-This means blocker handling (updating plan with blocker notes without committing code) still counts as progress, preventing false stuck detection.
+This means blocker handling (updating spec with blocker notes without committing code) still counts as progress, preventing false stuck detection.
 
-## Plan File Structure
+## Spec File Structure
 
-The plan is a **single self-contained file** with free-form content. No separate spec files.
+The spec is a **single self-contained file** describing the desired end state. No separate task lists.
 
-Recommended structure (LLM generates naturally, not enforced):
+Required structure:
 
 ```markdown
 ## Context
@@ -195,39 +196,43 @@ Recommended structure (LLM generates naturally, not enforced):
 [Goals, constraints, technical background — concise but sufficient
  for a fresh-context agent to understand the project]
 
-## Tasks
+## Acceptance Criteria
 
-- Task description with implementation detail
-  Related files, verification approach
-- Next task, prioritized by importance
-  ...
+- Criterion describing a desired outcome (observable, testable)
+- Another criterion...
+
+## Progress Log
+
+(populated by build iterations)
 ```
 
 **Key properties:**
-- Free-form. No checkbox format enforced. LLM manages naturally.
-- Context section replaces separate specs — one file, full picture.
-- Living document — BUILDING iterations update with discoveries and completed work.
+- Declarative. Acceptance criteria describe outcomes, not implementation steps.
+- Context section gives fresh agents full project understanding.
+- Progress Log tracks what was done — build iterations append here.
+- Acceptance Criteria section is immutable during BUILDING — only PLANNING modifies it.
 - Disposable — re-run PLANNING to regenerate from scratch.
 
-See `reference/plan-quality.md` for Ralph-ready plan criteria.
+See `reference/spec-quality.md` for Ralph-ready spec criteria.
 
 ## Common Mistakes
 
 | Mistake | Fix |
 |---|---|
-| Forcing checkbox format on plans | Let LLM manage task format naturally. Free-form bullet points. |
+| Writing imperative tasks instead of acceptance criteria | Describe desired outcomes. "GET /api/users returns paginated results" not "Add pagination to /api/users." |
 | Skipping DONE condition proposal | Always propose and confirm DONE condition before starting the loop. |
-| Using opus for loop iterations | Sonnet is sufficient for well-defined tasks. Save opus for planning. |
-| Writing files into the project | Prompt is in memory. Plan goes to tmp/ralph/. |
+| Modifying acceptance criteria during BUILDING | Only append to Progress Log during BUILDING. Use PLANNING to change criteria. |
+| Using opus for loop iterations | Sonnet is sufficient for gap analysis. Save opus for planning. |
+| Writing files into the project | Prompt is in memory. Spec goes to tmp/ralph/. |
 | Running multiple iterations in parallel | Sequential — each iteration depends on the previous. One subagent at a time. |
-| Skipping user confirmation on plan | Always preview and confirm before transitioning PLANNING → BUILDING. |
+| Skipping user confirmation on spec | Always preview and confirm before transitioning PLANNING → BUILDING. |
 
 ## Reference
 
 The `templates/` directory contains prompt templates:
-- `PROMPT_plan.md` — Planning mode prompt (generate/refine plan)
-- `PROMPT_build.md` — Building mode prompt (implement from plan)
+- `PROMPT_plan.md` — Planning mode prompt (generate/refine spec)
+- `PROMPT_build.md` — Building mode prompt (gap analysis + implement)
 - `loop.sh` — Bash loop script for external execution (reference only)
 
 The `reference/` directory contains:
-- `plan-quality.md` — Criteria for Ralph-ready plans (used as verification during PLANNING)
+- `spec-quality.md` — Criteria for Ralph-ready specs (used as verification during PLANNING)
