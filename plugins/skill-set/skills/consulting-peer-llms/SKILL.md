@@ -75,13 +75,30 @@ Focus on: {user's specific requirements — paths or areas only if user explicit
 - Path references (unless user explicitly asked to focus on specific files)
 - Summaries derived by reading git log or files (if no conversation context, omit the summary)
 
+**DO NOT run git commands (git diff, git log, git remote, git status) to gather context for prompt construction.** CLIs run in the same repo — they discover this themselves. If there is no conversation context, use Tier 1 (bare prompt) as-is. Do not fabricate context.
+
 **Full template**: See [reference/prompt-template.md](reference/prompt-template.md)
 
 ### Step 2: Execute in Parallel
 
-Run target CLIs simultaneously and collect results.
+**Use the bundled script** — it handles CLI detection, correct flags, parallel execution, and timeout:
 
-**CLI commands**: See [reference/cli-commands.md](reference/cli-commands.md)
+```bash
+bash "$SKILL_DIR/scripts/peer-review.sh" execute "$PROMPT"
+```
+
+Run in background and collect output when complete.
+
+**Exact CLI commands** (for reference — the script uses these internally):
+
+| CLI | Command | Pitfall |
+|-----|---------|---------|
+| gemini | `gemini -p "$PROMPT"` | Without `-p`, enters interactive mode |
+| codex | `codex exec "$PROMPT"` | **`-p` is `--profile`, NOT prompt** |
+
+**Use ONLY the exact commands above. No additional flags** (`--full-auto`, `--quiet`, `--model`, etc.).
+
+**Details**: See [reference/cli-commands.md](reference/cli-commands.md)
 
 ### Step 3: Present Raw Responses
 
