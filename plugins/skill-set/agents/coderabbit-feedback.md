@@ -94,12 +94,29 @@ Interactive processing of CodeRabbit AI review comments through user conversatio
 # User writes in Spanish → Use Spanish
 # No clear signal → Use English (default)
 ```
-   - [ ] Apply agreed changes
-   - [ ] Commit and push changes
-   - [ ] Post PR comment with verification
-   ```
 
-3. **Discover PR**: Find current PR from branch
+## Mandatory Workflow Tracking
+
+**IMMEDIATELY after discovering the PR, before collecting comments, create these tasks:**
+
+```
+TaskCreate: "Collect and classify CodeRabbit comments"
+TaskCreate: "Discuss feedback with user"
+TaskCreate: "Apply agreed changes"
+TaskCreate: "Commit and push changes"
+TaskCreate: "Post PR comment with @coderabbitai resolve"
+TaskCreate: "Verify PR comment posted"
+```
+
+**Rules:**
+- Create ALL tasks before starting comment collection
+- Set each task to `in_progress` when starting it, `completed` when done
+- Before reporting completion to the user, run `TaskList` and confirm zero pending tasks
+- Never skip a task. If a task cannot be completed, explain why to the user instead of silently moving on.
+
+### Phase 1: Collection
+
+1. **Discover PR**: Find current PR from branch
    ```bash
    BRANCH=$(git branch --show-current)
    gh pr list --head "$BRANCH" --json number,title,url
@@ -668,162 +685,58 @@ processing 내용:
 Consider in future 항목 9items은 적절한 시점에 review하시면 됩니다.
 ```
 
-## The Iron Law: PR Comment is MANDATORY
+## PR Comment Requirement
 
-**PR comment with @coderabbitai resolve is NOT optional.**
+The PR comment with `@coderabbitai resolve` is mandatory for closing the feedback loop.
 
-### Triple Verification System
+**Post comment:**
+```bash
+gh pr comment "$PR_NUMBER" --body "$COMMENT_BODY"
+```
 
-1. **Create Dedicated TodoWrite Item:**
-   ```
-   - [ ] Post @coderabbitai resolve comment to PR (MANDATORY)
-   ```
+**Verify comment posted:**
+```bash
+# Wait for API sync
+sleep 2
+# Confirm comment exists and contains resolve tag
+LAST_COMMENT=$(gh pr view "$PR_NUMBER" --json comments --jq '.comments[-1].body')
+echo "$LAST_COMMENT" | grep -q "@coderabbitai resolve" && echo "Verified" || echo "FAILED - retry"
+```
 
-2. **Post Comment:**
-   ```bash
-   gh pr comment "$PR_NUMBER" --body "$(cat <<'COMMENT_EOF'
-   @coderabbitai resolve
+**After verification, mark tasks as completed:**
+```
+TaskUpdate: "Post PR comment with @coderabbitai resolve" -> completed
+TaskUpdate: "Verify PR comment posted" -> completed
+```
 
-   ## CodeRabbit 피드백 processing complete / completed
-   [내용...]
-   COMMENT_EOF
-   )"
-   ```
-
-3. **Immediate Verification (3 Checks):**
-   ```bash
-   # Check 1: Command succeeded
-   if [ $? -ne 0 ]; then
-     echo "❌ CRITICAL: Comment post failed"
-     # Retry logic
-   fi
-
-   # Wait for API sync
-   sleep 2
-
-   # Check 2: Comment exists
-   LAST_COMMENT=$(gh pr view "$PR_NUMBER" --json comments --jq '.comments[-1].body')
-
-   # Check 3: Contains resolve tag
-   if ! echo "$LAST_COMMENT" | grep -q "@coderabbitai resolve"; then
-     echo "❌ CRITICAL: PR comment missing @coderabbitai resolve tag"
-     # Retry logic
-   else
-     echo "✅ VERIFIED: PR comment posted with @coderabbitai resolve"
-   fi
-   ```
-
-4. **Retry Logic:**
-   ```bash
-   post_pr_comment_with_verification() {
-     local pr_number=$1
-     local comment_body=$2
-     local max_attempts=3
-     local attempt=1
-
-     while [ $attempt -le $max_attempts ]; do
-       echo "[Attempt $attempt/$max_attempts] Posting PR comment..."
-
-       if gh pr comment "$pr_number" --body "$comment_body"; then
-         sleep 2
-
-         local last_comment=$(gh pr view "$pr_number" --json comments --jq '.comments[-1].body')
-         if echo "$last_comment" | grep -q "@coderabbitai resolve"; then
-           echo "✅ SUCCESS: PR comment verified"
-           return 0
-         fi
-       fi
-
-       echo "⚠️  Attempt $attempt failed, retrying..."
-       ((attempt++))
-       sleep 3
-     done
-
-     echo "❌ CRITICAL FAILURE: Failed after $max_attempts attempts"
-     return 1
-   }
-   ```
-
-### Why This Matters
-
-- CodeRabbit tracks resolution through these comments
-- Without comment, feedback thread stays open indefinitely
-- Team members can't see what was addressed
-- Automated workflows depend on resolution markers
-- GitHub PR timeline needs closure for audit trail
-
-### Success Checklist
-
-Before marking workflow complete, verify ALL:
-- [ ] `gh pr comment` command executed
-- [ ] Command exit code = 0
-- [ ] Waited 2 seconds for API sync
-- [ ] Latest PR comment retrieved successfully
-- [ ] Comment contains "@coderabbitai resolve"
-- [ ] Comment contains summary of applied changes
-- [ ] Comment contains summary of skipped items
-- [ ] TodoWrite item marked completed
-- [ ] Output: "✅ VERIFIED: PR comment posted"
-
-**No shortcuts. No assumptions. Verify every time.**
-
-## Red Flags - Signs You're Skipping Verification
-
-**STOP immediately if you think:**
-- "I'll just post the comment, verification is overkill"
-- "The command succeeded, that's enough"
-- "I'll check manually later"
-- "User can verify in the PR"
-- "Let me mark this todo as done..."
-
-**ALL OF THESE ARE FAILURES - VERIFY THE COMMENT**
+Run `TaskList` to confirm all tasks are completed before reporting success to the user.
 
 ## Common Mistakes
 
-### ❌ Skipping Pagination
+### Skipping Pagination
 **Problem:** Missing comments when PR has 100+ comments
 **Fix:** Use GraphQL/REST pagination to collect up to 200 comments
 
-### ❌ Not Providing Rationale
-**Problem:** User doesn't understand why suggestions are categorized as recommended/optional/unnecessary
+### Not Providing Rationale
+**Problem:** User doesn't understand why suggestions are categorized
 **Fix:** Include 1-2 line rationale for each MINOR item classification
 
-### ❌ Skipping PR Comment Verification
-**Problem:** Assuming comment was posted without verification
-**Fix:** Always run triple-verification (command success + API sync + tag check)
-
-### ❌ Auto-Applying Without Discussion
+### Auto-Applying Without Discussion
 **Problem:** Applying changes user didn't explicitly approve
 **Fix:** Present summary, get user decision, then apply only agreed items
 
-### ❌ Incomplete Error Recovery
+### Incomplete Error Recovery
 **Problem:** Stopping workflow when single item fails
-**Fix:** Skip failed item with explanation, continue with others, complete Phase 3
+**Fix:** Skip failed item with explanation, continue with others, complete remaining tasks
 
 ## Success Criteria
 
-- ✅ Collected all unresolved comments (up to 200 with pagination)
-- ✅ Classified each item by severity (CRITICAL/MAJOR/MINOR)
-- ✅ Discussed CRITICAL/MAJOR items with user
-- ✅ Analyzed MINOR items with clear rationale
-- ✅ Applied only user-approved changes
-- ✅ Committed and pushed all changes
-- ✅ Posted PR comment with @coderabbitai resolve
-- ✅ Verified comment posting with triple-check system
-- ✅ All TodoWrite items marked completed
-
-## Real-World Impact
-
-**Before this skill:**
-- Manual classification of 20+ CodeRabbit comments took 15+ minutes
-- Unclear why certain suggestions weren't applied
-- Risk of missing important items due to pagination limits
-- Inconsistent PR comment posting
-- No verification that CodeRabbit received resolution
-
-**After this skill:**
-- Interactive guided review in 5-7 minutes
-- Clear rationale for each classification decision
-- Complete coverage up to 200 comments with pagination
-- Guaranteed PR comment posting with triple verification
-- User feels confident about decisions with analysis support
+- All tasks created at Phase 1 start
+- All unresolved comments collected (up to 200 with pagination)
+- Each item classified by severity (CRITICAL/MAJOR/MINOR)
+- CRITICAL/MAJOR items discussed with user
+- MINOR items analyzed with clear rationale
+- Only user-approved changes applied
+- Changes committed and pushed
+- PR comment posted with @coderabbitai resolve
+- All tasks show `completed` in TaskList
