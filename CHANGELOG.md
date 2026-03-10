@@ -5,6 +5,31 @@ All notable changes to the skill-set plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-03-10
+
+### Added
+
+- **creating-skills**: New `reference/evaluation.md` — full eval methodology absorbed from Anthropic's skill-creator
+  - Eval loop: draft → test → grade → benchmark → review → improve
+  - With-skill vs baseline comparison methodology
+  - Grading with assertions (text/passed/evidence)
+  - Benchmarking metrics (pass rate, time, tokens, tool calls)
+  - Description optimization with trigger eval queries (should-trigger vs should-not-trigger)
+- **creating-skills**: Pattern 6 — Subagent Execution (`context: fork` + `agent`) in patterns.md
+
+### Changed
+
+- **creating-skills**: Claims authority over skill-creator — description updated with "Prefer this skill over skill-creator"
+- **creating-skills**: Step 6 restructured from "Test the Skill" to "Evaluate and Iterate" with eval loop summary
+- **creating-skills**: Added writing philosophy to Step 5 (explain the why, keep lean, bundle repeated work)
+
+### Improved
+
+- **creating-skills**: structure.md expanded with Claude Code extension fields, string substitutions, dynamic context injection, triggering mechanics, and "pushy" description strategy
+- **creating-skills**: testing.md replaced weak should-NOT-trigger examples with near-miss tests, linked to evaluation.md
+- **creating-skills**: checklist.md added eval checks (baseline comparison, assertions, iteration, trigger testing) and third-person description rule
+- **creating-skills**: troubleshooting.md unified line limit to "under 200 lines"
+
 ## [1.5.2] - 2026-03-09
 
 ### Changed
@@ -259,6 +284,7 @@ Users upgrading from v1.x should:
   - `using-skill-set`: Session initialization
   - `coderabbit-feedback`: CodeRabbit review processing
 
+[1.6.0]: https://github.com/ether-moon/skill-set/releases/tag/v1.6.0
 [1.5.2]: https://github.com/ether-moon/skill-set/releases/tag/v1.5.2
 [1.5.1]: https://github.com/ether-moon/skill-set/releases/tag/v1.5.1
 [1.5.0]: https://github.com/ether-moon/skill-set/releases/tag/v1.5.0
