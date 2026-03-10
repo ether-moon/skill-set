@@ -11,6 +11,10 @@ declare -a SKILL_SET_PLUGINS=(
   "consulting-peer-llms"
   "managing-git-workflow"
   "understanding-code-context"
+  "ralph"
+  "writing-clear-prose"
+  "creating-skills"
+  "guarding-agent-directives"
   "coderabbit-feedback"
 )
 

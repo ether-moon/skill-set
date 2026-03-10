@@ -1,6 +1,6 @@
 ---
 name: understanding-code-context
-description: Use when understanding external libraries, frameworks, or dependencies - provides workflows for finding and reading official documentation via Context7 instead of web search or source code reading
+description: Find and read official documentation for external libraries and frameworks using Context7. Use when researching library APIs, understanding framework configuration, learning library concepts, or looking up dependency documentation — provides authoritative, version-specific docs instead of outdated web search results or source code reading.
 ---
 
 # Understanding Code Context

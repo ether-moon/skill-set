@@ -121,6 +121,19 @@ Test your skill, then iterate based on real results. The core loop:
 
 **Full methodology**: [reference/evaluation.md](reference/evaluation.md) for eval loops, benchmarking, and description optimization
 
+## Example Skills
+
+Study these skill-set skills as real-world references for different patterns:
+
+| Skill | Pattern | Notable Technique |
+|-------|---------|-------------------|
+| `managing-git-workflow` | Sequential workflow | Self-contained reference files, Bash call optimization |
+| `understanding-code-context` | Context-aware tool selection | Anti-pattern defense, multi-variation search |
+| `consulting-peer-llms` | Multi-tool coordination | Parallel CLI execution, bundled script |
+| `ralph` | Iterative refinement | Fresh-context subagents, spec-driven loop |
+| `writing-clear-prose` | Domain-specific intelligence | Before/After examples, 4-pass revision |
+| `guarding-agent-directives` | Verification workflow | 5-question gate, user authority override |
+
 ## Quick Reference
 
 **Use Case Categories:**

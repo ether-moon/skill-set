@@ -28,15 +28,16 @@ Create a pull request with auto-generated title and description, automatically c
 Collect all needed git information in a single call:
 
 ```bash
-git branch --show-current; git status --porcelain; git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || echo "NO_UPSTREAM"; git log --oneline -10; git diff HEAD --stat
+git branch --show-current; git status --porcelain; git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || echo "NO_UPSTREAM"; git log --oneline -10; git diff HEAD --stat; git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "main"
 ```
 
-**Parse the output into 5 sections:**
+**Parse the output into 6 sections:**
 1. **Branch** (`git branch --show-current`): Current branch name — abort if `main` or `master`
 2. **Status** (`git status --porcelain`): Uncommitted changes — empty means all committed
 3. **Upstream** (`git rev-parse ...`): Tracking branch or `NO_UPSTREAM`
 4. **Log** (`git log --oneline -10`): Recent commit patterns and style
 5. **Diff stat** (`git diff HEAD --stat`): Summary of uncommitted changes
+6. **Base branch** (`git symbolic-ref ...`): Default branch name (e.g., `main` or `master`). Use this as `BASE` in all subsequent steps.
 
 **Exit if:** Branch is `main` or `master` → Inform user: "Cannot create PR from main/master branch."
 
@@ -95,8 +96,10 @@ Skip — already pushed.
 Get the full scope of changes for PR description:
 
 ```bash
-git log --oneline origin/master..HEAD; git diff --stat origin/master..HEAD
+git log --oneline origin/BASE..HEAD; git diff --stat origin/BASE..HEAD
 ```
+
+Replace `BASE` with the base branch detected in step 1.
 
 **Parse the output into 2 sections:**
 1. **Commits**: All commits since diverging from base branch
@@ -148,7 +151,7 @@ gh pr create --title "Generated title" --body "$(cat <<'EOF'
 ## Test Plan
 - [ ] Test item 1
 EOF
-)" --base master && gh pr view --web
+)" --base BASE && gh pr view --web
 ```
 
 **Important:** Use HEREDOC for PR body to handle multi-line content correctly.
@@ -178,7 +181,7 @@ Opening in browser...
 **Fix:** Automatically detected in step 2. Outputs existing PR URL instead.
 
 **Issue:** Can't determine appropriate PR description
-**Fix:** Analyze more context with `git diff --name-only origin/master..HEAD` or `git diff origin/master..HEAD`.
+**Fix:** Analyze more context with `git diff --name-only origin/BASE..HEAD` or `git diff origin/BASE..HEAD` (use the base branch detected in step 1).
 
 **Issue:** Push rejected (diverged branches)
 **Fix:** Run `git pull --rebase` then retry step 3.

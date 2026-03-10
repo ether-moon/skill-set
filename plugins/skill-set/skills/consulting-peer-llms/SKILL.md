@@ -1,6 +1,6 @@
 ---
 name: consulting-peer-llms
-description: Use when user explicitly requests feedback from other LLM tools (Gemini, Codex) on current work
+description: Execute peer reviews from other LLM CLI tools (Gemini, Codex) in parallel and synthesize actionable insights. Use when user explicitly requests feedback from other LLMs, peer review, validation from external tools — e.g., "get feedback from gemini", "validate with codex", "peer review this", "what do other LLMs think".
 allowed-tools: "Bash(gemini:*) Bash(codex:*) Bash(timeout:*) Bash(command:*) Bash(bash:*) Bash($SKILL_DIR:*)"
 ---
 
@@ -114,9 +114,13 @@ Show original responses first for transparency:
 **Commands:**
 - `/consulting-peer-llms:review <requirements>` - Auto-detect all installed CLIs and review with the given requirements
 
+**Bundled script:** `scripts/peer-review.sh` — Handles CLI detection, parallel execution with timeout, and result collection. Bash 3.2+ compatible (macOS/Linux).
+- `scripts/peer-review.sh check` — Show installed CLIs and timeout availability
+- `scripts/peer-review.sh execute "prompt" [cli1 cli2]` — Run review with specified or all available CLIs
+
 **Typical execution time:** 5-30 minutes (parallel)
 
-**Temp files:** `/tmp/{cli-name}-review.txt` (one per CLI)
+**Temp files:** `/tmp/{cli-name}-review-$$.txt` (one per CLI, auto-cleaned)
 
 ## Red Flags - STOP Immediately
 

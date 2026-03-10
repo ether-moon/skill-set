@@ -106,55 +106,15 @@ The DONE condition is passed to each subagent as part of the prompt context, so 
 
 ### Step 7: Execute Loop
 
-Report loop start to user, then run:
+Each iteration: spawn fresh Task subagent → wait for completion → check progress → evaluate DONE condition.
 
-```
-iteration = 0
-stuck_count = 0
-max_iterations = 100
+- **Progress detection:** New git commits OR spec file hash changes count as progress
+- **Circuit breaker:** 3 consecutive iterations with no progress → ask user
+- **Subagent:** `general-purpose`, model `sonnet` (default), same repo (no worktree isolation)
+- **Max iterations:** 100
+- **PLANNING → BUILDING transition:** Report generated spec to user, confirm, propose DONE condition, then switch to BUILDING mode
 
-while iteration < max_iterations:
-  1. iteration += 1
-     Report: "Iteration {iteration}"
-
-  2. Save: prev_head = `git rev-parse HEAD`
-     Save: prev_spec_hash = hash of spec file
-
-  3. Spawn Task subagent:
-     - subagent_type: "general-purpose"
-     - prompt: the constructed prompt from Step 5 + DONE condition from Step 6
-     - description: "Ralph iteration {iteration}"
-
-  4. Wait for subagent completion
-
-  5. Check progress:
-     curr_head = `git rev-parse HEAD`
-     curr_spec_hash = hash of spec file
-
-     progress = (curr_head != prev_head) OR (curr_spec_hash != prev_spec_hash)
-
-     If NOT progress:
-       stuck_count += 1
-       Report: "Warning: No progress ({stuck_count} consecutive)"
-       If stuck_count >= 3:
-         Ask user: "No progress for {stuck_count} iterations. Continue or stop?"
-         If continue → stuck_count = 0
-         If stop → break
-     Else:
-       stuck_count = 0
-
-  6. Completion check:
-     Evaluate the DONE condition from Step 6.
-     If met → break
-```
-
-**Subagent configuration:**
-- Model: `sonnet` (default). Sufficient for well-defined tasks. User can request different model.
-- No isolation (worktree) — subagent works in same repo.
-- Subagent has access to all tools (general-purpose agent).
-
-**PLANNING → BUILDING transition:**
-When PLANNING completes within `/skill-set:ralph:execute`, report the generated spec to user, ask for confirmation, then propose DONE condition and transition to BUILDING mode.
+**Full loop pseudocode and subagent configuration:** See [reference/workflow.md](reference/workflow.md)
 
 ### Step 8: Report Results
 
@@ -186,34 +146,9 @@ This means blocker handling (updating spec with blocker notes without committing
 
 ## Spec File Structure
 
-The spec is a **single self-contained file** describing the desired end state. No separate task lists.
+A single self-contained file with three sections: **Context** (goals, constraints), **Acceptance Criteria** (declarative outcomes), and **Progress Log** (populated by build iterations). Acceptance Criteria are immutable during BUILDING — only PLANNING modifies them.
 
-Required structure:
-
-```markdown
-## Context
-
-[Goals, constraints, technical background — concise but sufficient
- for a fresh-context agent to understand the project]
-
-## Acceptance Criteria
-
-- Criterion describing a desired outcome (observable, testable)
-- Another criterion...
-
-## Progress Log
-
-(populated by build iterations)
-```
-
-**Key properties:**
-- Declarative. Acceptance criteria describe outcomes, not implementation steps.
-- Context section gives fresh agents full project understanding.
-- Progress Log tracks what was done — build iterations append here.
-- Acceptance Criteria section is immutable during BUILDING — only PLANNING modifies it.
-- Disposable — re-run PLANNING to regenerate from scratch.
-
-See `reference/spec-quality.md` for Ralph-ready spec criteria.
+**Full structure, key properties, and examples:** See [reference/workflow.md](reference/workflow.md) and [reference/spec-quality.md](reference/spec-quality.md)
 
 ## Common Mistakes
 
@@ -235,4 +170,5 @@ The `templates/` directory contains prompt templates:
 - `loop.sh` — Bash loop script for external execution (reference only)
 
 The `reference/` directory contains:
+- `workflow.md` — Loop pseudocode, subagent configuration, spec file structure details
 - `spec-quality.md` — Criteria for Ralph-ready specs (used as verification during PLANNING)
