@@ -5,6 +5,20 @@ All notable changes to the skill-set plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] - 2026-03-10
+
+### Improved
+
+- **ralph**: Extracted loop pseudocode and spec structure to `reference/workflow.md`, reducing SKILL.md from 238 to 174 lines
+- **managing-git-workflow**: Replaced hardcoded `origin/master` with dynamic base branch detection in PR workflow
+- **consulting-peer-llms**: Enhanced description with trigger phrases; documented `scripts/peer-review.sh` in Quick Reference
+- **understanding-code-context**: Rewrote description to action-oriented format with broader trigger coverage
+- **using-skill-set**: Synced `session-start.sh` with full skill list (added ralph, writing-clear-prose, creating-skills, guarding-agent-directives)
+
+### Added
+
+- **creating-skills**: Example Skills table referencing all skill-set skills as real-world pattern references
+
 ## [1.6.0] - 2026-03-10
 
 ### Added
@@ -284,6 +298,7 @@ Users upgrading from v1.x should:
   - `using-skill-set`: Session initialization
   - `coderabbit-feedback`: CodeRabbit review processing
 
+[1.6.1]: https://github.com/ether-moon/skill-set/releases/tag/v1.6.1
 [1.6.0]: https://github.com/ether-moon/skill-set/releases/tag/v1.6.0
 [1.5.2]: https://github.com/ether-moon/skill-set/releases/tag/v1.5.2
 [1.5.1]: https://github.com/ether-moon/skill-set/releases/tag/v1.5.1
