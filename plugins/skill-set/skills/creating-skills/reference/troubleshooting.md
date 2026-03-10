@@ -194,7 +194,7 @@ Note: Adding this to user prompts is more effective than in SKILL.md
 
 - Move detailed docs to `reference/`
 - Link to references instead of inline
-- Keep SKILL.md under 5,000 words (ideally under 200 lines)
+- Keep SKILL.md under 200 lines
 
 ### 2. Reduce Enabled Skills
 

@@ -186,6 +186,38 @@ ELSE:
 
 ---
 
+## Pattern 6: Subagent Execution
+
+**Use when**: Skill runs exploratory or isolated tasks that shouldn't pollute the main conversation context.
+
+```yaml
+---
+name: deep-research
+context: fork
+agent: Explore
+allowed-tools: Bash(gh *)
+---
+
+Research $ARGUMENTS thoroughly:
+
+1. Find relevant files using Glob and Grep
+2. Read and analyze the code
+3. Summarize findings with file references
+```
+
+**Key techniques:**
+- `context: fork` creates an isolated subagent context
+- `agent` selects execution environment (`Explore`, `Plan`, `general-purpose`, or custom)
+- Skill content becomes the subagent's prompt — no access to conversation history
+- Results are summarized and returned to main conversation
+- Only meaningful for skills with explicit task instructions, not guidelines
+
+**When NOT to use `context: fork`:**
+- Skills that provide conventions or style guides (no actionable prompt for subagent)
+- Skills that need access to the current conversation context
+
+---
+
 ## Use Case Categories
 
 ### Category 1: Document & Asset Creation

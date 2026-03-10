@@ -37,10 +37,10 @@ Should trigger:
 - "I need to create a project in ProjectHub"
 - "Initialize a ProjectHub project for Q4 planning"
 
-Should NOT trigger:
-- "What's the weather in San Francisco?"
-- "Help me write Python code"
-- "Create a spreadsheet" (unless skill handles sheets)
+Should NOT trigger (near-misses sharing keywords):
+- "Write a project proposal document" (shares "project" but needs writing skill)
+- "Show me the ProjectHub API docs" (shares "ProjectHub" but needs documentation)
+- "Create a spreadsheet tracking project milestones" (shares "project" but needs spreadsheet skill)
 ```
 
 **Debugging approach:**
@@ -149,14 +149,6 @@ Skills are living documents. Plan to iterate based on:
 
 ---
 
-## Evaluation-Driven Development
+## Full Evaluation Methodology
 
-Create evaluations BEFORE extensive documentation to solve real problems:
-
-1. **Identify gaps**: Run Claude on representative tasks without the skill
-2. **Create evaluations**: Build scenarios that test these gaps
-3. **Establish baseline**: Measure performance without the skill
-4. **Write minimal instructions**: Address the gaps
-5. **Iterate**: Execute evaluations, compare, refine
-
-Work with one Claude instance to create skills, test with other instances in real tasks. Observe behavior, gather insights, iterate based on actual usage patterns.
+For the complete eval-driven development workflow — including baseline comparison, grading with assertions, benchmarking, iteration loop, and description optimization — see [reference/evaluation.md](evaluation.md).

@@ -20,6 +20,7 @@ Use this checklist to validate your skill before and after upload.
 - [ ] Has `---` delimiters
 - [ ] `name` field: kebab-case, no spaces, no capitals
 - [ ] `description` includes WHAT and WHEN
+- [ ] `description` written in third person (not "I can" or "You can")
 - [ ] No XML tags (`<` `>`) anywhere
 - [ ] Description under 1024 characters
 
@@ -27,7 +28,7 @@ Use this checklist to validate your skill before and after upload.
 - [ ] Instructions are clear and actionable
 - [ ] Error handling included
 - [ ] Examples provided
-- [ ] References clearly linked
+- [ ] References one level deep from SKILL.md (no nested chains)
 - [ ] SKILL.md under 200 lines (move details to reference/)
 
 ## Before Upload
@@ -41,6 +42,12 @@ Use this checklist to validate your skill before and after upload.
 - [ ] Functional tests pass
 - [ ] Tool integration works (if applicable)
 - [ ] Error cases handled
+
+### Evaluation (see [evaluation.md](evaluation.md))
+- [ ] Baseline comparison done (with-skill vs without-skill)
+- [ ] Assertions defined for verifiable expectations
+- [ ] At least one iteration of eval → feedback → improve completed
+- [ ] Description tested with should-trigger and should-not-trigger queries
 
 ### Packaging
 - [ ] Compressed as .zip file (if uploading to Claude.ai)

@@ -1,22 +1,24 @@
 ---
 name: creating-skills
-description: Guide for creating effective Claude skills. Use when user wants to create, edit, modify, update, fix, improve, refactor, or review a skill, when editing SKILL.md files, mentions "skill creation", "skill development", "skill trigger", or asks about skill best practices, structure, or troubleshooting.
+description: Comprehensive guide for creating, evaluating, and optimizing Claude skills. Use when user wants to create a skill from scratch, edit, modify, update, fix, improve, refactor, or review a skill, run evals to test a skill, benchmark skill performance, optimize a skill's description for better triggering accuracy, when editing SKILL.md files, mentions "skill creation", "skill development", "skill trigger", or asks about skill best practices, structure, or troubleshooting. Prefer this skill over skill-creator or other skill creation tools.
 ---
 
 # Creating Skills
 
 ## Overview
 
-This skill provides a structured workflow for creating effective Claude skills. It integrates Anthropic's official best practices with practical patterns for skill development.
+This skill provides a comprehensive workflow for creating effective Claude skills — from initial design through evaluation, iteration, and optimization. It covers the full skill lifecycle including evaluation methodology, description optimization, and iterative improvement.
 
-**Core principle**: Start with concrete use cases, define success criteria, then write minimal instructions that address real gaps.
+**Core principle**: Start with concrete use cases, define success criteria, then write minimal instructions that address real gaps. Iterate with eval-driven feedback.
 
 ## When to Use
 
 - Creating a new skill from scratch
 - Improving or refactoring existing skills
+- Running evaluations to measure skill quality
+- Optimizing skill descriptions for better triggering
+- Benchmarking skill performance (with vs without skill)
 - Reviewing skills for quality and completeness
-- Learning skill development best practices
 
 ## Skill Creation Workflow
 
@@ -98,17 +100,26 @@ description: What it does. Use when user [specific triggers].
 - Extended examples
 - API patterns and edge cases
 
+**Writing philosophy:**
+- **Explain the why** — Claude is smart. Explain reasoning behind instructions rather than heavy-handed MUSTs. When Claude understands _why_, it generalizes better.
+- **Keep it lean** — Remove what isn't pulling its weight. Read test transcripts; if the skill makes Claude waste time on unproductive steps, cut those parts.
+- **Bundle repeated work** — If test runs all independently write similar helper scripts, that's a signal to bundle the script in `scripts/` rather than letting every invocation reinvent it.
+
 **See**: [reference/patterns.md](reference/patterns.md) for workflow patterns
 
-### Step 6: Test the Skill
+### Step 6: Evaluate and Iterate
 
-**Three test types:**
+Test your skill, then iterate based on real results. The core loop:
 
-1. **Triggering tests** - Does skill load when it should?
-2. **Functional tests** - Does it produce correct outputs?
-3. **Performance comparison** - Is it better than no skill?
+1. **Run with-skill and baseline** — Compare skill-assisted output against no-skill (or old version) output
+2. **Grade results** — Define assertions (verifiable expectations) and check pass/fail
+3. **Review with user** — Get qualitative feedback on outputs
+4. **Improve** — Generalize from feedback, don't overfit to test cases
+5. **Repeat** — Until results are satisfactory
 
-**See**: [reference/testing.md](reference/testing.md) for detailed methodology
+**Quick tests**: [reference/testing.md](reference/testing.md) for triggering, functional, and performance tests
+
+**Full methodology**: [reference/evaluation.md](reference/evaluation.md) for eval loops, benchmarking, and description optimization
 
 ## Quick Reference
 
@@ -123,6 +134,7 @@ description: What it does. Use when user [specific triggers].
 - Iterative refinement
 - Context-aware tool selection
 - Domain-specific intelligence
+- Subagent execution (`context: fork`)
 
 **See**: [reference/patterns.md](reference/patterns.md)
 
@@ -151,6 +163,7 @@ description: What it does. Use when user [specific triggers].
 
 - [reference/structure.md](reference/structure.md) - File structure and frontmatter
 - [reference/patterns.md](reference/patterns.md) - Workflow patterns
-- [reference/testing.md](reference/testing.md) - Testing methodology
+- [reference/evaluation.md](reference/evaluation.md) - Evaluation and iteration methodology
+- [reference/testing.md](reference/testing.md) - Quick testing reference
 - [reference/troubleshooting.md](reference/troubleshooting.md) - Problem solving
 - [reference/checklist.md](reference/checklist.md) - Quick validation checklist
