@@ -81,22 +81,15 @@ Focus on: {user's specific requirements — paths or areas only if user explicit
 
 ### Step 2: Execute in Parallel
 
-**Use the bundled script** — it handles CLI detection, correct flags, parallel execution, and timeout:
+**Run the bundled script. Do NOT call `gemini` or `codex` directly.**
 
 ```bash
 bash "$SKILL_DIR/scripts/peer-review.sh" execute "$PROMPT"
 ```
 
-Run in background and collect output when complete.
+Run in background and collect output when complete. The script handles CLI detection, correct flags, parallel execution, and timeout.
 
-**Exact CLI commands** (for reference — the script uses these internally):
-
-| CLI | Command | Pitfall |
-|-----|---------|---------|
-| gemini | `gemini -p "$PROMPT"` | Without `-p`, enters interactive mode |
-| codex | `codex exec "$PROMPT"` | **`-p` is `--profile`, NOT prompt** |
-
-**Use ONLY the exact commands above. No additional flags** (`--full-auto`, `--quiet`, `--model`, etc.).
+**Why the script is mandatory**: Each CLI has different and surprising flag semantics (e.g., `codex -p` is `--profile`, not prompt). The script encapsulates these details so you never need to guess. Calling CLIs directly has failed repeatedly — always use the script.
 
 **Details**: See [reference/cli-commands.md](reference/cli-commands.md)
 
@@ -141,6 +134,8 @@ Show original responses first for transparency:
 
 ## Red Flags - STOP Immediately
 
+- Calling `gemini` or `codex` directly instead of using the bundled script
+- Adding flags like `--full-auto`, `-q`, `--quiet`, `-a`, `--model` to CLI commands
 - Running peer review without explicit user request
 - Skipping raw response output
 - Just showing raw responses without synthesis
@@ -161,8 +156,9 @@ Show original responses first for transparency:
 
 ## Troubleshooting
 
-**"codex failed" or "profile not found"**
-- `codex -p` is `--profile`, NOT prompt. Always use `codex exec "prompt"`
+**"codex failed", "unexpected argument", or "profile not found"**
+- You called `codex` directly instead of using the script. Use `bash "$SKILL_DIR/scripts/peer-review.sh" execute "$PROMPT"`
+- Common wrong commands: `codex -q`, `codex -a full-auto`, `codex -p` — none of these are valid for one-shot review
 
 **"Empty response from CLI"**
 - Check CLI can run: `gemini -p "test"` or `codex exec "test"`
