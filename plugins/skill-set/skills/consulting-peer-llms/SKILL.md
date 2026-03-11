@@ -1,7 +1,7 @@
 ---
 name: consulting-peer-llms
 description: Execute peer reviews from other LLM CLI tools (Gemini, Codex) in parallel and synthesize actionable insights. Use when user explicitly requests feedback from other LLMs, peer review, validation from external tools — e.g., "get feedback from gemini", "validate with codex", "peer review this", "what do other LLMs think".
-allowed-tools: "Bash(gemini:*) Bash(codex:*) Bash(timeout:*) Bash(command:*) Bash(bash:*) Bash($SKILL_DIR:*)"
+allowed-tools: "Bash(command:*) Bash(bash:*) Bash($SKILL_DIR:*)"
 ---
 
 # Consulting Peer LLMs
@@ -87,9 +87,9 @@ Focus on: {user's specific requirements — paths or areas only if user explicit
 bash "$SKILL_DIR/scripts/peer-review.sh" execute "$PROMPT"
 ```
 
-Run in background and collect output when complete. The script handles CLI detection, correct flags, parallel execution, and timeout.
+Run in background and collect output when complete. The script handles CLI detection, correct flags, base branch detection, parallel execution, and timeout.
 
-**Why the script is mandatory**: Each CLI has different and surprising flag semantics (e.g., `codex -p` is `--profile`, not prompt). The script encapsulates these details so you never need to guess. Calling CLIs directly has failed repeatedly — always use the script.
+**Why the script is mandatory**: CLI flag semantics are unintuitive and differ between tools — `codex -p` means `--profile` (not prompt), `codex` without `exec` enters interactive mode. These details have caused repeated failures when guessed. The script encapsulates correct invocations, timeout, and parallel execution. Direct CLI tool permissions are intentionally excluded from `allowed-tools` to enforce this.
 
 **Details**: See [reference/cli-commands.md](reference/cli-commands.md)
 
@@ -158,7 +158,9 @@ Show original responses first for transparency:
 
 **"codex failed", "unexpected argument", or "profile not found"**
 - You called `codex` directly instead of using the script. Use `bash "$SKILL_DIR/scripts/peer-review.sh" execute "$PROMPT"`
-- Common wrong commands: `codex -q`, `codex -a full-auto`, `codex -p` — none of these are valid for one-shot review
+- Direct `codex` and `gemini` calls are intentionally excluded from `allowed-tools` — if the user is prompted for Bash approval, you are calling the CLI directly instead of using the script
+- Invalid flags: `codex -q`, `codex -a full-auto`, `codex -p` — these are not valid one-shot invocations
+- Valid but still wrong here: `codex exec`, `codex review` — these work, but calling them directly bypasses timeout and parallel execution. Use the script.
 
 **"Empty response from CLI"**
 - Check CLI can run: `gemini -p "test"` or `codex exec "test"`

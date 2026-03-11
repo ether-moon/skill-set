@@ -19,9 +19,10 @@
 **Excluded CLIs:**
 - `claude` — invoking `claude` CLI from within a Claude session fails
 
-**Common mistakes:**
-- `codex -p "prompt"` → **WRONG** — `-p` is `--profile`, not prompt. Use `codex exec "prompt"`
-- `codex "prompt"` → **WRONG** — enters interactive mode. Use `codex exec "prompt"`
+**Common mistakes (why the script exists):**
+- `codex -p "prompt"` → `-p` is `--profile`, not prompt
+- `codex "prompt"` → enters interactive mode
+- Any direct `codex` or `gemini` call → bypasses timeout, parallel execution, and correct flag handling
 
 ## Parallel Execution
 
