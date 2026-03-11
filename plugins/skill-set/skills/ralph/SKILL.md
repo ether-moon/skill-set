@@ -160,6 +160,7 @@ A single self-contained file with three sections: **Context** (goals, constraint
 | Using opus for loop iterations | Sonnet is sufficient for gap analysis. Save opus for planning. |
 | Writing files into the project | Prompt is in memory. Spec goes to tmp/ralph/. |
 | Running multiple iterations in parallel | Sequential — each iteration depends on the previous. One subagent at a time. |
+| Fabricating quantitative targets | Never invent numbers (e.g., "reduce by 30%") unless user-stated or evidence-backed. |
 | Skipping user confirmation on spec | Always preview and confirm before transitioning PLANNING → BUILDING. |
 
 ## Reference

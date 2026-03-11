@@ -15,11 +15,20 @@ Replace vague claims with specific, observable details. Abstract language feels 
 | We leveraged cutting-edge technology. | We used PostgreSQL 16's parallel query execution. |
 | Stakeholder alignment was achieved. | The engineering lead, PM, and designer signed off on the spec. |
 
+**Critical caveat**: Concreteness demands real evidence, not invented precision. If no measurement, benchmark, or data point exists, do NOT fabricate one. Describe the observable change qualitatively instead. A vague truth is always better than a precise lie.
+
+| Situation | Wrong | Right |
+|---|---|---|
+| No performance data exists | "Response time improved by 40%." | "Response time improved noticeably after caching was added." |
+| User didn't specify a target | "Reduce bundle size by 30%." | "Reduce bundle size." |
+| No benchmark was run | "Throughput increased 3x." | "Throughput increased after switching to batch processing." |
+
 **Diagnostic questions**:
 - Can someone verify this claim with a measurement?
 - Would two readers picture the same thing?
 - Does this sentence survive "compared to what?"
 - Has a specific, unusual detail been replaced with a generic positive description? (over-smooth tone)
+- **Is this number from real data, or did I invent it to sound concrete?**
 
 **Sources**: Orwell's "Politics and the English Language" — "Never use a metaphor, simile or other figure of speech which you are used to seeing in print." Strunk & White Rule 12 — "Use definite, specific, concrete language."
 

@@ -51,6 +51,8 @@ Replace vague claims with specific, observable details. If a sentence can't be f
 - Before: "We significantly improved performance."
 - After: "Response time dropped from 1200ms to 340ms."
 
+**Critical caveat**: Concreteness requires real data. If no measurement exists, do NOT invent numbers. Describe the observable change without fabricating metrics. A vague truth is better than a precise lie.
+
 ### 2. Transcreation Over Translation
 
 Adapt foreign-language sources and domain jargon naturally. Annotate technical terms on first use.
@@ -90,6 +92,7 @@ If you catch yourself doing any of these, stop and correct:
 
 | Red Flag | Fix |
 |---|---|
+| Fabricating numbers to sound concrete | Only use numbers from real data. No data? Describe the change without metrics. |
 | Starting with background the reader already knows | Start where the reader's knowledge ends |
 | Using "robust", "leverage", "delve", "tapestry" | Use concrete language (see `reference/anti-patterns.md`) |
 | Writing abstract claims without examples | Add a specific data point or measurement |

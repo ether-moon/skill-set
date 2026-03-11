@@ -37,6 +37,7 @@ An initially empty section populated by build iterations. Each entry records:
 | Compound criteria | "Auth works and dashboard loads" | Split into separate criteria for auth and dashboard |
 | Missing context | Criteria reference unnamed patterns | Add Context section explaining architecture and conventions |
 | Implementation-specific | "Use Redis for caching" | "API responses for /api/products are cached with TTL ≥ 60s" (unless Redis is a hard requirement) |
+| Fabricated metrics | "Reduce bundle size by 40%", "Improve response time by 3x" | Remove the number entirely unless user stated it or evidence supports it. Unsubstantiated numbers are false, not aspirational. |
 
 ## Good Spec Example
 

@@ -51,6 +51,18 @@ Adverbs that inflate mundane descriptions. Delete if the sentence works without 
 
 - quietly, deeply, fundamentally, merely, simply (as intensifiers)
 
+### Fabricated Precision
+
+Inventing specific numbers, percentages, or metrics to appear concrete when no real data exists. This is the dark side of the Concreteness principle — worse than vagueness because it presents fiction as fact.
+
+| Fabricated | Fix |
+|---|---|
+| "Reduced load time by 47%." (no benchmark run) | "Reduced load time." or "Reduced load time noticeably." |
+| "3x throughput improvement." (no measurement) | "Throughput improved after the refactor." |
+| "Saved the team 20 hours per sprint." (no tracking) | "Reduced manual work for the team." |
+
+**Rule**: Numbers require sources. If you can't link a number to a benchmark, profiling result, user requirement, or documented threshold, delete it. Qualitative descriptions are honest; fabricated metrics are misinformation.
+
 ## AI Sentence Patterns
 
 Structural patterns that appear far more often in AI text than human text.

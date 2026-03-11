@@ -30,3 +30,4 @@ Refine any criterion that fails these checks.
 - Do NOT modify AGENTS.md, CLAUDE.md, or project meta-configuration.
 - Write acceptance criteria as OUTCOMES. Bad: "Add pagination to /api/users." Good: "GET /api/users supports ?page and ?limit and returns paginated results."
 - Do not include criteria for functionality that already exists.
+- Do NOT fabricate quantitative targets (e.g., "reduce by 30%", "improve by 2x", "under 200ms") unless the user explicitly stated them or there is concrete, measurable evidence (benchmarks, profiling data, documented thresholds). Unsubstantiated numbers are false information, not goals.
