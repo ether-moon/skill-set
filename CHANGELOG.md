@@ -5,6 +5,13 @@ All notable changes to the skill-set plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.4] - 2026-03-11
+
+### Fixed
+
+- **ralph**: Prohibit fabricated quantitative targets in planning mode unless user-stated or evidence-backed
+- **writing-clear-prose**: Add "Fabricated Precision" anti-pattern and guardrails against invented metrics in concreteness principle
+
 ## [1.6.3] - 2026-03-10
 
 ### Fixed
