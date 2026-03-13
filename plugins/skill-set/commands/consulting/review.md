@@ -1,6 +1,6 @@
 ---
 description: Execute peer LLM reviews using the consulting-peer-llms skill
-allowed-tools: "Bash(gemini:*) Bash(codex:*) Bash(timeout:*) Bash(command:*) Bash(bash:*) Bash($SKILL_DIR:*)"
+allowed-tools: "Bash(command:*) Bash(bash:*) Bash($SKILL_DIR:*)"
 ---
 
 Use the consulting-peer-llms skill to execute peer LLM reviews.
