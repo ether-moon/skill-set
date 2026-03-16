@@ -5,6 +5,16 @@ All notable changes to the skill-set plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-03-16
+
+### Changed
+
+- **coderabbit-feedback** renamed to **pr-review-feedback**: Generalized from CodeRabbit-specific to handling all PR review sources (human reviewers, CodeRabbit, Codex, Claude, other bots)
+  - Comment collection no longer filters by author — processes ALL review comments
+  - `@coderabbitai resolve` tag included only when CodeRabbit is detected among reviewers
+  - Slash command changed: `/skill-set:coderabbit:fix` → `/skill-set:pr-review:fix`
+  - Agent file slimmed from 743 to ~290 lines by removing verbose example templates
+
 ## [1.6.7] - 2026-03-13
 
 ### Fixed
