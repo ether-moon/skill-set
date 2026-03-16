@@ -15,7 +15,7 @@ declare -a SKILL_SET_PLUGINS=(
   "writing-clear-prose"
   "creating-skills"
   "guarding-agent-directives"
-  "coderabbit-feedback"
+  "pr-review-feedback"
 )
 
 # Find installed plugins

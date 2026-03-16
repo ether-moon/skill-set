@@ -69,16 +69,17 @@ Plan and execute implementation work with fresh context per iteration via Task s
 - Auto-planning fallback (execute without a plan → auto-creates one)
 - DONE condition negotiation before loop starts
 
-### CodeRabbit Feedback Processing
-Interactive CodeRabbit review processing with severity classification and verified completion workflow.
+### PR Review Feedback Processing
+Interactive PR review processing from any source (human, CodeRabbit, Codex, Claude, other bots) with severity classification and verified completion workflow.
 
 **Command**:
 ```bash
-/skill-set:coderabbit:fix
+/skill-set:pr-review:fix
 ```
 
 **Features**:
-- Automatic severity-based classification (CRITICAL, MAJOR, MINOR, OPTIONAL, IGNORE)
+- Processes review comments from any source (human reviewers, AI tools, bots)
+- Automatic severity-based classification (CRITICAL, MAJOR, MINOR)
 - Interactive issue discussion before applying changes
 - Verified completion workflow with mandatory steps
 
@@ -106,7 +107,7 @@ Skills are automatically available after installing the plugin. Claude will use 
 /skill-set:git:pr
 /skill-set:ralph:plan
 /skill-set:ralph:execute
-/skill-set:coderabbit:fix
+/skill-set:pr-review:fix
 /skill-set:consulting:review
 ```
 
@@ -121,7 +122,7 @@ plugins/
     ├── commands/
     │   ├── git/                    # commit, push, pr
     │   ├── ralph/                  # plan, execute
-    │   ├── coderabbit/             # fix
+    │   ├── pr-review/              # fix
     │   └── consulting/             # review
     ├── skills/
     │   ├── managing-git-workflow/
@@ -133,7 +134,7 @@ plugins/
     │   ├── guarding-agent-directives/
     │   └── using-skill-set/
     ├── agents/
-    │   └── coderabbit-feedback.md
+    │   └── pr-review-feedback.md
     └── hooks/
         └── hooks.json
 ```

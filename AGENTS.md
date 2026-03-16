@@ -17,7 +17,7 @@
 8. **guarding-agent-directives**: Guards agent directive files against bloat by verifying additions through strict criteria while preserving user authority
 
 #### Agents
-1. **coderabbit-feedback**: Interactive CodeRabbit review processing with severity-based classification, user discussion, and verified completion workflow. Runs as isolated subagent for better context management.
+1. **pr-review-feedback**: Interactive PR review processing with severity-based classification, user discussion, and verified completion workflow. Handles comments from any source (human, CodeRabbit, Codex, Claude, other bots). Runs as isolated subagent for better context management.
 
 ### Project Structure
 
@@ -33,8 +33,8 @@ plugins/
     │   │   ├── commit.md         # /skill-set:git:commit
     │   │   ├── push.md           # /skill-set:git:push
     │   │   └── pr.md             # /skill-set:git:pr
-    │   ├── coderabbit/
-    │   │   └── fix.md            # /skill-set:coderabbit:fix
+    │   ├── pr-review/
+    │   │   └── fix.md            # /skill-set:pr-review:fix
     │   ├── consulting/
     │   │   └── review.md         # /skill-set:consulting:review
     │   └── ralph/
@@ -90,7 +90,7 @@ plugins/
     │       └── reference/
     │           └── verification.md
     ├── agents/                    # Isolated subagents
-    │   └── coderabbit-feedback.md
+    │   └── pr-review-feedback.md
     └── hooks/                     # Event handlers
         └── hooks.json            # SessionStart hook
 ```

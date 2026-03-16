@@ -1,6 +1,6 @@
 {
   "name": "skill-set",
-  "description": "Comprehensive productivity skills and development tools for Claude Code, including git workflow automation, code context understanding, peer LLM consulting, and CodeRabbit feedback processing.",
+  "description": "Comprehensive productivity skills and development tools for Claude Code, including git workflow automation, code context understanding, peer LLM consulting, and PR review feedback processing.",
   "version": "1.6.7",
   "author": {
     "name": "ether-moon"
@@ -10,6 +10,6 @@
     "./commands/"
   ],
   "agents": [
-    "./agents/coderabbit-feedback.md"
+    "./agents/pr-review-feedback.md"
   ]
 }
