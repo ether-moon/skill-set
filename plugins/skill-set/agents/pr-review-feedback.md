@@ -1,23 +1,22 @@
 ---
 name: pr-review-feedback
-description: Use when a PR has review comments from any source (human reviewers, CodeRabbit, Codex, Claude, other bots) - interactively classify feedback by severity, discuss recommendations with user, apply agreed changes, and ensure mandatory commit and PR comment workflow with verification
+description: Use when a PR has review comments from any source (human reviewers, CodeRabbit, Codex, Claude, other bots) - classifies feedback as obvious or ambiguous, auto-fixes obvious items, discusses ambiguous items with rationale and recommendation, and ensures mandatory commit and PR comment workflow with verification
 ---
 
 # PR Review Feedback
 
 ## Overview
 
-Interactive processing of PR review comments from any source (human reviewers, AI tools like CodeRabbit, Codex, Claude, or other bots): collect and classify feedback, discuss CRITICAL/MAJOR items for immediate action, analyze MINOR items with recommendations, and complete workflow with verified git commits and PR comments.
+Interactive processing of PR review comments from any source (human reviewers, AI tools like CodeRabbit, Codex, Claude, or other bots): collect feedback, classify as obvious or ambiguous, auto-fix obvious items, discuss ambiguous items with recommendations, and complete workflow with verified git commits and PR comments.
 
-**Core principle:** Interactive severity-based workflow with user conversation (collect → discuss → apply together → verify completion).
+**Core principle:** Classify by clarity, not severity. Obvious issues get fixed immediately; ambiguous ones get discussed with rationale and recommendations.
 
 ## When to Use
 
 **Use when:**
 - Reviewers (human or automated) have posted comments on your current PR
-- You need to process review feedback with user input
-- You want to discuss which suggestions to apply
-- You need guided review with recommendations and rationale
+- You need to process review feedback with user input on ambiguous items
+- You want obvious fixes applied automatically with a summary report
 
 **Don't use when:**
 - No PR exists or no review comments
@@ -28,36 +27,88 @@ Interactive processing of PR review comments from any source (human reviewers, A
 
 | Phase | Mode | Key Actions |
 |-------|------|-------------|
-| **Collection** | Auto | Pre-check → Discover PR → Collect comments → Filter & Classify |
-| **Discussion** | **Interactive** | Present items → Get user decisions → Analyze MINOR with rationale |
-| **Application** | Auto | Apply agreed changes → Commit & Push |
-| **Verification** | Auto | Post PR summary comment → Verify posted |
+| **Collection** | Auto | Pre-check → Discover PR → Collect comments → Filter |
+| **Classification** | Auto | Classify each item as OBVIOUS or AMBIGUOUS |
+| **Auto-fix** | Auto | Apply all OBVIOUS fixes → Report summary to user |
+| **Discussion** | **Interactive** | Present AMBIGUOUS items (grouped by severity) → Get user decisions |
+| **Completion** | Auto | Commit & Push → Post PR summary → Verify |
 
-## Severity Classification
+## Primary Classification: OBVIOUS vs AMBIGUOUS
 
-### CRITICAL (Immediate Discussion Required)
-- **Security**: SQL injection, XSS, CSRF, auth bypass, sensitive data exposure
-- **Data Loss**: Destructive operations, cascade deletes, corruption risks
-- **Breaking Bugs**: Nil pointer errors, type crashes, unhandled exceptions
-- **Critical Logic**: Payment errors, authorization failures, data integrity violations
+The primary axis is **clarity of correctness**, not severity.
 
-### MAJOR (Important Discussion)
-- **Performance**: N+1 queries, memory leaks, slow algorithms, missing indexes
-- **Resource Issues**: File handle leaks, connection pool exhaustion, unbounded loops
-- **Significant Bugs**: Wrong calculations, incorrect validations, race conditions
-- **Production Impact**: High error rates, significant user impact, reliability issues
+### OBVIOUS (Auto-fix)
 
-### MINOR (Analyze & Recommend)
-- **Code Quality**: Variable naming, method extraction, DRY violations
-- **Style**: Formatting preferences, comment style, code organization
-- **Documentation**: Missing comments, outdated docs, unclear naming
-- **Speculative**: "Could be", "might consider", optional improvements
+Items where the reviewer explicitly identified a specific issue AND the fix is objectively correct with no room for reasonable disagreement.
+
+**All four criteria must be met:**
+1. The reviewer explicitly identified a specific issue (not a general suggestion)
+2. The issue is objectively verifiable (not opinion-based)
+3. There is exactly one correct way to fix it (no design choices involved)
+4. No reasonable developer would disagree with the fix
+
+**Examples:**
+- Typos in variable names, comments, or docs that the reviewer pointed out
+- Missing null/nil checks that will provably crash
+- Textbook security flaws (SQL injection, XSS) with a clear fix
+- Off-by-one errors that are provably wrong
+- Unused imports/variables the reviewer identified
+- Wrong API usage per official documentation
+- Syntax errors or broken references
+
+### AMBIGUOUS (Discuss with user)
+
+Items where there is room for interpretation, trade-offs, or legitimate disagreement.
+
+**Examples:**
+- "Consider using X pattern instead of Y" — architectural preference
+- "This could be more performant with..." — trade-off involved
+- "Maybe extract this into a separate function" — design choice
+- Style preferences not enforced by linter
+- Suggestions requiring significant refactoring
+- Performance optimizations with readability trade-offs
+- Alternative approaches where both are valid
+- Changes affecting public API surface
+- Suggestions involving new dependencies
+
+### ALWAYS AMBIGUOUS (Never auto-fix)
+
+Classify as AMBIGUOUS regardless of apparent clarity:
+- Reviewer used hedging language: "might", "could", "consider", "maybe", "what about"
+- Fix requires changing more than ~10 lines
+- Fix has multiple valid approaches
+- Involves architectural or design decisions
+- Affects public API or external contracts
+
+### Safety Rule
+
+**When in doubt, classify as AMBIGUOUS.** It is always better to discuss than to silently apply a wrong fix.
 
 ### ALWAYS SKIP (Never Process)
 - Comments with resolution markers: checkmarks or "resolved", "fixed", "applied"
 - Threads already resolved (including `@coderabbitai resolve` or similar bot resolution commands)
 - Developer confirmation replies: "Applied", "Done", "Fixed"
 - Duplicate suggestions (process once only)
+
+## Secondary Classification: Severity (AMBIGUOUS items only)
+
+Within AMBIGUOUS items, assign severity for grouping and sort order:
+
+### CRITICAL
+- Security: auth bypass, sensitive data exposure, injection vulnerabilities
+- Data Loss: destructive operations, corruption risks
+- Breaking Bugs: nil pointer errors, type crashes, unhandled exceptions
+
+### MAJOR
+- Performance: N+1 queries, memory leaks, missing indexes
+- Significant Bugs: wrong calculations, race conditions
+- Resource Issues: file handle leaks, connection pool exhaustion
+
+### MINOR
+- Code Quality: naming, method extraction, DRY violations
+- Style: formatting, code organization
+- Documentation: missing comments, unclear naming
+- Speculative: optional improvements
 
 ## Language Detection
 
@@ -74,7 +125,6 @@ Interactive processing of PR review comments from any source (human reviewers, A
 - PR comment content
 - Reports and summaries
 - Error messages and warnings
-- Status updates
 
 **Always keep in English:**
 - Code examples
@@ -88,7 +138,8 @@ Interactive processing of PR review comments from any source (human reviewers, A
 
 ```
 TaskCreate: "Collect and classify PR review comments"
-TaskCreate: "Discuss feedback with user"
+TaskCreate: "Auto-fix obvious items"
+TaskCreate: "Report obvious fixes and discuss ambiguous items"
 TaskCreate: "Apply agreed changes"
 TaskCreate: "Commit and push changes"
 TaskCreate: "Post PR summary comment"
@@ -99,7 +150,7 @@ TaskCreate: "Verify PR comment posted"
 - Create ALL tasks before starting comment collection
 - Set each task to `in_progress` when starting it, `completed` when done
 - Before reporting completion to the user, run `TaskList` and confirm zero pending tasks
-- Never skip a task. If a task cannot be completed, explain why to the user instead of silently moving on.
+- Never skip a task. If a task has nothing to do (e.g., no OBVIOUS items), mark it completed with a note explaining why.
 
 ### Phase 1: Collection
 
@@ -111,76 +162,62 @@ TaskCreate: "Verify PR comment posted"
 
 2. **Collect Comments with Pagination** (up to 200 comments):
 
-   **Important:** Collect BOTH PR-level comments (`pullRequest.comments`) AND inline review threads (`pullRequest.reviews`, `pullRequest.reviewThreads`). Human reviewers typically leave inline code comments via review threads, not PR-level comments.
+   **Important:** Collect ALL comment sources — PR-level comments, review bodies, and inline review threads. Human reviewers typically leave inline code comments via review threads, not PR-level comments.
 
-   **Method 1: GraphQL with Pagination (Recommended)**
+   **Method 1: GraphQL (Recommended)**
    ```bash
    get_all_comments() {
      local pr_number=$1
      local owner=$2
      local repo=$3
-     local cursor=""
-     local has_next=true
-     local all_comments="[]"
 
-     while [ "$has_next" = "true" ]; do
-       local query='query($owner:String!, $repo:String!, $number:Int!, $cursor:String) {
-         repository(owner:$owner, name:$repo) {
-           pullRequest(number:$number) {
-             comments(first:100, after:$cursor) {
-               pageInfo { hasNextPage endCursor }
-               nodes {
-                 id
-                 author { login }
-                 body
-                 createdAt
-                 replies(first:10) {
-                   nodes { author { login } body createdAt }
+     local query='query($owner:String!, $repo:String!, $number:Int!) {
+       repository(owner:$owner, name:$repo) {
+         pullRequest(number:$number) {
+           comments(first:100) {
+             nodes {
+               id author { login } body createdAt
+               replies(first:10) { nodes { author { login } body createdAt } }
+             }
+           }
+           reviewThreads(first:100) {
+             nodes {
+               isResolved
+               comments(first:10) {
+                 nodes {
+                   author { login } body createdAt
+                   path line
                  }
                }
              }
            }
          }
-       }'
+       }
+     }'
 
-       local result=$(gh api graphql -f query="$query" \
-         -F owner="$owner" -F repo="$repo" -F number="$pr_number" \
-         ${cursor:+-F cursor="$cursor"})
-
-       local page_comments=$(echo "$result" | jq '.data.repository.pullRequest.comments.nodes')
-       all_comments=$(echo "$all_comments" | jq ". + $page_comments")
-
-       has_next=$(echo "$result" | jq -r '.data.repository.pullRequest.comments.pageInfo.hasNextPage')
-       cursor=$(echo "$result" | jq -r '.data.repository.pullRequest.comments.pageInfo.endCursor')
-
-       [ "$has_next" = "false" ] && break
-       [ $(echo "$all_comments" | jq 'length') -ge 200 ] && break
-     done
-
-     echo "$all_comments" | jq 'sort_by(.createdAt) | reverse | .[:200]'
+     gh api graphql -f query="$query" \
+       -F owner="$owner" -F repo="$repo" -F number="$pr_number"
    }
    ```
 
-   **Method 2: REST API with Pagination (Alternative)**
+   The query returns both PR-level `comments` and inline `reviewThreads`. Filter out threads where `isResolved: true`. For large PRs with 100+ comments, add pagination cursors to both fields.
+
+   **Method 2: REST API (Alternative)**
    ```bash
    get_all_comments_rest() {
      local pr_number=$1
-     local page=1
-     local per_page=100
-     local all_comments="[]"
+     local owner=$2
+     local repo=$3
 
-     while [ $page -le 2 ]; do  # Max 2 pages = 200 comments
-       local result=$(gh api "repos/$OWNER/$REPO/issues/$pr_number/comments?per_page=$per_page&page=$page")
+     # PR-level comments
+     gh api "repos/$owner/$repo/issues/$pr_number/comments?per_page=100"
 
-       [ "$(echo "$result" | jq 'length')" -eq 0 ] && break
-
-       all_comments=$(echo "$all_comments" | jq ". + $result")
-       ((page++))
-     done
-
-     echo "$all_comments" | jq 'sort_by(.created_at) | reverse | .[:200]'
+     # Inline review comments (different endpoint)
+     gh api "repos/$owner/$repo/pulls/$pr_number/comments?per_page=100"
    }
    ```
+
+   Merge results from both endpoints. For 100+ comments, paginate with `&page=2`.
 
 3. **Filter**: Process unresolved review comments
    - Collect ALL review comments (do not filter by author)
@@ -191,50 +228,89 @@ TaskCreate: "Verify PR comment posted"
    - If a thread contains a bot-specific resolution command (e.g., `@coderabbitai resolve`), treat it as resolved
    - Sort by recency (newest first)
 
-4. **Classify**: Assign severity to each actionable item
-   - Extract file path, line number, and specific change
-   - Match against severity criteria (CRITICAL > MAJOR > MINOR)
-   - Skip summaries without actionable items (e.g., "LGTM", general praise)
+### Phase 2: Classification
 
-### Phase 2: Interactive Discussion
+For each actionable comment, extract:
+- File path, line number, and specific change requested
+- Reviewer name and whether they are a bot
 
-**Step 2.1 - Present Summary and CRITICAL/MAJOR Items:**
-Show the user a summary with counts per severity and reviewer breakdown, then list each CRITICAL and MAJOR item with:
+Then classify:
+1. **Primary**: Apply the OBVIOUS criteria (all four must be met) → OBVIOUS or AMBIGUOUS
+2. **Secondary** (AMBIGUOUS only): Assign severity (CRITICAL > MAJOR > MINOR)
+3. **Safety check**: Apply the "ALWAYS AMBIGUOUS" rules to catch misclassifications
+
+Skip summaries without actionable items (e.g., "LGTM", general praise).
+
+### Phase 3: Auto-fix Obvious Items
+
+Apply all OBVIOUS items immediately without user interaction.
+
+- Apply each fix in sequence
+- If any fix fails, move it to AMBIGUOUS with an explanation of why auto-fix failed
+- Track what was applied for the summary report
+
+### Phase 4: Report & Discuss
+
+**Step 4.1 — Report Obvious Fixes:**
+
+Present a summary of what was auto-applied:
+
+> Applied N obvious fixes:
+> - `path/to/file.ts:42` — Fixed null check (reviewer: @alice)
+> - `path/to/file.ts:87` — Removed unused import (reviewer: @coderabbitai)
+> - ...
+
+If no OBVIOUS items existed, skip this and proceed to Step 4.2.
+
+**Step 4.2 — Present Ambiguous Items:**
+
+Present AMBIGUOUS items grouped by severity (CRITICAL → MAJOR → MINOR). For each item show:
 - File path and line number
 - One-line issue description
-- Suggested fix
-- Risk/impact assessment
+- **Why it's ambiguous**: What makes this debatable or uncertain
+- **Recommendation**: Agent's suggested action with rationale
 - Who raised it (reviewer name)
 
-Offer choices: [1] Apply all, [2] Review individually, [3] See details first, [4] Start with MINOR analysis
+Example format:
 
-**Step 2.2 - Individual Review (if selected):**
+> ### CRITICAL (1 item)
+>
+> **1. Race condition in user update** — `src/api/users.ts:134` (reviewer: @bob)
+> - Issue: Concurrent updates may overwrite each other
+> - Why ambiguous: Fix requires choosing between optimistic locking, pessimistic locking, or retry logic — each has different trade-offs
+> - Recommendation: Apply optimistic locking — it's the least invasive change and matches the existing pattern in `orders.ts`
+>
+> ### MINOR (2 items)
+>
+> **2. Extract validation logic** — `src/api/users.ts:45` (reviewer: @coderabbitai)
+> - Issue: Validation logic is inline, could be a separate function
+> - Why ambiguous: Current code is only 8 lines and used once — extraction adds indirection without clear benefit yet
+> - Recommendation: Skip — extract when a second caller appears
+>
+> ...
+
+Offer choices: [1] Apply all recommended, [2] Review individually, [3] Skip all
+
+**Step 4.3 — Individual Review (if selected):**
 Walk through each item one at a time. For each, show current code, suggested change, and analysis. Ask: Apply? [Y/n/skip]
 
-**Step 2.3 - MINOR Analysis & Recommendations:**
-After CRITICAL/MAJOR decisions are made, analyze all MINOR items and classify each as:
-- **Recommended to apply**: Clear improvement, low risk — include rationale
-- **Optional**: Trade-offs exist, user should decide based on project context
-- **Not recommended**: Adds unnecessary complexity or dependencies — include rationale
+**Step 4.4 — Final Confirmation:**
+Before applying, show a complete summary of what will be applied and what was skipped. Get explicit user confirmation.
 
-Present summary with apply options.
+### Phase 5: Application & Completion
 
-**Step 2.4 - Final Confirmation:**
-Before applying, show a complete summary of what will be applied, what was skipped, and why. Get explicit user confirmation.
+**Step 5.1 — Apply Changes:**
+Apply each user-approved AMBIGUOUS change in sequence. Report progress as each item completes.
 
-### Phase 3: Application & Completion
+**Step 5.2 — Commit & Push:**
+Stage all modified files, create a commit with a descriptive message summarizing what was addressed, and push to the remote branch.
 
-**Step 3.1 - Apply Changes:**
-Apply each user-approved change in sequence. Report progress as each item completes.
-
-**Step 3.2 - Commit & Push:**
-Stage all modified files, create a commit with a descriptive message summarizing what was addressed (group by severity), and push to the remote branch.
-
-**Step 3.3 - Post PR Summary Comment:**
+**Step 5.3 — Post PR Summary Comment:**
 Generate a PR comment summarizing all actions taken:
-- Items applied (grouped by CRITICAL/MAJOR/MINOR with file paths)
-- Items skipped with brief rationale
-- Statistics (total reviewed, applied, deferred, skipped)
+- **Auto-applied** (OBVIOUS): list with file paths
+- **Applied after discussion** (AMBIGUOUS): list with file paths
+- **Skipped**: list with brief rationale
+- **Statistics**: total reviewed, auto-applied, discussed & applied, skipped
 
 **Bot resolution detection:** If any collected comments were authored by `coderabbitai[bot]` or similar CodeRabbit accounts, prepend `@coderabbitai resolve` to the PR comment. Do NOT include this tag if CodeRabbit was not among the reviewers.
 
@@ -243,7 +319,7 @@ Post the comment:
 gh pr comment "$PR_NUMBER" --body "$COMMENT_BODY"
 ```
 
-**Step 3.4 - Verify:**
+**Step 5.4 — Verify:**
 ```bash
 # Wait for API sync
 sleep 2
@@ -258,21 +334,25 @@ Mark all remaining tasks as completed. Run `TaskList` to confirm zero pending ta
 
 ## Common Mistakes
 
+### Classifying Ambiguous Items as Obvious
+**Problem:** Auto-applying a fix that had trade-offs the user should have weighed
+**Fix:** Apply the four OBVIOUS criteria strictly. When in doubt, classify as AMBIGUOUS.
+
 ### Skipping Pagination
 **Problem:** Missing comments when PR has 100+ comments
 **Fix:** Use GraphQL/REST pagination to collect up to 200 comments
 
-### Not Providing Rationale
-**Problem:** User doesn't understand why suggestions are categorized
-**Fix:** Include 1-2 line rationale for each MINOR item classification
+### Not Explaining Why Something Is Ambiguous
+**Problem:** User sees an ambiguous item but doesn't understand what makes it debatable
+**Fix:** Always include "Why ambiguous" with each item — what's the trade-off or uncertainty?
 
-### Auto-Applying Without Discussion
-**Problem:** Applying changes user didn't explicitly approve
-**Fix:** Present summary, get user decision, then apply only agreed items
+### Auto-Applying Without Reporting
+**Problem:** User doesn't know what was changed on their behalf
+**Fix:** Always present the obvious-fix summary before moving to ambiguous discussion
 
 ### Incomplete Error Recovery
 **Problem:** Stopping workflow when single item fails
-**Fix:** Skip failed item with explanation, continue with others, complete remaining tasks
+**Fix:** If an OBVIOUS fix fails, move it to AMBIGUOUS with explanation. Continue with remaining items.
 
 ### Ignoring Reviewer Context
 **Problem:** Treating human and bot comments identically without noting who said what
@@ -280,12 +360,12 @@ Mark all remaining tasks as completed. Run `TaskList` to confirm zero pending ta
 
 ## Success Criteria
 
-- All tasks created at Phase 1 start
+- All tasks created at workflow start
 - All unresolved comments collected (up to 200 with pagination)
-- Each item classified by severity (CRITICAL/MAJOR/MINOR)
-- CRITICAL/MAJOR items discussed with user
-- MINOR items analyzed with clear rationale
-- Only user-approved changes applied
+- Each item classified as OBVIOUS or AMBIGUOUS (with severity for AMBIGUOUS)
+- All OBVIOUS items auto-applied and reported to user before discussion
+- AMBIGUOUS items presented with "why ambiguous" + recommendation + rationale
+- Only user-approved AMBIGUOUS changes applied
 - Changes committed and pushed
 - PR comment posted (with `@coderabbitai resolve` if CodeRabbit was a reviewer)
 - All tasks show `completed` in TaskList

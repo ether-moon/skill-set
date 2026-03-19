@@ -17,7 +17,7 @@
 8. **guarding-agent-directives**: Guards agent directive files against bloat by verifying additions through strict criteria while preserving user authority
 
 #### Agents
-1. **pr-review-feedback**: Interactive PR review processing with severity-based classification, user discussion, and verified completion workflow. Handles comments from any source (human, CodeRabbit, Codex, Claude, other bots). Runs as isolated subagent for better context management.
+1. **pr-review-feedback**: Classifies PR review feedback as obvious or ambiguous — auto-fixes obvious issues, discusses ambiguous ones with rationale and recommendations. Handles comments from any source (human, CodeRabbit, Codex, Claude, other bots). Runs as isolated subagent for better context management.
 
 ### Project Structure
 
