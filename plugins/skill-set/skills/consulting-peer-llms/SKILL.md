@@ -1,6 +1,6 @@
 ---
 name: consulting-peer-llms
-description: Execute peer reviews from other LLM CLI tools (Gemini, Codex) in parallel and synthesize actionable insights. Use when user explicitly requests feedback from other LLMs, peer review, validation from external tools — e.g., "get feedback from gemini", "validate with codex", "peer review this", "what do other LLMs think".
+description: Execute peer reviews from other LLM CLI tools (Gemini, Codex) in parallel and synthesize actionable insights. Use when user requests feedback from other LLMs, peer review, or external validation — e.g., "get feedback from gemini", "ask codex to review", "peer review this", "what do other LLMs think", "get a second opinion", "validate with codex".
 allowed-tools: "Bash(command:*) Bash(bash:*) Bash($SKILL_DIR:*)"
 ---
 
@@ -14,16 +14,13 @@ Get feedback from other LLM CLI tools (Gemini, Codex) on your current work. This
 
 ## When to Use
 
-**Use this skill when the user explicitly requests:**
+Use this skill when the user requests external LLM review:
 - "Validate this with codex"
 - "Get feedback from gemini"
 - "I want a review from other LLMs"
-- "Do a peer review"
+- "Do a peer review" / "Get a second opinion"
 
-**Do NOT use:**
-- Automatically without user request
-- For every piece of code (it's heavyweight)
-- When quick internal review is sufficient
+This skill runs CLI tools in parallel, which takes 5-30 minutes. Only trigger on explicit user request, not as a routine step.
 
 ## Prerequisites
 
@@ -67,29 +64,27 @@ Focus on: {user's specific requirements — paths or areas only if user explicit
 - 1-2 sentence summary of intent (only if known from conversation — never gather it)
 - User's review focus (if any, passed as-is)
 
-**What NEVER goes in the prompt:**
-- File contents or code snippets
-- Git diffs, stats, or change summaries
-- File lists or directory structures
-- SHAs or commit messages
+**Keep out of the prompt** (CLIs run in the same repo and discover all of this themselves):
+- File contents, code snippets, git diffs, stats, or change summaries
+- File lists, directory structures, SHAs, or commit messages
 - Path references (unless user explicitly asked to focus on specific files)
-- Summaries derived by reading git log or files (if no conversation context, omit the summary)
+- Summaries derived by reading git log or files
 
-**DO NOT run git commands (git diff, git log, git remote, git status) to gather context for prompt construction.** CLIs run in the same repo — they discover this themselves. If there is no conversation context, use Tier 1 (bare prompt) as-is. Do not fabricate context.
+Avoid running git commands to gather context for the prompt. If there is no conversation context, use Tier 1 (bare prompt) as-is rather than fabricating context. Shorter prompts produce more focused reviews.
 
 **Full template**: See [reference/prompt-template.md](reference/prompt-template.md)
 
 ### Step 2: Execute in Parallel
 
-**Run the bundled script. Do NOT call `gemini` or `codex` directly.**
+Always use the bundled script rather than calling `gemini` or `codex` directly:
 
 ```bash
 bash "$SKILL_DIR/scripts/peer-review.sh" execute "$PROMPT"
 ```
 
-Run in background and collect output when complete. The script handles CLI detection, correct flags, base branch detection, parallel execution, and timeout.
+Run in background and collect output when complete. The script handles CLI detection, correct flags, parallel execution, and timeout.
 
-**Why the script is mandatory**: CLI flag semantics are unintuitive and differ between tools — `codex -p` means `--profile` (not prompt), `codex` without `exec` enters interactive mode. These details have caused repeated failures when guessed. The script encapsulates correct invocations, timeout, and parallel execution. Direct CLI tool permissions are intentionally excluded from `allowed-tools` to enforce this.
+CLI flag semantics are unintuitive and differ between tools — for example, `codex -p` means `--profile` (not prompt), and `codex` without `exec` enters interactive mode. These have caused repeated failures when invoked directly. The script encapsulates the correct invocations. Direct CLI tool permissions are intentionally excluded from `allowed-tools` to prevent bypassing it.
 
 **Details**: See [reference/cli-commands.md](reference/cli-commands.md)
 
@@ -122,7 +117,7 @@ Show original responses first for transparency:
 ## Quick Reference
 
 **Commands:**
-- `/consulting-peer-llms:review <requirements>` - Auto-detect all installed CLIs and review with the given requirements
+- `/skill-set:consulting:review <requirements>` - Auto-detect all installed CLIs and review with the given requirements
 
 **Bundled script:** `scripts/peer-review.sh` — Handles CLI detection, parallel execution with timeout, and result collection. Bash 3.2+ compatible (macOS/Linux).
 - `scripts/peer-review.sh check` — Show installed CLIs and timeout availability
@@ -135,16 +130,11 @@ Show original responses first for transparency:
 ## Red Flags - STOP Immediately
 
 - Calling `gemini` or `codex` directly instead of using the bundled script
-- Adding flags like `--full-auto`, `-q`, `--quiet`, `-a`, `--model` to CLI commands
+- Running git commands or reading files to embed context in the prompt (CLIs discover this themselves)
 - Running peer review without explicit user request
-- Skipping raw response output
-- Just showing raw responses without synthesis
-- Skipping synthesis for single CLI
-- Passing file contents, diffs, file lists, SHAs, or change summaries in the prompt
-- Passing file paths or references unless user explicitly requested focus on specific files
-- Building the prompt by reading files or running git commands to embed results
+- Showing raw responses without synthesis, or skipping raw responses before synthesis
 - Writing prompts to separate temp files instead of passing inline
-- Specifying model parameters (e.g., `--model`) — use each CLI's default model
+- Adding flags not in the script (`--full-auto`, `-q`, `--model`, etc.)
 
 ## Error Handling
 

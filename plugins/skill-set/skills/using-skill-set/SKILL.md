@@ -1,37 +1,37 @@
 ---
 name: using-skill-set
-description: Establishes workflows for discovering and using skill-set skills. Use at session start to understand available capabilities, or when user asks about available skills, commands, or plugin features.
+description: Discovers and routes to the right skill-set skill for any task. Use when user asks "what can you do", "which skills are available", "help me find the right tool", "list commands", "what features do you have", or mentions available skills, commands, or plugin capabilities. Also use at session start to understand available capabilities.
 ---
 
 # Using skill-set
 
 ## Overview
 
-This skill helps you discover and use skill-set features effectively. It provides a structured approach to finding relevant skills for your tasks.
+Route tasks to the right skill-set skill. Each skill encodes a tested workflow that produces more consistent results than ad-hoc approaches — checking for a matching skill before starting work avoids reinventing steps that have already been refined.
 
 ## Available Skills
-
-The following skills are currently installed:
 
 {{INSTALLED_PLUGINS}}
 
 ### consulting-peer-llms
-**Use when**: User explicitly requests review from other LLMs (e.g., "validate with codex", "get feedback from gemini").
+**Use when**: User requests review from other LLMs (e.g., "validate with codex", "get feedback from gemini").
 
 Execute peer reviews from other LLM tools in parallel and synthesize actionable insights.
 
+**Command**: `/skill-set:consulting:review`
+
 ### managing-git-workflow
-**Use when**: Creating commits, pushing to remote, creating pull requests.
+**Use when**: Creating commits, pushing to remote, creating pull requests, or user mentions git/GitHub operations.
 
 Automates git commits, push, and PR creation with context-aware messages and ticket extraction.
 
 **Commands**:
-- `/skill-set:git:commit` - Create a git commit
-- `/skill-set:git:push` - Push changes to remote
-- `/skill-set:git:pr` - Create a pull request
+- `/skill-set:git:commit` — Create a git commit
+- `/skill-set:git:push` — Push changes to remote
+- `/skill-set:git:pr` — Create a pull request
 
 ### understanding-code-context
-**Use when**: Understanding external libraries, frameworks, or dependencies.
+**Use when**: Looking up external library APIs, framework patterns, or dependency documentation.
 
 Find and read official documentation using Context7.
 
@@ -41,8 +41,8 @@ Find and read official documentation using Context7.
 Plans and executes via Ralph Wiggum loop — two modes (PLANNING/BUILDING), fresh subagent per iteration, plan file as single source of truth.
 
 **Commands**:
-- `/skill-set:ralph:plan` - Generate a Ralph-ready plan from any input
-- `/skill-set:ralph:execute` - Execute a plan (auto-plans if none exists)
+- `/skill-set:ralph:plan` — Generate a Ralph-ready plan from any input
+- `/skill-set:ralph:execute` — Execute a plan (auto-plans if none exists)
 
 ### writing-clear-prose
 **Use when**: Writing, drafting, revising, editing, or proofreading prose, proposals, reports, or technical documents.
@@ -50,74 +50,37 @@ Plans and executes via Ralph Wiggum loop — two modes (PLANNING/BUILDING), fres
 Guides writing and revision with four core principles: concreteness, transcreation, steel man argumentation, and brevity.
 
 ### creating-skills
-**Use when**: Creating, improving, or reviewing skills; learning skill best practices.
+**Use when**: Creating, improving, or reviewing skills; learning skill best practices; editing SKILL.md files.
 
-Guide for creating effective Claude skills with structured workflow.
+Comprehensive guide for creating effective Claude skills with structured workflow, testing, and optimization.
 
 ### guarding-agent-directives
 **Use when**: Adding, modifying, or reviewing content in CLAUDE.md, AGENTS.md, or their referenced documents. Also applies when any agent autonomously attempts to modify these files.
 
-Guards directive files against bloat by verifying additions through 5 strict criteria while preserving user authority.
+Guards directive files against bloat by verifying additions through strict criteria while preserving user authority.
 
-## How to Use Skills
+### pr-review-feedback (agent)
+**Use when**: A PR has review comments from any source — human reviewers, CodeRabbit, Codex, Claude, or other bots.
 
-### 1. Check for Relevant Skills
+Classifies PR feedback as obvious or ambiguous, auto-fixes obvious items, discusses ambiguous ones with rationale and recommendations.
 
-Before starting a task, consider if any installed skill applies:
+**Command**: `/skill-set:pr-review:fix`
 
-- Git operations? → Use `managing-git-workflow`
-- External library docs? → Use `understanding-code-context`
-- Peer LLM review? → Use `consulting-peer-llms`
-- Ralph loop execution? → Use `ralph`
-- Writing/revising prose? → Use `writing-clear-prose`
-- Creating skills? → Use `creating-skills`
-- Modifying CLAUDE.md/AGENTS.md? → Use `guarding-agent-directives`
+## Using Skills Effectively
 
-### 2. Load and Follow the Skill
+Before starting a task, scan the catalog above for a matching skill. Skills encode workflows that have been tested and refined — they handle edge cases and produce consistent output that improves over time as the skill evolves.
 
-When a skill is relevant:
+When a skill matches:
 1. Read the skill's SKILL.md to understand the workflow
-2. Follow the documented steps
-3. Reference linked files as needed
+2. Follow the documented steps and reference linked files as needed
+3. Briefly mention which skill you are using for transparency (e.g., "Using managing-git-workflow for this commit.")
 
-### 3. Announce When Using Skills
+When no skill matches, proceed normally — skills should never be forced onto tasks they were not designed for. Also skip skills when the task is purely conversational or the user explicitly opts out.
 
-For transparency, briefly mention when using a skill:
+## Why Check for Skills
 
-"I'm using managing-git-workflow to create this commit."
-
-This helps users understand your process.
-
-## Common Rationalizations to Avoid
-
-If you catch yourself thinking these, check for relevant skills first:
-
-- "This is just a simple task" → Skills handle simple tasks efficiently
-- "I can do this quickly without help" → Skills provide consistent workflows
-- "Let me gather information first" → Skills define how to gather information
-- "I remember how to do this" → Skills evolve; check the current version
-
-## Best Practices
-
-**Do check for skills** when:
-- Starting git operations
-- Working with external libraries
-- Planning or executing implementation loops
-- Creating new skills
-
-**Don't force skill usage** when:
-- No skill is relevant to the task
-- The task is conversational
-- User explicitly opts out
-
-## Quick Reference
-
-| Task | Skill |
-|------|-------|
-| Git commit/push/PR | `managing-git-workflow` |
-| External library docs | `understanding-code-context` |
-| Peer LLM review | `consulting-peer-llms` |
-| Plan/execute with fresh context | `ralph` |
-| Writing/revising prose | `writing-clear-prose` |
-| Creating skills | `creating-skills` |
-| Modifying directive files | `guarding-agent-directives` |
+Skills are worth checking because they solve problems Claude has already encountered:
+- **Consistency** — A skill's workflow produces the same quality every time, while ad-hoc approaches vary between sessions
+- **Evolved edge-case handling** — Skills accumulate fixes for failure modes discovered in real usage
+- **Token efficiency** — Skills encode optimized tool-call sequences (e.g., combining git commands) that reduce round trips
+- **Current best practice** — Skills get updated; what worked last session may have been improved since then

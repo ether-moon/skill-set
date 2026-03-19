@@ -1,5 +1,18 @@
 # Workflow Patterns
 
+## Table of Contents
+
+- [Choosing Your Approach](#choosing-your-approach)
+- [Pattern 1: Sequential Workflow Orchestration](#pattern-1-sequential-workflow-orchestration)
+- [Pattern 2: Multi-MCP Coordination](#pattern-2-multi-mcp-coordination)
+- [Pattern 3: Iterative Refinement](#pattern-3-iterative-refinement)
+- [Pattern 4: Context-Aware Tool Selection](#pattern-4-context-aware-tool-selection)
+- [Pattern 5: Domain-Specific Intelligence](#pattern-5-domain-specific-intelligence)
+- [Pattern 6: Subagent Execution](#pattern-6-subagent-execution)
+- [Use Case Categories](#use-case-categories)
+
+---
+
 These patterns emerged from skills created by early adopters and internal teams. Choose the pattern that best fits your use case.
 
 ## Choosing Your Approach

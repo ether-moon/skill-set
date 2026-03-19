@@ -4,6 +4,18 @@ Common mistakes in AI-assisted and human writing. Check output against these lis
 
 Sources: Orwell, Strunk & White, [tropes.fyi](https://tropes.fyi/tropes-md), [Wikipedia: Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing)
 
+## Table of Contents
+
+- [AI Vocabulary](#ai-vocabulary) — Cliche phrases, inflated vocabulary, filler words, magic adverbs, fabricated precision
+- [AI Sentence Patterns](#ai-sentence-patterns) — Negative parallelism, dramatic countdown, rhetorical questions, anaphora, tricolon, -ing analysis, false ranges, serves-as dodge
+- [AI Tone Patterns](#ai-tone-patterns) — Stakes inflation, inflated symbolism, asserting obviousness, vague attributions, promotional tone, despite-challenges dismissal
+- [AI Structural Patterns](#ai-structural-patterns) — Fractal summaries, dead metaphor repetition, one-point dilution, listicle in a trench coat, paragraph uniformity, over-smooth tone
+- [AI Formatting Patterns](#ai-formatting-patterns) — Em-dash overuse, bold-first bullets, overused transitions
+- [AI Composition Patterns](#ai-composition-patterns-conditional) — Conditional patterns (OK in moderation)
+- [Drafting Anti-Patterns](#drafting-anti-patterns) — Burying the lead, hedge stacking, synonym drift, abstraction cascade, kitchen sink, throat clearing
+- [Revision Anti-Patterns](#revision-anti-patterns) — Style-first revision, rewriting instead of editing, consistency blindness, feedback accumulation
+- [Rationalization Table](#rationalization-table) — Common self-deceptions and the principles they violate
+
 ## AI Vocabulary
 
 These words and phrases signal AI-generated text. Avoid or replace.

@@ -41,7 +41,7 @@ git branch --show-current; git status --porcelain; git rev-parse --abbrev-ref --
 
 **Exit if:** Branch is `main` or `master` → Inform user: "Cannot create PR from main/master branch."
 
-**Extract ticket number** from branch name (match patterns like `FMT-1234`, `FLEASVR-287`, `ABC-123`).
+**Extract ticket number** from branch name (match patterns like `PROJ-123`, `TEAM-456`).
 
 ### 2. Check Existing PR (1 Bash call)
 
@@ -59,11 +59,11 @@ Replace `BRANCH_NAME` with the branch from step 1.
 
 If uncommitted changes exist, generate a commit message first:
 
-**Commit message rules:**
-- **Language:** Use language specified in project context, prompts, or documentation (default to English)
-- **Style:** Follow patterns from the log output in step 1
-- **Ticket numbers:** Include if extracted from branch name in step 1
-- **Clarity:** Clearly describe what changed and why
+**Commit message guidelines:**
+- **Language:** Match the project's language. Default to English if unclear.
+- **Style:** Follow patterns from the log output in step 1.
+- **Ticket numbers:** Include if extracted from branch name in step 1.
+- **Clarity:** Describe what changed and why.
 
 Then execute the appropriate command:
 
@@ -107,11 +107,11 @@ Replace `BASE` with the base branch detected in step 1.
 
 ### 5. Generate PR Title and Description (no Bash call)
 
-**Language:** Use language specified in project context, prompts, or documentation (default to English).
+**Language:** Match the project's language. Default to English if unclear.
 
 **Title format:**
 ```
-[TICKET-123]: Feature summary
+TICKET-123: Feature summary
 ```
 
 **If no ticket number:**
@@ -164,7 +164,7 @@ EOF
 **Example output:**
 ```
 Pull request created: https://github.com/owner/repo/pull/123
-  Title: FLEASVR-287: Install Github spec kit
+  Title: PROJ-123: Add user authentication flow
 
 Opening in browser...
 ```

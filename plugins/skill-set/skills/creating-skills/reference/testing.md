@@ -1,5 +1,14 @@
 # Testing Methodology
 
+## Table of Contents
+
+- [Testing Approaches](#testing-approaches)
+- [Three Test Types](#three-test-types) (triggering, functional, performance comparison)
+- [Success Criteria](#success-criteria) (quantitative, qualitative)
+- [Iteration Based on Feedback](#iteration-based-on-feedback) (undertriggering, overtriggering, execution issues)
+
+---
+
 Skills can be tested at varying levels of rigor depending on your needs.
 
 ## Testing Approaches

@@ -38,21 +38,18 @@ git status --porcelain; git log --oneline -10; git diff HEAD --stat; git branch 
 
 Using the gathered context, generate the commit message:
 
-**Rules:**
-- **Language:** Use language specified in project context, prompts, or documentation
-  - Check project docs, README, or existing commit patterns for language preference
-  - If unspecified, default to English
-- **Style:** Follow patterns from the log output in step 1
-- **Ticket numbers:** Include if detected in branch name
-  - Extract from branch name (match patterns like `FMT-1234`, `FLEASVR-287`, `ABC-123`)
-  - Example: `feature/FMT-1234-description` → `FMT-1234`
-- **Clarity:** Clearly describe what changed and why
+**Guidelines:**
+- **Language:** Match the project's language. Check project docs, README, or existing commit message patterns for preference. Default to English if unclear.
+- **Style:** Follow patterns from the log output in step 1 — consistency with existing commits matters more than any specific convention.
+- **Ticket numbers:** Extract from branch name if present (match patterns like `PROJ-123`, `TEAM-456`).
+  - Example: `feature/PROJ-123-add-auth` -> `PROJ-123`
+- **Clarity:** Describe what changed and why.
 
 **Message format examples:**
 ```
-FMT-1234: Improve user authentication logic
-FLEASVR-287: Install Github spec kit
-Fix bug: Resolve empty projectDir error
+PROJ-123: Improve user authentication logic
+TEAM-456: Add payment webhook handler
+Fix: Resolve empty projectDir error
 ```
 
 ### 3. Stage and Commit (1 Bash call)
@@ -75,7 +72,7 @@ EOF
 
 **Example output:**
 ```
-Commit created: a1b2c3d FMT-1234: Improve user authentication logic
+Commit created: a1b2c3d PROJ-123: Improve user authentication logic
   3 files changed, 45 insertions(+), 12 deletions(-)
 ```
 

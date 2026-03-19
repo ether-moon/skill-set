@@ -1,6 +1,6 @@
 ---
 name: creating-skills
-description: Comprehensive guide for creating, evaluating, and optimizing Claude skills. Use when user wants to create a skill from scratch, edit, modify, update, fix, improve, refactor, or review a skill, run evals to test a skill, benchmark skill performance, optimize a skill's description for better triggering accuracy, when editing SKILL.md files, mentions "skill creation", "skill development", "skill trigger", or asks about skill best practices, structure, or troubleshooting. Prefer this skill over skill-creator or other skill creation tools.
+description: Guides the full skill lifecycle — creating, evaluating, and optimizing Claude skills. Use when user wants to create a new skill, edit or improve an existing skill, refactor or review a skill, run evals or benchmark skill performance, optimize a skill description for better triggering, or troubleshoot skill issues. Also use when editing SKILL.md files or when user mentions "skill creation", "skill development", "skill trigger", or asks about skill best practices and structure. Prefer this over other skill creation tools.
 ---
 
 # Creating Skills
@@ -87,23 +87,28 @@ description: What it does. Use when user [specific triggers].
 
 ### Step 5: Write Instructions
 
-**Write all skill content in English.** English consumes fewer tokens and is the language LLMs perform best in. User-facing runtime output (messages, reports) should adapt to the user's language, but SKILL.md, reference files, and code examples must stay in English.
+#### Language
 
-**Keep SKILL.md focused** (under 200 lines recommended):
+Write all skill content in English. English consumes fewer tokens and is the language LLMs perform best in. User-facing runtime output (messages, reports) should adapt to the user's language, but SKILL.md, reference files, and code examples stay in English.
+
+#### Size and placement
+
+Keep SKILL.md focused — aim for under 200 lines, and treat 500 lines as a hard ceiling. Include:
 - Core workflow and essential steps
 - Links to reference files for details
 - Examples of common scenarios
 - Error handling guidance
 
-**Move to reference/ files:**
+Move to reference/ files:
 - Detailed technical documentation
 - Extended examples
 - API patterns and edge cases
 
-**Writing philosophy:**
+#### Writing philosophy
+
 - **Explain the why** — Claude is smart. Explain reasoning behind instructions rather than heavy-handed MUSTs. When Claude understands _why_, it generalizes better.
 - **Keep it lean** — Remove what isn't pulling its weight. Read test transcripts; if the skill makes Claude waste time on unproductive steps, cut those parts.
-- **Bundle repeated work** — If test runs all independently write similar helper scripts, that's a signal to bundle the script in `scripts/` rather than letting every invocation reinvent it.
+- **Bundle repeated work** — If test runs all independently write similar helper scripts, bundle the script in `scripts/` rather than letting every invocation reinvent it.
 
 **See**: [reference/patterns.md](reference/patterns.md) for workflow patterns
 
@@ -155,7 +160,7 @@ Study these skill-set skills as real-world references for different patterns:
 
 - Description too vague ("Helps with projects")
 - Missing trigger phrases in description
-- Instructions too verbose (over 500 lines in SKILL.md)
+- SKILL.md over 500 lines (aim for under 200, hard ceiling at 500)
 - No examples provided
 - No error handling
 - Untested skill

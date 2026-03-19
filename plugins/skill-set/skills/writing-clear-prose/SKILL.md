@@ -1,18 +1,18 @@
 ---
 name: writing-clear-prose
-description: Use when user asks to write, draft, compose, revise, edit, proofread, or improve prose, reports, proposals, or technical documents — including explanatory text, persuasive proposals, and documentation.
+description: Guides drafting and revising non-fiction prose — reports, proposals, technical documents, and explanatory text — using four core principles (concreteness, transcreation, steel man, brevity). Use when user asks to write, draft, compose, revise, edit, proofread, rewrite, polish, tighten, shorten, or improve prose, or says "make this clearer", "this is too wordy", "review my writing", or "help me write a proposal".
 ---
 
 # Writing Clear Prose
 
 ## Overview
 
-Two workflows for non-fiction professional writing:
+Produces clear, concrete, credible non-fiction prose through two workflows:
 
 1. **Drafting**: Create new text from scratch → `reference/drafting.md`
 2. **Revising**: Improve existing text → `reference/revising.md`
 
-Both workflows apply four core principles: concreteness, transcreation, steel man argumentation, and brevity.
+Both workflows apply four core principles (concreteness, transcreation, steel man argumentation, brevity) to eliminate vagueness, jargon, and filler.
 
 ## When to Use
 
@@ -93,18 +93,17 @@ If you catch yourself doing any of these, stop and correct:
 | Red Flag | Fix |
 |---|---|
 | Fabricating numbers to sound concrete | Only use numbers from real data. No data? Describe the change without metrics. |
-| Starting with background the reader already knows | Start where the reader's knowledge ends |
-| Using "robust", "leverage", "delve", "tapestry" | Use concrete language (see `reference/anti-patterns.md`) |
+| Starting with background the reader already knows | Start where the reader's knowledge ends — wasted context loses the reader |
+| Using "robust", "leverage", "delve", "tapestry" | These signal AI-generated text; use concrete language (see `reference/anti-patterns.md`) |
 | Writing abstract claims without examples | Add a specific data point or measurement |
-| Ending a sentence with "-ing" filler ("highlighting its importance") | Delete the -ing phrase or replace with concrete evidence |
+| Ending a sentence with "-ing" filler ("highlighting its importance") | Delete the -ing phrase — strongest single AI tell per tropes.fyi |
 | Using "It's not X — it's Y" structure | State the point directly; limit to 1 per document at most |
-| Summarizing at every level (paragraph, section, document) | One summary per document, at the top |
+| Summarizing at every level (paragraph, section, document) | One summary per document, at the top — repetition dilutes the argument |
 | Every bullet starts with **bold label** | Vary bullet structure |
-| Skipping structure review, going straight to style | Always revise structure before style |
+| Skipping structure review, going straight to style | Always revise structure before style — polishing sentences in the wrong section wastes effort |
 | Hedging every claim ("might possibly perhaps") | One hedge maximum per claim |
-| Using different terms for the same concept | Pick one term, use it consistently |
+| Using different terms for the same concept | Pick one term, use it consistently — synonym drift confuses readers |
 | Ignoring counter-arguments in persuasive text | Steel man the strongest objection |
-| Drawing diagrams as ASCII art | Use Mermaid or equivalent markup-based format (see `reference/drafting.md`) |
 
 Full anti-pattern catalog with sentence, tone, structural, and formatting patterns: `reference/anti-patterns.md`
 
@@ -132,9 +131,3 @@ Full anti-pattern catalog with sentence, tone, structural, and formatting patter
 | Tone is inconsistent | Pick formal or informal in Step 1 and enforce during Pass 4 |
 | Counter-arguments feel weak | You're straw-manning; restate the objection as its proponent would |
 
-## See Also
-
-- [reference/principles.md](reference/principles.md) — Full principle details with sourcing and examples
-- [reference/anti-patterns.md](reference/anti-patterns.md) — AI vocabulary, sentence/tone/structural/formatting patterns, drafting and revision mistakes
-- [reference/drafting.md](reference/drafting.md) — Step-by-step drafting workflow with templates
-- [reference/revising.md](reference/revising.md) — 4-pass revision checklist

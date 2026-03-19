@@ -1,20 +1,16 @@
-# Core Workflow
+# Workflow: Understanding External Libraries
 
-## Understanding External Library
+## The Workflow
 
-This is the only workflow provided by this skill. Use it whenever you need to understand an external library, framework, or dependency.
+This is the single workflow provided by this skill. Use it whenever you need to understand an external library, framework, or dependency.
 
-**❌ Old way (baseline):**
 ```
-WebSearch → Read blog posts → Guess from code → Trial and error
-```
-
-**✅ New way:**
-```
-1. resolve-library-id "library-name" (try multiple variations)
-2. get-library-docs to understand concepts and patterns
+1. resolve-library-id "library-name" (try multiple search variations)
+2. get-library-docs to read official concepts, patterns, and APIs
 3. Apply official patterns to project usage
 ```
+
+This replaces the less reliable default approach of web searching for blog posts, guessing from source code, or relying on prior knowledge that may be outdated.
 
 ---
 
@@ -22,109 +18,85 @@ WebSearch → Read blog posts → Guess from code → Trial and error
 
 ### Step 1: Find Library ID
 
-Try multiple search term variations:
+Try multiple search term variations. Library names differ between package managers, GitHub organizations, and common usage:
 
 ```bash
 # Variation 1: Exact package name
-resolve-library-id "importmap-rails"
+resolve-library-id libraryName="@tanstack/react-query" query="data fetching and caching"
 
-# If not found, Variation 2: Framework + concept
-resolve-library-id "rails import maps"
+# If not found — Variation 2: Common name
+resolve-library-id libraryName="react-query" query="data fetching and caching"
 
-# If not found, Variation 3: Organization/repo
-resolve-library-id "rails/importmap"
-
-# If not found, Variation 4: Base name
-resolve-library-id "importmap"
+# If not found — Variation 3: Organization/repo
+resolve-library-id libraryName="tanstack/query" query="data fetching and caching"
 ```
 
-**Important**: Try 2+ variations before giving up or using WebSearch.
+Try at least 2 variations before falling back to WebSearch — Context7 has the library more often than the first search term suggests.
 
----
+### Step 2: Fetch Documentation
 
-### Step 2: Get Documentation
-
-Once you have the library ID:
+Once you have the library ID, query for the specific topic you need:
 
 ```bash
-get-library-docs context7CompatibleLibraryID="/rails/importmap"
+get-library-docs libraryId="/tanstack/query" query="how to use useQuery hook for data fetching with caching"
 ```
 
-This provides:
-- Official documentation
-- Concepts and architecture
-- API reference
-- Best practices
-- Configuration examples
-
----
+Be specific in your query. "useQuery hook caching and refetch behavior" returns more relevant docs than "react-query".
 
 ### Step 3: Apply Understanding
 
 Use the official documentation to:
-- Understand how the library works
-- Learn recommended patterns
-- Apply to project usage
-- Avoid common pitfalls
+- Understand the library's intended usage patterns
+- Learn recommended configuration approaches
+- Identify common pitfalls the docs warn about
+- Apply best practices to the project's specific context
 
 ---
 
-## Complete Example
+## Example 1: Rails Dependency
 
 **User request:** "Help me understand how importmap works and how to add a new library"
 
-**Workflow execution:**
+```
+1. resolve-library-id libraryName="importmap-rails" query="how to add JavaScript packages"
+   - Found: /rails/importmap-rails
 
-```markdown
-1. resolve-library-id "importmap-rails"
-   - If not found: try "rails/importmap", "rails import maps", "importmap"
-   
-2. get-library-docs context7CompatibleLibraryID="/rails/importmap"
-   - Understand: import maps spec, pin vs pin_all_from, CDN vs vendor
-   
-3. Explain concepts based on official docs:
-   - What import maps are
-   - How pin() works
-   - How to add a new library using pin()
-   - Best practices from official docs
+2. get-library-docs libraryId="/rails/importmap-rails" query="pin JavaScript packages and manage import maps"
+   - Learned: import maps spec, pin vs pin_all_from, CDN vs vendor
+
+3. Explain:
+   - What import maps are and how Rails implements them
+   - How pin() works for adding packages
+   - When to use pin_all_from for directory-level imports
+   - CDN vs vendored approaches based on official recommendations
+```
+
+## Example 2: React Library
+
+**User request:** "How do I handle form validation with react-hook-form?"
+
+```
+1. resolve-library-id libraryName="react-hook-form" query="form validation setup"
+   - Found: /react-hook-form/react-hook-form
+
+2. get-library-docs libraryId="/react-hook-form/react-hook-form" query="register fields, validation rules, and error handling"
+   - Learned: useForm hook, register API, validation modes, resolver pattern
+
+3. Explain:
+   - How useForm() and register() work together
+   - Built-in validation vs schema validation with resolvers
+   - Error handling patterns from official docs
+   - Performance considerations (uncontrolled vs controlled)
 ```
 
 ---
 
 ## When This Workflow Applies
 
-**Always use this workflow when:**
-- Understanding any external library/framework
-- Learning library concepts and patterns
-- Finding official documentation
-- Understanding library configuration
-- Learning how to use a library feature
+This workflow applies to any task involving external dependencies:
+- Any `import`, `require`, `gem`, pip package, or cargo crate
+- Framework features and configuration
+- Library APIs and usage patterns
+- Understanding how a third-party tool works
 
-**This workflow applies to:**
-- ✅ Any `import`, `require`, `gem`, external dependency
-- ✅ Framework features
-- ✅ Library configuration
-- ✅ Understanding library APIs
-
-**Common rationalizations to REJECT:**
-- "This is just config, not library usage" → WRONG. Config is HOW you use the library. This workflow applies.
-- "I can guess from the code" → WRONG. Official docs explain intent and best practices.
-- "WebSearch is faster" → WRONG. Context7 has official, version-specific docs.
-
----
-
-## Why This Workflow Matters
-
-**Official documentation provides:**
-- Authoritative information
-- Version-specific details
-- Best practices and patterns
-- Intent and design rationale
-- Common pitfalls and gotchas
-
-**Without official docs, you:**
-- May misunderstand library behavior
-- Miss important concepts
-- Use outdated patterns
-- Encounter version-specific issues
-- Waste time reading source code
+Configuration is part of library usage. "Just config" still benefits from official docs that explain what each option does and what the defaults mean.

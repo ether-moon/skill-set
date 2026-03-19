@@ -1,6 +1,6 @@
 # Report Format
 
-Every consultation produces three outputs in sequence:
+Every consultation produces two outputs in sequence:
 
 1. **Raw responses** - Each CLI's original, unmodified output
 2. **Synthesized final report** - Analyzed and consolidated

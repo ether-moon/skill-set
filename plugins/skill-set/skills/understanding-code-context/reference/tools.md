@@ -1,129 +1,75 @@
-# Context7 Tool Usage
+# Context7 Tool Reference
 
 ## Overview
 
-Context7 provides authoritative, version-specific documentation for external libraries and frameworks. This is the primary and only tool used by this skill.
+Context7 provides authoritative, version-specific documentation for external libraries and frameworks. These are the two tools this skill uses.
 
-## Tool Commands
-
-### resolve-library-id
+## resolve-library-id
 
 **Purpose:** Find the Context7-compatible library ID for a given library name.
 
-**When to use:**
-- First step when looking up any external library
-- Before calling `get-library-docs`
+**When to use:** Always the first step when looking up any external library — required before calling `get-library-docs`.
+
+**Parameters:**
+- `libraryName` (required): The library name to search for
+- `query` (required): Description of what you need help with, used to rank results by relevance
 
 **Command:**
 ```bash
-resolve-library-id "library-name"
+resolve-library-id libraryName="importmap-rails" query="how to pin JavaScript packages in Rails"
 ```
 
-**Search Strategy:**
+**Returns:** A list of matching libraries with:
+- Library ID (format: `/org/project`)
+- Name and description
+- Code snippet count
+- Source reputation (High, Medium, Low, Unknown)
+- Benchmark score (quality indicator, max 100)
+- Available versions
 
-Try multiple variations in this order:
+**Selection guidance:** Prioritize results by name match, source reputation, snippet count, and benchmark score. If multiple good matches exist, prefer High reputation with more snippets.
 
-1. **Exact package name**: `"importmap-rails"`
-2. **Framework + concept**: `"rails import maps"`
-3. **Organization/repo**: `"rails/importmap"`
-4. **Base name**: `"importmap"`
-
-**Important**: Try 2+ variations before giving up or using WebSearch.
-
-**Example:**
-```bash
-# Try 1: Exact name
-resolve-library-id "importmap-rails"
-
-# If not found, try 2: Framework + concept
-resolve-library-id "rails import maps"
-
-# If not found, try 3: Organization/repo
-resolve-library-id "rails/importmap"
-
-# If not found, try 4: Base name
-resolve-library-id "importmap"
-```
+**Search variations:** When the first search does not match, try in this order:
+1. Exact package name: `"importmap-rails"`
+2. Framework + concept: `"rails import maps"`
+3. Organization/repo: `"rails/importmap"`
+4. Base name: `"importmap"`
 
 ---
 
-### get-library-docs
+## get-library-docs
 
-**Purpose:** Get official documentation for a library using its Context7-compatible library ID.
+**Purpose:** Fetch official documentation for a library using its Context7-compatible library ID.
 
-**When to use:**
-- After successfully resolving library ID with `resolve-library-id`
-- To understand library concepts, patterns, APIs, and best practices
+**When to use:** After resolving a library ID with `resolve-library-id`.
+
+**Parameters:**
+- `libraryId` (required): Context7-compatible library ID (e.g., `/rails/importmap`, `/vercel/next.js/v14.3.0-canary.87`)
+- `query` (required): Specific question or task — be descriptive for better results
 
 **Command:**
 ```bash
-get-library-docs context7CompatibleLibraryID="/org/project"
+get-library-docs libraryId="/rails/importmap" query="how to pin a new JavaScript package"
 ```
 
-**What you get:**
+**Returns:**
 - Official, version-specific documentation
 - Library concepts and architecture
-- API reference and patterns
-- Best practices and gotchas
-- Configuration examples
+- API reference and usage patterns
+- Best practices, gotchas, and configuration examples
 
-**Example:**
-```bash
-# After resolve-library-id returns "/rails/importmap"
-get-library-docs context7CompatibleLibraryID="/rails/importmap"
-```
-
----
-
-## Complete Workflow
-
-**Understanding an external library:**
-
-```bash
-# Step 1: Find library ID (try multiple variations)
-resolve-library-id "library-name"
-# If not found, try variations:
-resolve-library-id "framework concept"
-resolve-library-id "org/repo"
-resolve-library-id "basename"
-
-# Step 2: Get documentation
-get-library-docs context7CompatibleLibraryID="/org/project"
-
-# Step 3: Read and understand official patterns
-# Apply understanding to project usage
-```
+**Tips for better results:**
+- Use specific queries: "How to set up JWT authentication in Express" works better than "auth"
+- Include the version in `libraryId` if you need version-specific docs (e.g., `/vercel/next.js/v14.3.0-canary.87`)
 
 ---
 
 ## Why Context7 Over Alternatives
 
-**Context7 advantages:**
-- ✅ Official, version-specific documentation
-- ✅ Authoritative patterns and APIs
-- ✅ Up-to-date information
-- ✅ Explains intent and best practices
-- ✅ No outdated blog posts or StackOverflow answers
+| Source | Strengths | Weaknesses |
+|--------|-----------|------------|
+| **Context7** | Official, version-specific, authoritative, explains intent and best practices | Some libraries not indexed |
+| **WebSearch** | Broad coverage | Often outdated, version mismatches, blog posts over official docs |
+| **Source code** | Shows exact implementation | Time-consuming, does not explain intent or best practices |
 
-**WebSearch disadvantages:**
-- ❌ Often outdated information
-- ❌ Blog posts and tutorials (not official docs)
-- ❌ Version mismatches
-- ❌ Inconsistent quality
-
-**Reading source code disadvantages:**
-- ❌ Time-consuming
-- ❌ Doesn't explain intent or best practices
-- ❌ May miss important concepts
-- ❌ Version-specific issues
-
----
-
-## Common Mistakes
-
-| Mistake | Fix |
-|---------|-----|
-| **WebSearch first** | Use Context7 with multiple search term variations |
-| **One search term only** | Try 2+ variations before giving up |
-| **Reading source code** | Check Context7 official docs first |
-| **Assuming library behavior** | Official docs explain intent and best practices |
+Context7 should be the first source consulted. WebSearch is a reasonable fallback when a library is not indexed in Context7.

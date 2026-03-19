@@ -42,6 +42,10 @@ Write as if the reader has zero prior context about this topic.
 - [ ] No pronoun without a clear antecedent in the same paragraph
 - [ ] Background provided where reader's knowledge likely ends (Step 1 audience analysis)
 
+### Diagrams
+
+When a document needs diagrams, use Mermaid or equivalent markup-based format instead of ASCII art. Markup-based diagrams render consistently across platforms and are easier to maintain.
+
 ## Step 4: Draft Section by Section
 
 For each section in your outline:

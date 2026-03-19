@@ -1,15 +1,8 @@
 # CLI Commands Reference
 
-## Constraints
-
-- **No extra flags**: Use ONLY the exact commands in the table below. Do not add `--model`, `--full-auto`, `--quiet`, `--approval-mode`, `--profile`, or any other flags not shown.
-- **No prompt files**: Pass prompts directly inline to CLI commands. Do not write prompts to temp files.
-- **No embedded context**: Do not read files, run git commands, or gather any data to embed in the prompt. CLIs run in the same repository — they read git state and files themselves.
-- **Minimal prompts**: The prompt contains only: (1) instruction to review current branch vs origin/main, (2) 1-2 sentence intent summary, (3) user's review focus if explicitly requested. Nothing else.
-
 ## Supported CLIs
 
-**CRITICAL: Use non-interactive (one-shot) flags.** Without these, CLIs enter interactive/REPL mode.
+Use non-interactive (one-shot) flags. Without these, CLIs enter interactive/REPL mode.
 
 | CLI | Command | Notes |
 |-----|---------|-------|

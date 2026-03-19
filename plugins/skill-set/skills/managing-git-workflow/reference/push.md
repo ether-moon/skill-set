@@ -39,11 +39,11 @@ git status --porcelain; git log --oneline -10; git diff HEAD --stat; git branch 
 
 If status from step 1 is non-empty, generate a commit message:
 
-**Rules:**
-- **Language:** Use language specified in project context, prompts, or documentation (default to English)
-- **Style:** Follow patterns from the log output in step 1
-- **Ticket numbers:** Extract from branch name (match patterns like `FMT-1234`, `FLEASVR-287`, `ABC-123`)
-- **Clarity:** Clearly describe what changed and why
+**Guidelines:**
+- **Language:** Match the project's language. Default to English if unclear.
+- **Style:** Follow patterns from the log output in step 1.
+- **Ticket numbers:** Extract from branch name if present (match patterns like `PROJ-123`, `TEAM-456`).
+- **Clarity:** Describe what changed and why.
 
 ### 3. Commit and/or Push (1 Bash call)
 
@@ -83,7 +83,7 @@ git push
 **Example output:**
 ```
 Pushed to origin/feature-branch
-  Commit: a1b2c3d FMT-1234: Improve user authentication logic
+  Commit: a1b2c3d PROJ-123: Improve user authentication logic
   Branch is up to date with 'origin/feature-branch'
 ```
 

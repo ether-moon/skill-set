@@ -1,5 +1,17 @@
 # Skill Structure Reference
 
+## Table of Contents
+
+- [File Structure](#file-structure)
+- [Naming Rules](#naming-rules)
+- [YAML Frontmatter](#yaml-frontmatter) (required fields, optional fields, Claude Code extensions, string substitutions, dynamic context injection)
+- [Description Examples](#description-examples)
+- [Security Restrictions](#security-restrictions)
+- [Progressive Disclosure](#progressive-disclosure) (reference depth limit)
+- [Best Practices](#best-practices)
+
+---
+
 ## File Structure
 
 ```

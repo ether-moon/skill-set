@@ -1,5 +1,17 @@
 # Troubleshooting Guide
 
+## Table of Contents
+
+- [Skill Won't Upload](#skill-wont-upload) (SKILL.md not found, invalid frontmatter, invalid name)
+- [Skill Doesn't Trigger](#skill-doesnt-trigger)
+- [Skill Triggers Too Often](#skill-triggers-too-often)
+- [MCP Connection Issues](#mcp-connection-issues)
+- [Instructions Not Followed](#instructions-not-followed) (verbosity, buried instructions, ambiguity, validation scripts, model laziness)
+- [Large Context Issues](#large-context-issues)
+- [Common Error Messages](#common-error-messages)
+
+---
+
 ## Skill Won't Upload
 
 ### Error: "Could not find SKILL.md in uploaded folder"

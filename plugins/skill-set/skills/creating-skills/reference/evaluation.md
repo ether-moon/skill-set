@@ -1,5 +1,19 @@
 # Evaluation and Iteration Methodology
 
+## Table of Contents
+
+- [The Core Loop](#the-core-loop)
+- [Step 1: Define Test Cases](#step-1-define-test-cases)
+- [Step 2: Run With-Skill vs Baseline](#step-2-run-with-skill-vs-baseline)
+- [Step 3: Grade with Assertions](#step-3-grade-with-assertions)
+- [Step 4: Benchmark](#step-4-benchmark)
+- [Step 5: Iterate on Improvements](#step-5-iterate-on-improvements)
+- [Description Optimization](#description-optimization) (triggering, pushy strategy, testing)
+- [Blind Comparison (Advanced)](#blind-comparison-advanced)
+- [Quick Reference](#quick-reference)
+
+---
+
 ## The Core Loop
 
 Skill development is iterative. The loop:

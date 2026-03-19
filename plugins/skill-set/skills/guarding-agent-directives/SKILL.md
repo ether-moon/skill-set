@@ -1,6 +1,6 @@
 ---
 name: guarding-agent-directives
-description: Use when adding, modifying, or reviewing content in agent directive files (CLAUDE.md, AGENTS.md, referenced documents). Also triggers automatically when any agent attempts to modify these files.
+description: Guards agent directive files (CLAUDE.md, AGENTS.md, referenced documents) against bloat by verifying every proposed addition through strict criteria while preserving user authority. Use when adding, modifying, or reviewing content in directive files, when user says "add a rule", "update CLAUDE.md", "new directive", "add instruction to AGENTS.md", or when any agent autonomously attempts to modify these files.
 ---
 
 # Guarding Agent Directives
@@ -40,34 +40,18 @@ Every proposed addition must pass 5 questions:
 
 ## Workflow
 
-```dot
-digraph workflow {
-    "Input received" [shape=box];
-    "Run 5 questions" [shape=box];
-    "All pass?" [shape=diamond];
-    "Present results + choices" [shape=box];
-    "User decides" [shape=diamond];
-    "Decide placement" [shape=box];
-    "Review existing content" [shape=box];
-    "Suggest removals?" [shape=diamond];
-    "Present suggestions" [shape=box];
-    "Apply with confirmation" [shape=box];
-
-    "Input received" -> "Run 5 questions";
-    "Run 5 questions" -> "All pass?";
-    "All pass?" -> "Decide placement" [label="yes"];
-    "All pass?" -> "Present results + choices" [label="no"];
-    "Present results + choices" -> "User decides";
-    "User decides" -> "Decide placement" [label="add anyway"];
-    "User decides" -> "Run 5 questions" [label="revise"];
-    "User decides" -> "DONE" [label="don't add"];
-    "Decide placement" -> "Review existing content";
-    "Review existing content" -> "Suggest removals?";
-    "Suggest removals?" -> "Present suggestions" [label="found candidates"];
-    "Suggest removals?" -> "Apply with confirmation" [label="nothing to remove"];
-    "Present suggestions" -> "Apply with confirmation";
-    "Apply with confirmation" -> "DONE";
-}
+```
+Input received
+  |
+Run 5 questions
+  |
+  +-- All pass? --yes--> Decide placement --> Review existing content --> Apply with confirmation
+  |
+  +-- Any fail? ------> Present results + 3 choices
+                            |
+                            +-- "Add anyway"  --> Decide placement (continue above)
+                            +-- "Revise"      --> Run 5 questions again
+                            +-- "Don't add"   --> Done
 ```
 
 ### Step 1: Input received
@@ -81,18 +65,28 @@ Detect the proposed addition. Identify:
 
 Evaluate all 5 questions. Present a brief pass/fail summary with one-line reasoning per question.
 
+**Example output format:**
+
+```
+Proposed: "Always use pnpm, not npm"
+
+Q1 Recurring?       PASS — Agent defaults to npm every session
+Q2 Non-obvious?     PASS — Custom tooling choice not inferable
+Q3 Novel?           PASS — Not covered by existing directives
+Q4 Actionable?      PASS — Clear tool substitution
+Q5 Project-specific? PASS — Only applies to this repo
+
+Result: 5/5 passed. Recommend adding.
+```
+
 ### Step 3: Placement decision
 
-Based on abstraction level, recommend where to place the content:
+Directive files are loaded every session, so placement affects token cost. Recommend the most specific home:
 
-- **CLAUDE.md/AGENTS.md body** — Condensed core declaration. The project's table of contents. Only if it's truly TOC-level.
-- **Referenced files from CLAUDE.md/AGENTS.md** — Essential detail, loaded every session. For content that naturally extends an existing section.
-- **Skill-internal reference** — Only loaded when a specific skill triggers. For task-specific guidance.
-
-**Placement logic:**
-1. Does it belong in an existing reference file? → Add there
-2. New area? → Consider new reference file + one-line reference in CLAUDE.md/AGENTS.md
-3. TOC-level core declaration? → Add directly to CLAUDE.md/AGENTS.md body
+1. **Existing reference file** — Extends an existing section? Add there.
+2. **New reference file + one-line link** — New area that doesn't fit existing files? Create a reference file and add a one-line pointer from CLAUDE.md/AGENTS.md.
+3. **CLAUDE.md/AGENTS.md body** — Only for truly top-level declarations (the project's table of contents).
+4. **Skill-internal reference** — Task-specific guidance that only matters when a particular skill triggers.
 
 Present the recommendation with reasoning. User confirms.
 
@@ -111,18 +105,18 @@ If found, suggest removal or modification. If nothing to remove, proceed — wel
 
 Write the content. Present the exact diff to user for final confirmation. Modify file only after approval.
 
-## Red Flags - STOP Immediately
+## Red Flags
 
-If you catch yourself doing ANY of these:
+These patterns indicate the verification workflow was skipped or short-circuited:
 
-- Adding to directive files without running verification
-- Skipping verification because "this is obviously important"
-- Adding vague/aspirational statements ("write clean code", "be thorough")
-- Duplicating what's already expressed differently elsewhere
-- Adding universal knowledge the model already knows
-- Overriding user's decision to add after verification failure
+- Adding to directive files without running verification first
+- Skipping verification because the content "feels important"
+- Adding vague or aspirational statements ("write clean code", "be thorough")
+- Duplicating what existing directives already express in different words
+- Adding universal knowledge the model already has
+- Overriding the user's explicit decision after a verification failure
 
-**All mean: STOP. Run the verification workflow.**
+Any of these? Go back and run the verification workflow.
 
 ## Quick Reference
 

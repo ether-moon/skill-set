@@ -29,7 +29,7 @@ Use this checklist to validate your skill before and after upload.
 - [ ] Error handling included
 - [ ] Examples provided
 - [ ] References one level deep from SKILL.md (no nested chains)
-- [ ] SKILL.md under 200 lines (move details to reference/)
+- [ ] SKILL.md under 200 lines (move details to reference/; hard ceiling: 500)
 
 ## Before Upload
 

@@ -1,6 +1,6 @@
 ---
 name: understanding-code-context
-description: Find and read official documentation for external libraries and frameworks using Context7. Use when researching library APIs, understanding framework configuration, learning library concepts, or looking up dependency documentation — provides authoritative, version-specific docs instead of outdated web search results or source code reading.
+description: Find and read official documentation for external libraries and frameworks using Context7. Use when researching library APIs, understanding framework configuration, learning library concepts, looking up dependency documentation, or when user asks "how does X library work", "what's the API for X", "look up docs for X", "how to configure X" — provides authoritative, version-specific docs instead of outdated web search results or source code reading.
 ---
 
 # Understanding Code Context
@@ -9,113 +9,80 @@ description: Find and read official documentation for external libraries and fra
 
 **Core principle**: Use official documentation (Context7) to understand external libraries and frameworks instead of web search or reading source code.
 
-This skill provides structured workflows for finding authoritative, version-specific documentation for external dependencies.
+Official docs explain intent, best practices, and version-specific behavior — things you cannot reliably get from blog posts, StackOverflow, or source code alone.
 
 ## When to Use
 
 Use this skill when:
-- Understanding how an external library/framework works
+- Understanding how an external library or framework works
 - Learning library concepts, patterns, and APIs
 - Finding official documentation for dependencies
 - Understanding library configuration and usage patterns
 
-Don't use for:
-- Exploring project code (use other tools)
-- Finding implementations in your codebase
+Not applicable for:
+- Exploring project code (use Grep, Glob, Read)
+- Finding implementations within the current codebase
 - Simple file content reading
-
-## Context7 Tool Usage
-
-**Primary tool**: Context7 provides authoritative, version-specific documentation for external libraries.
-
-### Commands
-
-```bash
-# Step 1: Find library ID
-resolve-library-id "library-name"
-
-# Step 2: Get documentation
-get-library-docs context7CompatibleLibraryID="/org/project"
-```
-
-### Search Strategy
-
-When searching for library documentation, try multiple variations:
-
-1. **Exact package name**: `"importmap-rails"`
-2. **Framework + concept**: `"rails import maps"`
-3. **Organization/repo**: `"rails/importmap"`
-4. **Base name**: `"importmap"`
-
-**Important**: Try 2+ variations before using WebSearch. Context7 has official, version-specific documentation. WebSearch gives you blog posts and outdated StackOverflow.
 
 ## Core Workflow
 
-**Understanding External Library:**
+**Step 1**: Resolve the library ID with `resolve-library-id`. Try multiple search term variations — library names differ across registries, organizations, and common usage.
+
+**Step 2**: Fetch documentation with `get-library-docs` using the resolved ID.
+
+**Step 3**: Read and apply official patterns to the project.
 
 ```
 1. resolve-library-id "library-name"
    - If not found: try variations (framework + concept, org/repo, base name)
-   - Try 2+ variations before giving up
-2. get-library-docs context7CompatibleLibraryID="/org/project"
-3. Read and understand official patterns, APIs, and concepts
-4. Apply understanding to project usage
+   - Try at least 2 variations before falling back to WebSearch
+2. get-library-docs libraryId="/org/project"
+3. Apply official patterns and concepts to project usage
 ```
 
 **Example:**
-```markdown
-User: "Help me understand how importmap works and how to add a new library"
+```
+User: "How do I set up authentication middleware in Express?"
 
-You:
-1. resolve-library-id "importmap-rails"
-   - If not found: try "rails/importmap", "rails import maps", "importmap"
-2. get-library-docs context7CompatibleLibraryID="/rails/importmap"
-3. Understand: import maps spec, pin vs pin_all_from, CDN vs vendor
-4. Explain concepts and how to add a new library based on official docs
+1. resolve-library-id "express"
+   - If ambiguous: try "expressjs", "express.js middleware"
+2. get-library-docs libraryId="/expressjs/express"
+3. Explain middleware patterns, app.use() setup, and auth best practices from official docs
 ```
 
-## Red Flags - STOP Immediately
+## Search Strategy
 
-If you catch yourself doing ANY of these, STOP and start over:
+Context7 indexes libraries under various names. When the first search does not match, try variations in this order:
 
-- ❌ "Context7 didn't work" after 1 try (try 2+ search term variations!)
-- ❌ "WebSearch is faster" (it's less accurate and often outdated!)
-- ❌ "I know how this lib works" (check official docs anyway!)
-- ❌ Reading source code before checking Context7 docs
-- ❌ Using WebSearch before trying Context7 variations
+1. **Exact package name**: `"importmap-rails"`, `"@tanstack/react-query"`
+2. **Framework + concept**: `"rails import maps"`, `"react server components"`
+3. **Organization/repo**: `"rails/importmap"`, `"tanstack/query"`
+4. **Base name**: `"importmap"`, `"react-query"`
 
-**All of these mean: STOP. Try Context7 with multiple search variations first.**
+Context7 has official, version-specific documentation that WebSearch cannot match. Exhausting these variations first avoids falling back to outdated blog posts or StackOverflow answers.
 
-## Anti-Patterns
+## Avoiding Common Pitfalls
 
-**Common mistakes:**
+Context7 is the preferred first source because it provides official, version-specific documentation. These habits undermine that advantage:
 
-| Mistake | Fix |
-|---------|-----|
-| **WebSearch first** | Use Context7 with multiple search term variations |
-| **One search term only** | Try 2+ variations (exact name, framework+concept, org/repo, base name) |
-| **Reading source code** | Check Context7 official docs first |
-| **Assuming library behavior** | Official docs explain intent, best practices, and gotchas |
+- **Reaching for WebSearch first** — WebSearch returns blog posts and tutorials that may be outdated or version-mismatched. Try Context7 variations first.
+- **Giving up after one search term** — Library names vary across package managers, GitHub orgs, and common usage. Two or more variations usually find the right result.
+- **Reading source code instead of docs** — Source code shows implementation (how) but not intent (why). Official docs explain best practices, gotchas, and design rationale.
+- **Assuming prior knowledge is sufficient** — Libraries update frequently. Context7 has the latest version-specific information.
 
-**Why Context7 over WebSearch:**
-- Official, version-specific documentation
-- Authoritative patterns and APIs
-- Up-to-date information
-- Explains intent and best practices
+For a deeper catalog of these patterns and recovery strategies, see [reference/anti-patterns.md](reference/anti-patterns.md).
 
 ## Quick Reference
 
-**Find library documentation:**
 ```bash
+# Find library documentation
 resolve-library-id "library-name"
-get-library-docs context7CompatibleLibraryID="/org/project"
+get-library-docs libraryId="/org/project"
 ```
 
-**Search term variations to try:**
-1. Exact package name: `"package-name"`
-2. Framework + concept: `"framework concept"`
-3. Organization/repo: `"org/repo"`
-4. Base name: `"basename"`
+For detailed tool parameters and return values, see [reference/tools.md](reference/tools.md).
+
+For extended workflow patterns and examples, see [reference/workflows.md](reference/workflows.md).
 
 ## Troubleshooting
 
@@ -127,14 +94,14 @@ get-library-docs context7CompatibleLibraryID="/org/project"
 - Check API key is valid
 
 **"No results found"**
-- Try multiple search term variations (see Quick Reference)
+- Try multiple search term variations (see Search Strategy above)
 - Check spelling of library name
-- Some libraries may not be indexed - fall back to WebSearch
+- Some libraries may not be indexed — fall back to WebSearch
 
 ### Library Not Found
 
 **After trying multiple variations:**
-1. Check if library exists on npm/PyPI/etc.
+1. Check if the library exists on npm/PyPI/crates.io/etc.
 2. Use WebSearch as fallback for unindexed libraries
 3. Check the library's official documentation URL directly
 
@@ -142,11 +109,11 @@ get-library-docs context7CompatibleLibraryID="/org/project"
 
 **"Documentation seems outdated"**
 - Context7 provides version-specific docs
-- Verify you're using the correct library ID
-- Check library's changelog for recent changes
+- Verify you are using the correct library ID
+- Check the library's changelog for recent changes
 
 ## See Also
 
-- [reference/tools.md](reference/tools.md) - Detailed tool documentation
-- [reference/workflows.md](reference/workflows.md) - Extended workflow patterns
-- [reference/anti-patterns.md](reference/anti-patterns.md) - Common mistakes to avoid
+- [reference/tools.md](reference/tools.md) — Detailed tool parameters and usage
+- [reference/workflows.md](reference/workflows.md) — Extended workflow patterns with examples
+- [reference/anti-patterns.md](reference/anti-patterns.md) — Common mistakes and recovery strategies

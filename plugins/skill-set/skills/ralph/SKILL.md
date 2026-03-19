@@ -1,8 +1,12 @@
 ---
 name: ralph
 description: >
-  Use when user mentions "ralph", "ralph loop", or "ralph wiggum" in the context of
-  planning or executing implementation work with fresh context per iteration.
+  Plans and executes implementation work via an iterative loop with fresh-context Task subagents.
+  Two modes: PLANNING generates a declarative spec with acceptance criteria, BUILDING performs
+  gap analysis and implements toward it — one gap per iteration, no context rot.
+  Use when user mentions "ralph", "ralph loop", "ralph wiggum", wants iterative implementation
+  with fresh context per iteration, asks for spec-driven development, wants a subagent loop,
+  or needs to break large implementation work into autonomous iterations.
 ---
 
 # Ralph
@@ -17,11 +21,17 @@ Plans and executes implementation work via Geoffrey Huntley's Ralph Wiggum techn
 
 ## When to Use
 
-- User mentions "ralph", "ralph loop", "ralph wiggum"
-- User wants to plan or execute implementation work with fresh context per iteration
+- User mentions "ralph", "ralph loop", or "ralph wiggum"
+- User wants iterative implementation where each iteration starts with fresh context
+- Implementation is large enough that context rot would degrade quality in a single session
+- User wants to generate a declarative spec with acceptance criteria before building
+- User asks for a subagent loop or autonomous iteration toward a spec
+
+**What makes Ralph distinctive:** Normal implementation loads everything into one long session where context degrades over time. Ralph spawns a fresh subagent per iteration — each one reads the spec from disk, performs gap analysis, closes one gap, and exits. Disk is memory. No context rot.
 
 **When NOT to use:**
-- User asks to "implement the plan" without mentioning "ralph" → use other execution skills
+- Quick implementations that fit comfortably in a single session
+- User asks to "implement the plan" without needing iterative fresh-context execution
 
 ## Modes
 
@@ -82,7 +92,7 @@ Read the appropriate template from `templates/`. Substitute:
 - `{{TEST_CMD}}` → detected test command from Step 2
 - `{{SOURCE_DOC}}` → input document path (PLANNING only; remove the `0b.` orient line if no source document provided)
 
-Hold the constructed prompt in memory. Do NOT write files into the project.
+Hold the constructed prompt in memory — writing it to disk would pollute the project with infrastructure files that don't belong in the codebase.
 
 ### Step 6: Propose Done Condition
 
@@ -110,7 +120,8 @@ Each iteration: spawn fresh Task subagent → wait for completion → check prog
 
 - **Progress detection:** New git commits OR spec file hash changes count as progress
 - **Circuit breaker:** 3 consecutive iterations with no progress → ask user
-- **Subagent:** `general-purpose`, model `sonnet` (default), same repo (no worktree isolation)
+- **Subagent:** `general-purpose`, model `sonnet` (default), same repo. No worktree isolation — each iteration needs to see the previous iteration's commits and file changes for accurate gap analysis.
+- **Model choice:** Sonnet is the default because each iteration performs a well-scoped task (close one gap). Opus-level reasoning is valuable for planning, but gap analysis with a clear spec doesn't need it — and the cost difference compounds across many iterations.
 - **Max iterations:** 100
 - **PLANNING → BUILDING transition:** Report generated spec to user, confirm, propose DONE condition, then switch to BUILDING mode
 
@@ -146,7 +157,7 @@ This means blocker handling (updating spec with blocker notes without committing
 
 ## Spec File Structure
 
-A single self-contained file with three sections: **Context** (goals, constraints), **Acceptance Criteria** (declarative outcomes), and **Progress Log** (populated by build iterations). Acceptance Criteria are immutable during BUILDING — only PLANNING modifies them.
+A single self-contained file with three sections: **Context** (goals, constraints), **Acceptance Criteria** (declarative outcomes), and **Progress Log** (populated by build iterations). Acceptance Criteria stay frozen during BUILDING — if build iterations could edit criteria, they might silently lower the bar or mark things "done" by redefining what "done" means. Use PLANNING mode to intentionally revise criteria.
 
 **Full structure, key properties, and examples:** See [reference/workflow.md](reference/workflow.md) and [reference/spec-quality.md](reference/spec-quality.md)
 
@@ -156,11 +167,11 @@ A single self-contained file with three sections: **Context** (goals, constraint
 |---|---|
 | Writing imperative tasks instead of acceptance criteria | Describe desired outcomes. "GET /api/users returns paginated results" not "Add pagination to /api/users." |
 | Skipping DONE condition proposal | Always propose and confirm DONE condition before starting the loop. |
-| Modifying acceptance criteria during BUILDING | Only append to Progress Log during BUILDING. Use PLANNING to change criteria. |
-| Using opus for loop iterations | Sonnet is sufficient for gap analysis. Save opus for planning. |
-| Writing files into the project | Prompt is in memory. Spec goes to tmp/ralph/. |
-| Running multiple iterations in parallel | Sequential — each iteration depends on the previous. One subagent at a time. |
-| Fabricating quantitative targets | Never invent numbers (e.g., "reduce by 30%") unless user-stated or evidence-backed. |
+| Modifying acceptance criteria during BUILDING | Criteria stay frozen so build iterations can't silently lower the bar. Append only to Progress Log. Use PLANNING to revise criteria. |
+| Using opus for loop iterations | Each iteration closes one well-scoped gap — sonnet handles this well and the cost difference compounds across many iterations. Reserve opus for planning. |
+| Writing files into the project | Prompt stays in memory, spec goes to tmp/ralph/. Infrastructure files don't belong in the codebase. |
+| Running multiple iterations in parallel | Each iteration's gap analysis depends on the previous iteration's commits. Sequential execution is essential for correctness. |
+| Fabricating quantitative targets | Invented numbers (e.g., "reduce by 30%") become acceptance criteria that can't be verified, causing build iterations to chase fictional goals. Only include numbers the user stated or evidence supports. |
 | Skipping user confirmation on spec | Always preview and confirm before transitioning PLANNING → BUILDING. |
 
 ## Reference
