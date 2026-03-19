@@ -5,6 +5,13 @@ All notable changes to the skill-set plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] - 2026-03-19
+
+### Improved
+
+- **pr-review-feedback**: Replace severity-based classification with obvious/ambiguous model — obvious items auto-fixed immediately, ambiguous items discussed with rationale and recommendations
+- **pr-review-feedback**: Fix GraphQL query to collect inline review threads and correct REST API endpoint for pull request review comments
+
 ## [1.7.0] - 2026-03-16
 
 ### Changed
