@@ -5,6 +5,12 @@ All notable changes to the skill-set plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.3] - 2026-03-23
+
+### Fixed
+
+- **managing-git-workflow**: Remove `model: sonnet` override from git command files to prevent rate limit errors
+
 ## [1.7.1] - 2026-03-19
 
 ### Improved
