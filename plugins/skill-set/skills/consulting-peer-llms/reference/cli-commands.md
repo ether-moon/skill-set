@@ -8,14 +8,13 @@ Use non-interactive (one-shot) flags. Without these, CLIs enter interactive/REPL
 |-----|---------|-------|
 | gemini | `gemini -p "prompt"` | `-p` = prompt. Without it, enters interactive mode |
 | codex | `codex exec "prompt"` | `exec` subcommand runs one-shot. **`-p` is NOT prompt — it's `--profile`** |
-
-**Excluded CLIs:**
-- `claude` — invoking `claude` CLI from within a Claude session fails
+| claude | `claude -p "prompt"` | `-p` = print mode (non-interactive). Sends prompt, prints response, exits |
 
 **Common mistakes (why the script exists):**
 - `codex -p "prompt"` → `-p` is `--profile`, not prompt
 - `codex "prompt"` → enters interactive mode
-- Any direct `codex` or `gemini` call → bypasses timeout, parallel execution, and correct flag handling
+- `claude "prompt"` → enters interactive REPL mode
+- Any direct `codex`, `gemini`, or `claude` call → bypasses timeout, parallel execution, and correct flag handling
 
 ## Parallel Execution
 
@@ -30,7 +29,7 @@ run_cmd() {
   if [ -n "$TIMEOUT_CMD" ]; then "$TIMEOUT_CMD" "$TIMEOUT" "$@"; else "$@"; fi
 }
 
-TARGET_CLIS=("gemini" "codex")
+TARGET_CLIS=("gemini" "codex" "claude")
 PIDS=()
 FILES=()
 
@@ -40,6 +39,7 @@ for cli in "${TARGET_CLIS[@]}"; do
   case "$cli" in
     gemini)  run_cmd gemini -p "$PROMPT" > "$OUTPUT_FILE" 2>/dev/null & ;;
     codex)   run_cmd codex exec "$PROMPT" > "$OUTPUT_FILE" 2>/dev/null & ;;
+    claude)  run_cmd claude -p "$PROMPT" > "$OUTPUT_FILE" 2>/dev/null & ;;
   esac
   PIDS+=($!)
 done

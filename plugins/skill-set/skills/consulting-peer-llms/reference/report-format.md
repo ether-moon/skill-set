@@ -47,6 +47,29 @@ Every consultation produces two outputs in sequence:
 - Code is well-commented
 ```
 
+### Raw Claude Response
+
+```markdown
+## Security Issues
+
+1. **Hardcoded JWT Secret** (src/auth/TokenManager.js:15)
+   - Severity: Critical
+   - The secret should be loaded from environment variables
+
+2. **No Token Expiration Check** (src/auth/TokenManager.js:45)
+   - Severity: Critical
+   - Tokens never expire, allowing indefinite session hijacking
+
+## Design Improvements
+
+1. **Missing CSRF Protection** (src/auth/AuthService.js)
+   - Add CSRF token validation for state-changing operations
+
+## Positive Observations
+- Well-structured service layer with clear responsibilities
+- Async/await usage is consistent throughout
+```
+
 ### Synthesized Final Report
 
 ```markdown
@@ -73,6 +96,10 @@ Users must log in again when access tokens expire.
 ### Rate Limiting Missing
 Login endpoint vulnerable to brute force attacks.
 
+### Missing CSRF Protection
+State-changing operations lack CSRF token validation.
+**Recommendation:** Add CSRF middleware for all POST/PUT/DELETE endpoints.
+
 ## What's Working Well
 - Clean separation between AuthService and TokenManager
 - Consistent error handling with async/await
@@ -80,7 +107,7 @@ Login endpoint vulnerable to brute force attacks.
 
 ## Actionable Recommendations
 1. **Immediate:** Fix hardcoded secret + expiration validation
-2. **Before Merge:** Refresh token flow + rate limiting
+2. **Before Merge:** Refresh token flow + rate limiting + CSRF protection
 3. **Future:** 2FA, account lockout, audit logging
 ```
 

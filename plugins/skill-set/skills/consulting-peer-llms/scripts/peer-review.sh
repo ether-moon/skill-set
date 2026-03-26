@@ -45,7 +45,7 @@ run_cmd() {
 # If no arguments, returns all installed CLIs from default set
 get_target_clis() {
     local requested_clis=("$@")
-    local default_clis=("gemini" "codex")
+    local default_clis=("gemini" "codex" "claude")
     local target_clis=()
 
     if [ ${#requested_clis[@]} -eq 0 ]; then
@@ -83,6 +83,7 @@ execute_cli() {
     case "$cli" in
         gemini)  run_cmd gemini -p "$prompt" > "$output_file" 2>/dev/null ;;
         codex)   run_cmd codex exec "$prompt" > "$output_file" 2>/dev/null ;;
+        claude)  run_cmd claude -p "$prompt" > "$output_file" 2>/dev/null ;;
         *)       run_cmd "$cli" "$prompt" > "$output_file" 2>/dev/null ;;
     esac
 }
@@ -146,7 +147,7 @@ execute_all_clis() {
 # Check which CLIs are available
 check_available_clis() {
     echo "Checking available CLI tools..."
-    local default_clis=("gemini" "codex")
+    local default_clis=("gemini" "codex" "claude")
 
     for cli in "${default_clis[@]}"; do
         if command -v "$cli" &> /dev/null; then

@@ -1,6 +1,6 @@
 ---
 name: consulting-peer-llms
-description: Execute peer reviews from other LLM CLI tools (Gemini, Codex) in parallel and synthesize actionable insights. Use when user requests feedback from other LLMs, peer review, or external validation — e.g., "get feedback from gemini", "ask codex to review", "peer review this", "what do other LLMs think", "get a second opinion", "validate with codex".
+description: Execute peer reviews from other LLM CLI tools (Gemini, Codex, Claude) in parallel and synthesize actionable insights. Use when user requests feedback from other LLMs, peer review, or external validation — e.g., "get feedback from gemini", "ask codex to review", "ask claude to review", "peer review this", "what do other LLMs think", "get a second opinion", "validate with codex".
 allowed-tools: "Bash(command:*) Bash(bash:*) Bash($SKILL_DIR:*)"
 ---
 
@@ -8,7 +8,7 @@ allowed-tools: "Bash(command:*) Bash(bash:*) Bash($SKILL_DIR:*)"
 
 ## Overview
 
-Get feedback from other LLM CLI tools (Gemini, Codex) on your current work. This skill executes multiple LLM reviews in parallel and synthesizes their responses into one actionable report.
+Get feedback from other LLM CLI tools (Gemini, Codex, Claude) on your current work. This skill executes multiple LLM reviews in parallel and synthesizes their responses into one actionable report.
 
 **Core principle**: Use peer LLMs for external validation and diverse perspectives on implementation quality.
 
@@ -27,6 +27,7 @@ This skill runs CLI tools in parallel, which takes 5-30 minutes. Only trigger on
 **Supported CLI tools:**
 - `gemini` - Google Gemini CLI
 - `codex` - OpenAI Codex CLI
+- `claude` - Anthropic Claude Code CLI
 
 **Detection:**
 - Auto-detect all installed CLIs via `command -v`
@@ -76,7 +77,7 @@ Avoid running git commands to gather context for the prompt. If there is no conv
 
 ### Step 2: Execute in Parallel
 
-Always use the bundled script rather than calling `gemini` or `codex` directly:
+Always use the bundled script rather than calling `gemini`, `codex`, or `claude` directly:
 
 ```bash
 bash "$SKILL_DIR/scripts/peer-review.sh" execute "$PROMPT"
@@ -97,6 +98,9 @@ Show original responses first for transparency:
 {response}
 ---
 # Codex Review
+{response}
+---
+# Claude Review
 {response}
 ---
 ```
@@ -129,7 +133,7 @@ Show original responses first for transparency:
 
 ## Red Flags - STOP Immediately
 
-- Calling `gemini` or `codex` directly instead of using the bundled script
+- Calling `gemini`, `codex`, or `claude` directly instead of using the bundled script
 - Running git commands or reading files to embed context in the prompt (CLIs discover this themselves)
 - Running peer review without explicit user request
 - Showing raw responses without synthesis, or skipping raw responses before synthesis
@@ -148,17 +152,17 @@ Show original responses first for transparency:
 
 **"codex failed", "unexpected argument", or "profile not found"**
 - You called `codex` directly instead of using the script. Use `bash "$SKILL_DIR/scripts/peer-review.sh" execute "$PROMPT"`
-- Direct `codex` and `gemini` calls are intentionally excluded from `allowed-tools` — if the user is prompted for Bash approval, you are calling the CLI directly instead of using the script
+- Direct `codex`, `gemini`, and `claude` calls are intentionally excluded from `allowed-tools` — if the user is prompted for Bash approval, you are calling the CLI directly instead of using the script
 - Invalid flags: `codex -q`, `codex -a full-auto`, `codex -p` — these are not valid one-shot invocations
 - Valid but still wrong here: `codex exec`, `codex review` — these work, but calling them directly bypasses timeout and parallel execution. Use the script.
 
 **"Empty response from CLI"**
-- Check CLI can run: `gemini -p "test"` or `codex exec "test"`
+- Check CLI can run: `gemini -p "test"`, `codex exec "test"`, or `claude -p "test"`
 - Verify API keys/auth
 - Check prompt isn't too long
 
 **"All CLIs failed"**
-- Run diagnostics: `gemini --version && codex --version`
+- Run diagnostics: `gemini --version && codex --version && claude --version`
 - Check network connectivity
 
 **"Response is truncated"**
