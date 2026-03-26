@@ -111,6 +111,23 @@ State-changing operations lack CSRF token validation.
 3. **Future:** 2FA, account lockout, audit logging
 ```
 
+## After Synthesis: Classification and Resolution
+
+After producing the synthesized report, apply the `autofixing-and-escalating` skill. The synthesized items become the input.
+
+### Example Classification (from the report above)
+
+**OBVIOUS (auto-fix):**
+- `src/auth/TokenManager.js:15` — Move hardcoded JWT secret to `process.env.JWT_SECRET` (single correct fix, no trade-off)
+- `src/auth/TokenManager.js:45` — Add expiration check in verify method (provably missing validation)
+
+**AMBIGUOUS (escalate):**
+- Missing Refresh Token Flow — multiple valid approaches (short-lived + refresh, sliding sessions, etc.)
+- Rate Limiting Missing — implementation choice (middleware vs per-route, algorithm selection)
+- Missing CSRF Protection — scope decision (which endpoints, token strategy)
+
+The obvious items get auto-applied and reported. The ambiguous items are presented with rationale and recommendations for user decision, following the `autofixing-and-escalating` resolution workflow.
+
 ## Anti-Patterns
 
 ### Don't: Compare which CLI said what

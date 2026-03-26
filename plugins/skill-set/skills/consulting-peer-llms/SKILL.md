@@ -118,6 +118,12 @@ Show original responses first for transparency:
 
 **Report example**: See [reference/report-format.md](reference/report-format.md)
 
+### Step 5: Classify and Resolve
+
+Apply the `autofixing-and-escalating` skill to the synthesized report items. The synthesized items are the external source input — classify each as OBVIOUS or AMBIGUOUS, auto-fix obvious ones, and escalate ambiguous ones for user decision.
+
+**Integration point**: The synthesized report from Step 4 replaces the raw peer responses as the authoritative item list. Do not re-classify raw CLI output — only the deduplicated, validated synthesis.
+
 ## Quick Reference
 
 **Commands:**
