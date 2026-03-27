@@ -1,0 +1,19 @@
+## Decisions Made
+- Classified 7 CodeRabbit comments into OBVIOUS (4) and AMBIGUOUS (3): Used the four-criteria test (specific issue, objectively verifiable, one correct fix, no reasonable disagreement) to separate auto-fixable items from those needing user input
+- Shell injection fix uses env var + case validation: Followed actionlint recommendation and CodeRabbit's suggested pattern rather than a simpler regex approach
+- Skipped Knowledge Distillery settings.json changes: User decided these are not this project's concern to adjust
+- Skipped memento notes for CI bot commits: Memento summaries are for interactive Claude sessions, not automated CI commits that lack session context
+- Skipped version pinning for upstream dependencies: Same-org trust boundary and standard GitHub Action versioning make SHA pinning maintenance overhead outweigh the benefit
+
+## Problems Encountered
+- Pre-commit hook blocked direct git commit: Project requires /knowledge-distillery:memento-commit skill instead of bare git commit. Resolved by switching to the skill workflow.
+
+## Constraints Identified
+- PR remote branch name is "gwangju" while local branch is "fix-pr11-blockers": Must ensure push targets the correct remote ref
+- Knowledge Distillery related settings are maintained by the knowledge-distillery project, not skill-set: Owner boundary means some CodeRabbit findings are out of scope
+
+## Open Questions
+- None
+
+## Context
+Scanned PR #11 (feat: initialize Knowledge Distillery infrastructure) for all blockers — found no merge conflicts or CI failures, but 7 CodeRabbit review comments across 5 files. Applied 4 obvious security/correctness fixes (shell injection, access restriction, secret exposure prevention, prompt tightening). Presented 3 ambiguous items individually to the user who decided to skip all three. The changes affect GitHub Actions workflow files only.
