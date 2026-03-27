@@ -5,6 +5,23 @@ All notable changes to the skill-set plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-03-27
+
+### Added
+
+- **resolving-pr-blockers**: New orchestrator agent that scans PRs for all blockers (CI failures, merge conflicts, review comments) and dispatches specialized sub-agents to resolve them
+- **consulting-peer-llms**: Integrate autofixing-and-escalating skill into peer review workflow
+
+### Changed
+
+- **creating-skills**: Refactor with skill-creator integration and Anthropic best practices
+
+### Fixed
+
+- **consulting-peer-llms**: Narrow allowed-tools scope to prevent tool leakage
+- **plugin.json**: Register new agents (resolving-pr-blockers, merge-conflict-resolver, ci-failure-resolver) and update session-start plugins list
+- **creating-skills**: Update structure.md TOC to reflect new best practices subsections
+
 ## [1.7.4] - 2026-03-26
 
 ### Added
