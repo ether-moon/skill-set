@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(*/knowledge-gate:*)",
+      "Bash(sqlite3 .knowledge/vault.db:*)"
+    ]
+  },
+  "enabledPlugins": {
+    "knowledge-distillery@knowledge-distillery": true
+  }
+}

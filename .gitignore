@@ -4,3 +4,7 @@
 
 # Playwright output files
 tmp/playwright/
+
+# Knowledge Distillery — vault is committed as binary, reports are committed
+# Only ignore temporary/working files
+.knowledge/tmp/
