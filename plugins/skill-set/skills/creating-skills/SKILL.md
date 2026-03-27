@@ -7,91 +7,39 @@ description: Guides the full skill lifecycle — creating, evaluating, and optim
 
 ## Overview
 
-This skill provides a comprehensive workflow for creating effective Claude skills — from initial design through evaluation, iteration, and optimization. It covers the full skill lifecycle including evaluation methodology, description optimization, and iterative improvement.
+Conventions, quality standards, and reference material for creating effective Claude skills. For the full creation and evaluation workflow, use `skill-creator:skill-creator` when available.
 
 **Core principle**: Start with concrete use cases, define success criteria, then write minimal instructions that address real gaps. Iterate with eval-driven feedback.
 
-## When to Use
+## Workflow
 
-- Creating a new skill from scratch
-- Improving or refactoring existing skills
-- Running evaluations to measure skill quality
-- Optimizing skill descriptions for better triggering
-- Benchmarking skill performance (with vs without skill)
-- Reviewing skills for quality and completeness
+### When skill-creator is available
 
-## Skill Creation Workflow
+If `skill-creator:skill-creator` is available, use it as the primary workflow. It handles intent capture, file scaffolding, test case generation, parallel evaluation, benchmarking, and description optimization.
 
-### Step 1: Define Use Cases
+Use this skill (`creating-skills`) alongside skill-creator for:
+- **Language and size rules** below — conventions skill-creator does not enforce
+- **Example skills** — real-world references from this project
+- **Red flags** — quick quality gate
+- **Reference files** — detailed structure, patterns, testing, and checklist docs
 
-Before writing any code, identify 2-3 concrete use cases:
+### When skill-creator is not available
 
-```
-Use Case: [Name]
-Trigger: User says "[specific phrases]"
-Steps:
-1. [First action]
-2. [Second action]
-3. [Third action]
-Result: [What success looks like]
-```
+1. **Define use cases** — Identify 2-3 concrete scenarios with trigger phrases, steps, and expected results
+2. **Define success criteria** — Quantitative (trigger rate, tool calls) and qualitative (no user correction needed)
+3. **Create file structure and frontmatter** — See [reference/structure.md](reference/structure.md) for rules, fields, and examples
+4. **Write instructions** — Follow the language and size rules below
+5. **Evaluate and iterate** — See [reference/testing.md](reference/testing.md) and [reference/evaluation.md](reference/evaluation.md)
 
-**Ask yourself:**
-- What does a user want to accomplish?
-- What multi-step workflows does this require?
-- Which tools are needed (built-in or MCP)?
-- What domain knowledge should be embedded?
+## Skill Conventions
 
-### Step 2: Define Success Criteria
-
-**Quantitative:**
-- Skill triggers on 90% of relevant queries
-- Completes workflow in X tool calls
-- 0 failed API calls per workflow
-
-**Qualitative:**
-- Users don't need to prompt about next steps
-- Workflows complete without user correction
-- Consistent results across sessions
-
-### Step 3: Create File Structure
-
-```
-your-skill-name/           # kebab-case only
-├── SKILL.md               # Required - main skill file
-├── scripts/               # Optional - executable code
-├── reference/             # Optional - detailed documentation
-└── assets/                # Optional - templates, etc.
-```
-
-**Critical rules:**
-- SKILL.md must be exactly `SKILL.md` (case-sensitive)
-- Folder name: kebab-case only (no spaces, underscores, capitals)
-- No README.md inside skill folder
-
-### Step 4: Write YAML Frontmatter
-
-```yaml
----
-name: skill-name-in-kebab-case
-description: What it does. Use when user [specific triggers].
----
-```
-
-**Description must include:**
-1. What the skill does
-2. When to use it (trigger conditions)
-3. Specific phrases users might say
-
-**See**: [reference/structure.md](reference/structure.md) for detailed frontmatter options
-
-### Step 5: Write Instructions
-
-#### Language
+### Language
 
 Write all skill content in English. English consumes fewer tokens and is the language LLMs perform best in. User-facing runtime output (messages, reports) should adapt to the user's language, but SKILL.md, reference files, and code examples stay in English.
 
-#### Size and placement
+### Size and token economy
+
+The context window is a shared resource — your skill competes with conversation history, other skills' metadata, and the user's actual request. Challenge each piece of content: "Does Claude really need this? Can I assume Claude already knows this? Does this paragraph justify its token cost?"
 
 Keep SKILL.md focused — aim for under 200 lines, and treat 500 lines as a hard ceiling. Include:
 - Core workflow and essential steps
@@ -103,28 +51,6 @@ Move to reference/ files:
 - Detailed technical documentation
 - Extended examples
 - API patterns and edge cases
-
-#### Writing philosophy
-
-- **Explain the why** — Claude is smart. Explain reasoning behind instructions rather than heavy-handed MUSTs. When Claude understands _why_, it generalizes better.
-- **Keep it lean** — Remove what isn't pulling its weight. Read test transcripts; if the skill makes Claude waste time on unproductive steps, cut those parts.
-- **Bundle repeated work** — If test runs all independently write similar helper scripts, bundle the script in `scripts/` rather than letting every invocation reinvent it.
-
-**See**: [reference/patterns.md](reference/patterns.md) for workflow patterns
-
-### Step 6: Evaluate and Iterate
-
-Test your skill, then iterate based on real results. The core loop:
-
-1. **Run with-skill and baseline** — Compare skill-assisted output against no-skill (or old version) output
-2. **Grade results** — Define assertions (verifiable expectations) and check pass/fail
-3. **Review with user** — Get qualitative feedback on outputs
-4. **Improve** — Generalize from feedback, don't overfit to test cases
-5. **Repeat** — Until results are satisfactory
-
-**Quick tests**: [reference/testing.md](reference/testing.md) for triggering, functional, and performance tests
-
-**Full methodology**: [reference/evaluation.md](reference/evaluation.md) for eval loops, benchmarking, and description optimization
 
 ## Example Skills
 
@@ -164,6 +90,9 @@ Study these skill-set skills as real-world references for different patterns:
 - No examples provided
 - No error handling
 - Untested skill
+- Too many options without a default ("use pypdf, or pdfplumber, or PyMuPDF, or...") — provide one default with an escape hatch for alternatives
+- Inconsistent terminology (mixing "endpoint" / "URL" / "route" for the same concept)
+- Time-sensitive information without "old patterns" separation
 
 ## Troubleshooting
 

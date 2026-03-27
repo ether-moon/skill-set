@@ -3,7 +3,9 @@
 ## Table of Contents
 
 - [Testing Approaches](#testing-approaches)
+- [Cross-Model Testing](#cross-model-testing)
 - [Three Test Types](#three-test-types) (triggering, functional, performance comparison)
+- [Observing Claude's Navigation Behavior](#observing-claudes-navigation-behavior)
 - [Success Criteria](#success-criteria) (quantitative, qualitative)
 - [Iteration Based on Feedback](#iteration-based-on-feedback) (undertriggering, overtriggering, execution issues)
 
@@ -18,6 +20,19 @@ Skills can be tested at varying levels of rigor depending on your needs.
 - **Programmatic testing via API** - Build evaluation suites that run systematically against defined test sets.
 
 Choose the approach that matches your quality requirements and skill visibility.
+
+## Cross-Model Testing
+
+Skills act as additions to models, so effectiveness depends on the underlying model. Test your skill with all models you plan to use it with.
+
+**Considerations by model tier:**
+- **Haiku** (fast, economical): Does the skill provide enough guidance? Haiku may need more explicit instructions than larger models.
+- **Sonnet** (balanced): Is the skill clear and efficient? Good middle-ground for validating instruction clarity.
+- **Opus** (powerful reasoning): Does the skill avoid over-explaining? Opus can infer more from less context.
+
+What works perfectly for Opus might need more detail for Haiku. If you plan to use your skill across multiple models, aim for instructions that work well with all of them.
+
+---
 
 ## Pro Tip: Iterate on a Single Task First
 
@@ -97,6 +112,19 @@ With skill:
 - 0 failed API calls
 - 6,000 tokens consumed
 ```
+
+---
+
+## Observing Claude's Navigation Behavior
+
+As you iterate, pay attention to how Claude actually uses your skill in practice. Watch for:
+
+- **Unexpected exploration paths**: Does Claude read files in an order you didn't anticipate? Your structure may not be as intuitive as intended.
+- **Missed connections**: Does Claude fail to follow references to important files? Links might need to be more explicit or prominent.
+- **Overreliance on certain sections**: If Claude repeatedly reads the same file, consider whether that content should be in the main SKILL.md instead.
+- **Ignored content**: If Claude never accesses a bundled file, it might be unnecessary or poorly signaled in the main instructions.
+
+Iterate based on these observations rather than assumptions. The name and description in your skill's metadata are particularly critical — Claude uses these when deciding whether to trigger the skill for the current task.
 
 ---
 

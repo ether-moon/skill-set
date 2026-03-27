@@ -30,6 +30,9 @@ Use this checklist to validate your skill before and after upload.
 - [ ] Examples provided
 - [ ] References one level deep from SKILL.md (no nested chains)
 - [ ] SKILL.md under 200 lines (move details to reference/; hard ceiling: 500)
+- [ ] Consistent terminology throughout (one term per concept)
+- [ ] No time-sensitive information (or in "old patterns" collapsed section)
+- [ ] Default tool/approach provided (not a list of options without recommendation)
 
 ## Before Upload
 
@@ -42,6 +45,11 @@ Use this checklist to validate your skill before and after upload.
 - [ ] Functional tests pass
 - [ ] Tool integration works (if applicable)
 - [ ] Error cases handled
+
+### Cross-Model Testing
+- [ ] Tested with Haiku (enough guidance for smaller model?)
+- [ ] Tested with Sonnet (clear and efficient?)
+- [ ] Tested with Opus (not over-explaining?)
 
 ### Evaluation (see [evaluation.md](evaluation.md))
 - [ ] Baseline comparison done (with-skill vs without-skill)

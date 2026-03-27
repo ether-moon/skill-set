@@ -2,6 +2,9 @@
 
 ## Table of Contents
 
+- [Degrees of Freedom](#degrees-of-freedom) (high, medium, low)
+- [Template Patterns: Strict vs Flexible](#template-patterns-strict-vs-flexible)
+- [Plan-Validate-Execute Pattern](#plan-validate-execute-pattern)
 - [Choosing Your Approach](#choosing-your-approach)
 - [Pattern 1: Sequential Workflow Orchestration](#pattern-1-sequential-workflow-orchestration)
 - [Pattern 2: Multi-MCP Coordination](#pattern-2-multi-mcp-coordination)
@@ -14,6 +17,118 @@
 ---
 
 These patterns emerged from skills created by early adopters and internal teams. Choose the pattern that best fits your use case.
+
+## Degrees of Freedom
+
+Match the level of specificity in your instructions to the task's fragility and variability.
+
+**High freedom** (text-based guidance) — when multiple approaches are valid and decisions depend on context:
+
+```markdown
+## Code review process
+1. Analyze the code structure and organization
+2. Check for potential bugs or edge cases
+3. Suggest improvements for readability
+4. Verify adherence to project conventions
+```
+
+**Medium freedom** (pseudocode or parameterized scripts) — when a preferred pattern exists but some variation is acceptable:
+
+````markdown
+## Generate report
+Use this template and customize as needed:
+```python
+def generate_report(data, format="markdown", include_charts=True):
+    # Process data, generate output, optionally include visualizations
+```
+````
+
+**Low freedom** (exact scripts, no parameters) — when operations are fragile, consistency is critical, or a specific sequence must be followed:
+
+````markdown
+## Database migration
+Run exactly this script:
+```bash
+python scripts/migrate.py --verify --backup
+```
+Do not modify the command or add additional flags.
+````
+
+**Analogy:** Think of Claude as a robot exploring a path:
+- **Narrow bridge with cliffs**: One safe way forward. Provide exact instructions and guardrails. Example: database migrations that must run in exact sequence.
+- **Open field with no hazards**: Many paths lead to success. Give general direction. Example: code reviews where context determines approach.
+
+---
+
+## Template Patterns: Strict vs Flexible
+
+When providing output templates, match strictness to the situation.
+
+**Strict template** — for API responses, data formats, or compliance requirements:
+
+````markdown
+## Report structure
+ALWAYS use this exact template structure:
+```markdown
+# [Analysis Title]
+## Executive summary
+[One-paragraph overview of key findings]
+## Key findings
+- Finding 1 with supporting data
+- Finding 2 with supporting data
+## Recommendations
+1. Specific actionable recommendation
+```
+````
+
+**Flexible template** — when adaptation improves output:
+
+````markdown
+## Report structure
+Here is a sensible default format, but use your best judgment:
+```markdown
+# [Analysis Title]
+## Executive summary
+[Overview]
+## Key findings
+[Adapt sections based on what you discover]
+## Recommendations
+[Tailor to the specific context]
+```
+Adjust sections as needed for the specific analysis type.
+````
+
+The strict/flexible choice is itself a degree of freedom decision — match it to how fragile the output format is.
+
+---
+
+## Plan-Validate-Execute Pattern
+
+For complex operations where mistakes are costly, have Claude create a verifiable intermediate plan before executing.
+
+```
+analyze input → create plan file → validate plan → execute → verify output
+```
+
+**Example:** Updating 50 form fields in a PDF based on a spreadsheet. Without validation, Claude might reference non-existent fields, create conflicting values, or miss required fields.
+
+**Solution:** Create an intermediate `changes.json` that gets validated before applying:
+
+```markdown
+## Batch update workflow
+1. Analyze the PDF form fields: `python scripts/analyze_form.py input.pdf`
+2. Create `changes.json` mapping field names to new values
+3. Validate the plan: `python scripts/validate_changes.py changes.json`
+4. If validation fails, fix issues and re-validate
+5. Apply changes: `python scripts/apply_changes.py input.pdf changes.json output.pdf`
+6. Verify output: `python scripts/verify_output.py output.pdf`
+```
+
+**When to use:** Batch operations, destructive changes, complex validation rules, high-stakes operations.
+
+**Tip:** Make validation scripts verbose with specific error messages like `"Field 'signature_date' not found. Available fields: customer_name, order_total, signature_date_signed"` to help Claude fix issues.
+
+---
 
 ## Choosing Your Approach
 

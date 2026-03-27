@@ -32,9 +32,12 @@ your-skill-name/
 ### Skill Folder Name
 
 - **Use kebab-case**: `notion-project-setup`
+- **Prefer gerund form** (verb + -ing): `processing-pdfs`, `managing-databases`, `writing-documentation` — clearly describes the activity the skill provides
+- **Acceptable alternatives**: Noun phrases (`pdf-processing`) or action-oriented (`process-pdfs`)
 - **No spaces**: ~~Notion Project Setup~~
 - **No underscores**: ~~notion_project_setup~~
 - **No capitals**: ~~NotionProjectSetup~~
+- **Avoid vague names**: ~~helper~~, ~~utils~~, ~~tools~~
 
 ### SKILL.md File
 
@@ -245,6 +248,28 @@ Keep references **one level deep** from SKILL.md. Deeply nested references (file
 For reference files over 100 lines, include a table of contents at the top so Claude can see the full scope even when previewing.
 
 ## Best Practices
+
+### Use Consistent Terminology
+
+Choose one term for each concept and use it throughout the skill. Consistency helps Claude understand and follow instructions.
+
+- Good: Always "API endpoint", always "field", always "extract"
+- Bad: Mixing "API endpoint" / "URL" / "API route" / "path" for the same concept
+
+### Avoid Time-Sensitive Information
+
+Don't include content that will become outdated. If referencing deprecated approaches, put them in a collapsed "old patterns" section:
+
+```markdown
+## Current method
+Use the v2 API endpoint: `api.example.com/v2/messages`
+
+<details>
+<summary>Legacy v1 API (deprecated)</summary>
+The v1 API used: `api.example.com/v1/messages`
+This endpoint is no longer supported.
+</details>
+```
 
 ### Keep SKILL.md Focused
 
