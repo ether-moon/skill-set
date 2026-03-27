@@ -10,6 +10,9 @@
     "./commands/"
   ],
   "agents": [
+    "./agents/resolving-pr-blockers.md",
+    "./agents/merge-conflict-resolver.md",
+    "./agents/ci-failure-resolver.md",
     "./agents/pr-review-feedback.md"
   ]
 }

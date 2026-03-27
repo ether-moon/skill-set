@@ -15,7 +15,7 @@ declare -a SKILL_SET_PLUGINS=(
   "writing-clear-prose"
   "creating-skills"
   "guarding-agent-directives"
-  "pr-review-feedback"
+  "autofixing-and-escalating"
 )
 
 # Find installed plugins
