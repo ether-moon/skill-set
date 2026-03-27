@@ -15,9 +15,13 @@
 6. **ralph**: Plans and executes implementation work via Ralph Wiggum loop with Task subagents — two modes (PLANNING/BUILDING), fresh context per iteration, declarative spec with acceptance criteria, gap analysis per iteration
 7. **writing-clear-prose**: Guides writing and revision of explanatory text, persuasive proposals, and technical documents with 4 core principles
 8. **guarding-agent-directives**: Guards agent directive files against bloat by verifying additions through strict criteria while preserving user authority
+9. **autofixing-and-escalating**: Auto-fixes obvious issues and escalates ambiguous ones for user decision — classifies by clarity of correctness, applies obvious fixes automatically, presents ambiguous items with rationale and recommendations
 
 #### Agents
-1. **pr-review-feedback**: Classifies PR review feedback as obvious or ambiguous — auto-fixes obvious issues, discusses ambiguous ones with rationale and recommendations. Handles comments from any source (human, CodeRabbit, Codex, Claude, other bots). Runs as isolated subagent for better context management.
+1. **resolving-pr-blockers**: Orchestrator that scans a PR for all blockers (CI failures, merge conflicts, review comments) and dispatches specialized sub-agents to resolve them. Each sub-agent commits independently; orchestrator pushes once at the end.
+2. **merge-conflict-resolver**: Resolves merge conflicts by fetching the target branch and applying autofixing-and-escalating to classify each conflict. Sub-agent of resolving-pr-blockers.
+3. **ci-failure-resolver**: Extracts and parses failed CI workflow logs, applies autofixing-and-escalating to classify and fix errors. Sub-agent of resolving-pr-blockers.
+4. **pr-review-feedback**: Collects PR review comments, applies the `autofixing-and-escalating` skill to classify and resolve them, then commits and posts a PR summary. Handles comments from any source (human, CodeRabbit, Codex, Claude, other bots). Sub-agent of resolving-pr-blockers.
 
 ### Project Structure
 
@@ -33,8 +37,8 @@ plugins/
     │   │   ├── commit.md         # /skill-set:git:commit
     │   │   ├── push.md           # /skill-set:git:push
     │   │   └── pr.md             # /skill-set:git:pr
-    │   ├── pr-review/
-    │   │   └── fix.md            # /skill-set:pr-review:fix
+    │   ├── pr/
+    │   │   └── fix.md            # /skill-set:pr:fix
     │   ├── consulting/
     │   │   └── review.md         # /skill-set:consulting:review
     │   └── ralph/
@@ -78,6 +82,11 @@ plugins/
     │   │   │   └── loop.sh        # Bash loop reference template
     │   │   └── reference/
     │   │       └── spec-quality.md # Ralph-ready spec criteria
+    │   ├── autofixing-and-escalating/
+    │   │   ├── SKILL.md
+    │   │   └── reference/
+    │   │       ├── classification.md
+    │   │       └── resolution.md
     │   ├── writing-clear-prose/
     │   │   ├── SKILL.md
     │   │   └── reference/
@@ -90,7 +99,10 @@ plugins/
     │       └── reference/
     │           └── verification.md
     ├── agents/                    # Isolated subagents
-    │   └── pr-review-feedback.md
+    │   ├── resolving-pr-blockers.md    # Orchestrator
+    │   ├── merge-conflict-resolver.md  # Sub-agent: merge conflicts
+    │   ├── ci-failure-resolver.md      # Sub-agent: CI failures
+    │   └── pr-review-feedback.md       # Sub-agent: review comments
     └── hooks/                     # Event handlers
         └── hooks.json            # SessionStart hook
 ```

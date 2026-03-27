@@ -1,6 +1,6 @@
 ---
 name: pr-review-feedback
-description: Use when a PR has review comments from any source (human reviewers, CodeRabbit, Codex, Claude, other bots) - classifies feedback as obvious or ambiguous, auto-fixes obvious items, discusses ambiguous items with rationale and recommendation, and ensures mandatory commit and PR comment workflow with verification
+description: "Processes PR review comments — classifies feedback as obvious or ambiguous using the autofixing-and-escalating skill, auto-fixes obvious items, discusses ambiguous items with rationale and recommendation. Called as a sub-agent from resolving-pr-blockers orchestrator."
 ---
 
 # PR Review Feedback
@@ -31,84 +31,26 @@ Interactive processing of PR review comments from any source (human reviewers, A
 | **Classification** | Auto | Classify each item as OBVIOUS or AMBIGUOUS |
 | **Auto-fix** | Auto | Apply all OBVIOUS fixes → Report summary to user |
 | **Discussion** | **Interactive** | Present AMBIGUOUS items (grouped by severity) → Get user decisions |
-| **Completion** | Auto | Commit & Push → Post PR summary → Verify |
+| **Completion** | Auto | Commit → Post PR summary → Verify |
 
-## Primary Classification: OBVIOUS vs AMBIGUOUS
+## Autofix & Escalation Framework
 
-The primary axis is **clarity of correctness**, not severity.
+This agent applies the `autofixing-and-escalating` skill to PR review comments.
 
-### OBVIOUS (Auto-fix)
+**Before starting Phase 2 (Classification), read the skill:**
+1. Find and read `autofixing-and-escalating/SKILL.md` from the plugin's skills directory
+2. For edge cases, also read `autofixing-and-escalating/reference/classification.md`
 
-Items where the reviewer explicitly identified a specific issue AND the fix is objectively correct with no room for reasonable disagreement.
+**PR-specific terminology mapping:**
+- "Source" = the reviewer who posted the comment (human or bot)
+- "Item" = an unresolved review comment or thread
+- "Location" = file path + line number from the PR diff
 
-**All four criteria must be met:**
-1. The reviewer explicitly identified a specific issue (not a general suggestion)
-2. The issue is objectively verifiable (not opinion-based)
-3. There is exactly one correct way to fix it (no design choices involved)
-4. No reasonable developer would disagree with the fix
-
-**Examples:**
-- Typos in variable names, comments, or docs that the reviewer pointed out
-- Missing null/nil checks that will provably crash
-- Textbook security flaws (SQL injection, XSS) with a clear fix
-- Off-by-one errors that are provably wrong
-- Unused imports/variables the reviewer identified
-- Wrong API usage per official documentation
-- Syntax errors or broken references
-
-### AMBIGUOUS (Discuss with user)
-
-Items where there is room for interpretation, trade-offs, or legitimate disagreement.
-
-**Examples:**
-- "Consider using X pattern instead of Y" — architectural preference
-- "This could be more performant with..." — trade-off involved
-- "Maybe extract this into a separate function" — design choice
-- Style preferences not enforced by linter
-- Suggestions requiring significant refactoring
-- Performance optimizations with readability trade-offs
-- Alternative approaches where both are valid
-- Changes affecting public API surface
-- Suggestions involving new dependencies
-
-### ALWAYS AMBIGUOUS (Never auto-fix)
-
-Classify as AMBIGUOUS regardless of apparent clarity:
-- Reviewer used hedging language: "might", "could", "consider", "maybe", "what about"
-- Fix requires changing more than ~10 lines
-- Fix has multiple valid approaches
-- Involves architectural or design decisions
-- Affects public API or external contracts
-
-### Safety Rule
-
-**When in doubt, classify as AMBIGUOUS.** It is always better to discuss than to silently apply a wrong fix.
-
-### ALWAYS SKIP (Never Process)
-- Comments with resolution markers: checkmarks or "resolved", "fixed", "applied"
-- Threads already resolved (including `@coderabbitai resolve` or similar bot resolution commands)
-- Developer confirmation replies: "Applied", "Done", "Fixed"
-- Duplicate suggestions (process once only)
-
-## Secondary Classification: Severity (AMBIGUOUS items only)
-
-Within AMBIGUOUS items, assign severity for grouping and sort order:
-
-### CRITICAL
-- Security: auth bypass, sensitive data exposure, injection vulnerabilities
-- Data Loss: destructive operations, corruption risks
-- Breaking Bugs: nil pointer errors, type crashes, unhandled exceptions
-
-### MAJOR
-- Performance: N+1 queries, memory leaks, missing indexes
-- Significant Bugs: wrong calculations, race conditions
-- Resource Issues: file handle leaks, connection pool exhaustion
-
-### MINOR
-- Code Quality: naming, method extraction, DRY violations
-- Style: formatting, code organization
-- Documentation: missing comments, unclear naming
-- Speculative: optional improvements
+**PR-specific adaptations:**
+- Include reviewer name and bot/human status with each classified item
+- If auto-fix of an OBVIOUS item fails, move to AMBIGUOUS with explanation
+- Resolution report includes `(reviewer: @name)` attribution
+- Bot resolution: if items came from CodeRabbit, prepend `@coderabbitai resolve` to PR comment
 
 ## Language Detection
 
@@ -141,7 +83,7 @@ TaskCreate: "Collect and classify PR review comments"
 TaskCreate: "Auto-fix obvious items"
 TaskCreate: "Report obvious fixes and discuss ambiguous items"
 TaskCreate: "Apply agreed changes"
-TaskCreate: "Commit and push changes"
+TaskCreate: "Commit changes"
 TaskCreate: "Post PR summary comment"
 TaskCreate: "Verify PR comment posted"
 ```
@@ -230,82 +172,38 @@ TaskCreate: "Verify PR comment posted"
 
 ### Phase 2: Classification
 
-For each actionable comment, extract:
+Apply the `autofixing-and-escalating` skill to classify each actionable comment.
+
+For each comment, extract:
 - File path, line number, and specific change requested
 - Reviewer name and whether they are a bot
 
-Then classify:
+Then classify per the skill's criteria:
 1. **Primary**: Apply the OBVIOUS criteria (all four must be met) → OBVIOUS or AMBIGUOUS
 2. **Secondary** (AMBIGUOUS only): Assign severity (CRITICAL > MAJOR > MINOR)
 3. **Safety check**: Apply the "ALWAYS AMBIGUOUS" rules to catch misclassifications
 
 Skip summaries without actionable items (e.g., "LGTM", general praise).
 
-### Phase 3: Auto-fix Obvious Items
+### Phase 3: Auto-fix and Report
 
-Apply all OBVIOUS items immediately without user interaction.
+Follow the resolution workflow in `autofixing-and-escalating/reference/resolution.md`:
+- Auto-fix all OBVIOUS items using subagents (grouped by file), moving failures to AMBIGUOUS
+- Report every auto-applied fix to the user with reviewer attribution — never skip the report
 
-- Apply each fix in sequence
-- If any fix fails, move it to AMBIGUOUS with an explanation of why auto-fix failed
-- Track what was applied for the summary report
+### Phase 4: Discuss and Apply
 
-### Phase 4: Report & Discuss
+Continue the resolution workflow:
+- Present AMBIGUOUS items grouped by severity with "why ambiguous" + recommendation + reviewer attribution
+- Offer choices: [1] Apply all recommended, [2] Review individually, [3] Skip all
+- Show final summary and apply only after explicit user confirmation
 
-**Step 4.1 — Report Obvious Fixes:**
+### Phase 5: Completion
 
-Present a summary of what was auto-applied:
+**Step 5.1 — Commit:**
+Stage all modified files and create a commit with a descriptive message summarizing what was addressed. Do NOT push — the orchestrator handles the final push.
 
-> Applied N obvious fixes:
-> - `path/to/file.ts:42` — Fixed null check (reviewer: @alice)
-> - `path/to/file.ts:87` — Removed unused import (reviewer: @coderabbitai)
-> - ...
-
-If no OBVIOUS items existed, skip this and proceed to Step 4.2.
-
-**Step 4.2 — Present Ambiguous Items:**
-
-Present AMBIGUOUS items grouped by severity (CRITICAL → MAJOR → MINOR). For each item show:
-- File path and line number
-- One-line issue description
-- **Why it's ambiguous**: What makes this debatable or uncertain
-- **Recommendation**: Agent's suggested action with rationale
-- Who raised it (reviewer name)
-
-Example format:
-
-> ### CRITICAL (1 item)
->
-> **1. Race condition in user update** — `src/api/users.ts:134` (reviewer: @bob)
-> - Issue: Concurrent updates may overwrite each other
-> - Why ambiguous: Fix requires choosing between optimistic locking, pessimistic locking, or retry logic — each has different trade-offs
-> - Recommendation: Apply optimistic locking — it's the least invasive change and matches the existing pattern in `orders.ts`
->
-> ### MINOR (2 items)
->
-> **2. Extract validation logic** — `src/api/users.ts:45` (reviewer: @coderabbitai)
-> - Issue: Validation logic is inline, could be a separate function
-> - Why ambiguous: Current code is only 8 lines and used once — extraction adds indirection without clear benefit yet
-> - Recommendation: Skip — extract when a second caller appears
->
-> ...
-
-Offer choices: [1] Apply all recommended, [2] Review individually, [3] Skip all
-
-**Step 4.3 — Individual Review (if selected):**
-Walk through each item one at a time. For each, show current code, suggested change, and analysis. Ask: Apply? [Y/n/skip]
-
-**Step 4.4 — Final Confirmation:**
-Before applying, show a complete summary of what will be applied and what was skipped. Get explicit user confirmation.
-
-### Phase 5: Application & Completion
-
-**Step 5.1 — Apply Changes:**
-Apply each user-approved AMBIGUOUS change in sequence. Report progress as each item completes.
-
-**Step 5.2 — Commit & Push:**
-Stage all modified files, create a commit with a descriptive message summarizing what was addressed, and push to the remote branch.
-
-**Step 5.3 — Post PR Summary Comment:**
+**Step 5.2 — Post PR Summary Comment:**
 Generate a PR comment summarizing all actions taken:
 - **Auto-applied** (OBVIOUS): list with file paths
 - **Applied after discussion** (AMBIGUOUS): list with file paths
@@ -319,7 +217,7 @@ Post the comment:
 gh pr comment "$PR_NUMBER" --body "$COMMENT_BODY"
 ```
 
-**Step 5.4 — Verify:**
+**Step 5.3 — Verify:**
 ```bash
 # Wait for API sync
 sleep 2
@@ -334,25 +232,9 @@ Mark all remaining tasks as completed. Run `TaskList` to confirm zero pending ta
 
 ## Common Mistakes
 
-### Classifying Ambiguous Items as Obvious
-**Problem:** Auto-applying a fix that had trade-offs the user should have weighed
-**Fix:** Apply the four OBVIOUS criteria strictly. When in doubt, classify as AMBIGUOUS.
-
 ### Skipping Pagination
 **Problem:** Missing comments when PR has 100+ comments
 **Fix:** Use GraphQL/REST pagination to collect up to 200 comments
-
-### Not Explaining Why Something Is Ambiguous
-**Problem:** User sees an ambiguous item but doesn't understand what makes it debatable
-**Fix:** Always include "Why ambiguous" with each item — what's the trade-off or uncertainty?
-
-### Auto-Applying Without Reporting
-**Problem:** User doesn't know what was changed on their behalf
-**Fix:** Always present the obvious-fix summary before moving to ambiguous discussion
-
-### Incomplete Error Recovery
-**Problem:** Stopping workflow when single item fails
-**Fix:** If an OBVIOUS fix fails, move it to AMBIGUOUS with explanation. Continue with remaining items.
 
 ### Ignoring Reviewer Context
 **Problem:** Treating human and bot comments identically without noting who said what
@@ -366,6 +248,6 @@ Mark all remaining tasks as completed. Run `TaskList` to confirm zero pending ta
 - All OBVIOUS items auto-applied and reported to user before discussion
 - AMBIGUOUS items presented with "why ambiguous" + recommendation + rationale
 - Only user-approved AMBIGUOUS changes applied
-- Changes committed and pushed
+- Changes committed (orchestrator handles push)
 - PR comment posted (with `@coderabbitai resolve` if CodeRabbit was a reviewer)
 - All tasks show `completed` in TaskList

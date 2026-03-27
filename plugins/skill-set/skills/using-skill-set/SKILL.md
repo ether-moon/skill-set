@@ -44,6 +44,11 @@ Plans and executes via Ralph Wiggum loop — two modes (PLANNING/BUILDING), fres
 - `/skill-set:ralph:plan` — Generate a Ralph-ready plan from any input
 - `/skill-set:ralph:execute` — Execute a plan (auto-plans if none exists)
 
+### autofixing-and-escalating
+**Use when**: 2+ actionable items from an external source (linter, reviewer, scanner, test runner) appear — activates automatically without waiting for the user to ask.
+
+Classifies issues by clarity of correctness, auto-fixes obvious ones, and escalates ambiguous ones with rationale and recommendations. Always reports what was auto-fixed.
+
 ### writing-clear-prose
 **Use when**: Writing, drafting, revising, editing, or proofreading prose, proposals, reports, or technical documents.
 
@@ -59,12 +64,12 @@ Comprehensive guide for creating effective Claude skills with structured workflo
 
 Guards directive files against bloat by verifying additions through strict criteria while preserving user authority.
 
-### pr-review-feedback (agent)
-**Use when**: A PR has review comments from any source — human reviewers, CodeRabbit, Codex, Claude, or other bots.
+### resolving-pr-blockers (agent)
+**Use when**: PR has failing CI checks, merge conflicts, or unresolved review comments. User says "fix my PR", "CI failed", "resolve conflicts", "fix the build", "handle review comments", "PR won't merge".
 
-Classifies PR feedback as obvious or ambiguous, auto-fixes obvious items, discusses ambiguous ones with rationale and recommendations.
+Scans the current branch's PR for all blockers and dispatches specialized sub-agents to resolve them: merge conflicts, CI failures, and review feedback. Uses `autofixing-and-escalating` for classification.
 
-**Command**: `/skill-set:pr-review:fix`
+**Command**: `/skill-set:pr:fix`
 
 ## Using Skills Effectively
 
