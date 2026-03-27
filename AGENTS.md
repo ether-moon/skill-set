@@ -317,3 +317,21 @@ Without the server prefix, Claude may fail to locate the tool.
 - [Skills Overview](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview)
 - [The Complete Guide to Building Skills for Claude](The-Complete-Guide-to-Building-Skill-for-Claude.pdf) - Anthropic's official PDF guide
 - [Project Repository](https://github.com/ether-moon/skill-set)
+
+---
+
+## Knowledge Vault
+- A UserPromptSubmit hook reminds you to query the vault when active entries exist
+- When the hook fires and the task involves code modifications, query before planning:
+  - Single file: `knowledge-gate query-paths <file-path>`
+  - Multiple files: `knowledge-gate domain-resolve-path <path>` → `knowledge-gate query-domain <domain>`
+  - Topic search: `knowledge-gate search <keyword>`
+- MUST/MUST-NOT rules from returned entries must be strictly followed
+- For structural changes in areas without related rules, confirm with a human first
+- Do not directly read files in the .knowledge/ directory
+
+## Memento
+- After every git commit, attach a memento session summary as a git note on `refs/notes/commits`
+- The summary follows the 5-section format: Decisions Made, Problems Encountered, Constraints Identified, Open Questions, Context
+- See `/knowledge-distillery:memento-commit` for the full workflow and format specification
+- If the PostToolUse hook fires a reminder, follow it — generate the summary and attach the note
