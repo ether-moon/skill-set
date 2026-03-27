@@ -1,7 +1,7 @@
 ---
 name: consulting-peer-llms
 description: Execute peer reviews from other LLM CLI tools (Gemini, Codex, Claude) in parallel and synthesize actionable insights. Use when user requests feedback from other LLMs, peer review, or external validation — e.g., "get feedback from gemini", "ask codex to review", "ask claude to review", "peer review this", "what do other LLMs think", "get a second opinion", "validate with codex".
-allowed-tools: "Bash(command:*) Bash(bash:*) Bash($SKILL_DIR:*)"
+allowed-tools: "Bash(command:bash *peer-review.sh*)"
 ---
 
 # Consulting Peer LLMs
