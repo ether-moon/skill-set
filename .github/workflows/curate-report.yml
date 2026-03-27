@@ -8,7 +8,8 @@ jobs:
   curate-report:
     if: >-
       github.event.issue.pull_request &&
-      contains(github.event.comment.body, '/curate')
+      contains(github.event.comment.body, '/curate') &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -45,6 +46,12 @@ jobs:
           repository: ether-moon/knowledge-distillery
           ref: main
           path: .knowledge-distillery-plugin
+
+      - name: Guard .mcp.json from accidental commits
+        run: |
+          if ! grep -qxF '.mcp.json' .gitignore 2>/dev/null; then
+            echo '.mcp.json' >> .gitignore
+          fi
 
       - name: Write dynamic MCP config
         run: |

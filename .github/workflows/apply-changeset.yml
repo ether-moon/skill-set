@@ -33,11 +33,19 @@ jobs:
 
       - name: Extract batch date from branch name
         id: batch
+        env:
+          BRANCH: ${{ github.event.pull_request.head.ref }}
         run: |
-          BRANCH="${{ github.event.pull_request.head.ref }}"
+          case "$BRANCH" in
+            knowledge/batch-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
+            *)
+              echo "::error::Unexpected batch branch: $BRANCH"
+              exit 1
+              ;;
+          esac
           DATE="${BRANCH#knowledge/batch-}"
-          echo "date=${DATE}" >> "$GITHUB_OUTPUT"
-          echo "Batch date: ${DATE}"
+          printf 'date=%s\n' "$DATE" >> "$GITHUB_OUTPUT"
+          printf 'Batch date: %s\n' "$DATE"
 
       - name: Find and apply changeset
         run: |
