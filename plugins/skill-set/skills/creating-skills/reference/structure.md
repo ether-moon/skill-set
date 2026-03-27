@@ -8,7 +8,7 @@
 - [Description Examples](#description-examples)
 - [Security Restrictions](#security-restrictions)
 - [Progressive Disclosure](#progressive-disclosure) (reference depth limit)
-- [Best Practices](#best-practices)
+- [Best Practices](#best-practices) (consistent terminology, time-sensitive info, SKILL.md focus, reference files)
 
 ---
 
