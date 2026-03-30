@@ -5,6 +5,13 @@ All notable changes to the skill-set plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.1] - 2026-03-30
+
+### Fixed
+
+- **consulting-peer-llms**: Restrict review command `allowed-tools` from `Bash(command:*)` to `Bash(command:bash *peer-review.sh*)` to structurally prevent agents from bypassing the bundled script and calling `codex -p` directly
+- **consulting-peer-llms**: Use codex `--output-last-message` (`-o`) flag for reliable output capture instead of stdout redirection
+
 ## [1.8.0] - 2026-03-27
 
 ### Added
