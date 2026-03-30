@@ -7,7 +7,7 @@ Use non-interactive (one-shot) flags. Without these, CLIs enter interactive/REPL
 | CLI | Command | Notes |
 |-----|---------|-------|
 | gemini | `gemini -p "prompt"` | `-p` = prompt. Without it, enters interactive mode |
-| codex | `codex exec "prompt"` | `exec` subcommand runs one-shot. **`-p` is NOT prompt — it's `--profile`** |
+| codex | `codex exec -o output.txt "prompt"` | `exec` subcommand runs one-shot. `-o` captures final response to file. **`-p` is NOT prompt — it's `--profile`** |
 | claude | `claude -p "prompt"` | `-p` = print mode (non-interactive). Sends prompt, prints response, exits |
 
 **Common mistakes (why the script exists):**
@@ -38,7 +38,7 @@ for cli in "${TARGET_CLIS[@]}"; do
   FILES+=("$OUTPUT_FILE")
   case "$cli" in
     gemini)  run_cmd gemini -p "$PROMPT" > "$OUTPUT_FILE" 2>/dev/null & ;;
-    codex)   run_cmd codex exec "$PROMPT" > "$OUTPUT_FILE" 2>/dev/null & ;;
+    codex)   run_cmd codex exec -o "$OUTPUT_FILE" "$PROMPT" >/dev/null 2>&1 & ;;
     claude)  run_cmd claude -p "$PROMPT" > "$OUTPUT_FILE" 2>/dev/null & ;;
   esac
   PIDS+=($!)
