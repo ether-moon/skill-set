@@ -82,7 +82,7 @@ execute_cli() {
 
     case "$cli" in
         gemini)  run_cmd gemini -p "$prompt" > "$output_file" 2>/dev/null ;;
-        codex)   run_cmd codex exec "$prompt" > "$output_file" 2>/dev/null ;;
+        codex)   run_cmd codex exec -o "$output_file" "$prompt" >/dev/null 2>&1 ;;
         claude)  run_cmd claude -p "$prompt" > "$output_file" 2>/dev/null ;;
         *)       run_cmd "$cli" "$prompt" > "$output_file" 2>/dev/null ;;
     esac

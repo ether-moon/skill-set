@@ -163,7 +163,7 @@ Apply the `autofixing-and-escalating` skill to the synthesized report items. The
 - Valid but still wrong here: `codex exec`, `codex review` — these work, but calling them directly bypasses timeout and parallel execution. Use the script.
 
 **"Empty response from CLI"**
-- Check CLI can run: `gemini -p "test"`, `codex exec "test"`, or `claude -p "test"`
+- Check CLI can run: `gemini -p "test"`, `codex exec -o /tmp/test.txt "test"`, or `claude -p "test"`
 - Verify API keys/auth
 - Check prompt isn't too long
 
