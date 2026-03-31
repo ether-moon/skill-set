@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.8.1] - 2026-03-30
 
+### Added
+
+- **codex**: Add `.codex-plugin/plugin.json` for OpenAI Codex compatibility (skills and MCP servers)
+
 ### Fixed
 
 - **consulting-peer-llms**: Restrict review command `allowed-tools` from `Bash(command:*)` to `Bash(command:bash *peer-review.sh*)` to structurally prevent agents from bypassing the bundled script and calling `codex -p` directly
