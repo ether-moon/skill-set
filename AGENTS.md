@@ -16,6 +16,8 @@
 7. **writing-clear-prose**: Guides writing and revision of explanatory text, persuasive proposals, and technical documents with 4 core principles
 8. **guarding-agent-directives**: Guards agent directive files against bloat by verifying additions through strict criteria while preserving user authority
 9. **autofixing-and-escalating**: Auto-fixes obvious issues and escalates ambiguous ones for user decision — classifies by clarity of correctness, applies obvious fixes automatically, presents ambiguous items with rationale and recommendations
+10. **developing-test-first**: Enforces strict test-driven development discipline — Iron Law (no production code without a failing test), Red/Green/Refactor cycle, rationalization prevention
+11. **driving-with-tests**: Guides test strategy beyond TDD — orient (run suite first), probe (manual exploration), guard (test governance), multi-layer test architecture
 
 #### Agents
 1. **resolving-pr-blockers**: Orchestrator that scans a PR for all blockers (CI failures, merge conflicts, review comments) and dispatches specialized sub-agents to resolve them. Each sub-agent commits independently; orchestrator pushes once at the end.
@@ -94,10 +96,19 @@ plugins/
     │   │       ├── anti-patterns.md
     │   │       ├── drafting.md
     │   │       └── revising.md
-    │   └── guarding-agent-directives/
+    │   ├── guarding-agent-directives/
+    │   │   ├── SKILL.md
+    │   │   └── reference/
+    │   │       └── verification.md
+    │   ├── developing-test-first/
+    │   │   ├── SKILL.md
+    │   │   └── reference/
+    │   │       └── anti-patterns.md
+    │   └── driving-with-tests/
     │       ├── SKILL.md
     │       └── reference/
-    │           └── verification.md
+    │           ├── test-design.md
+    │           └── probing.md
     ├── agents/                    # Isolated subagents
     │   ├── resolving-pr-blockers.md    # Orchestrator
     │   ├── merge-conflict-resolver.md  # Sub-agent: merge conflicts
