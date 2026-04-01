@@ -12,7 +12,7 @@ Tests must verify real behavior, not mock behavior. Mocks are a means to isolate
 
 ## The Iron Laws
 
-```
+```text
 1. NEVER test mock behavior
 2. NEVER add test-only methods to production classes
 3. NEVER mock without understanding dependencies
@@ -28,7 +28,7 @@ Tests must verify real behavior, not mock behavior. Mocks are a means to isolate
 - Tells you nothing about real behavior
 
 **Gate Function:**
-```
+```text
 BEFORE asserting on any mock element:
   Ask: "Am I testing real behavior or just mock existence?"
   IF testing mock existence → STOP. Delete the assertion or unmock the component.
@@ -45,7 +45,7 @@ BEFORE asserting on any mock element:
 - Violates YAGNI and separation of concerns
 
 **Gate Function:**
-```
+```text
 BEFORE adding any method to a production class:
   Ask: "Is this only used by tests?"
   IF yes → STOP. Put it in test utilities instead.
@@ -64,7 +64,7 @@ BEFORE adding any method to a production class:
 - Test passes for wrong reason or fails mysteriously
 
 **Gate Function:**
-```
+```text
 BEFORE mocking any method:
   1. Ask: "What side effects does the real method have?"
   2. Ask: "Does this test depend on any of those side effects?"
@@ -91,7 +91,7 @@ BEFORE mocking any method:
 - False confidence in code that's never been truly tested
 
 **Gate Function:**
-```
+```text
 BEFORE creating mock responses:
   1. Check: "What fields does the real response contain?"
   2. Include ALL fields the system might consume downstream
@@ -135,3 +135,37 @@ BEFORE creating mock responses:
 **Mocks are tools to isolate, not things to test.**
 
 If TDD reveals you're testing mock behavior, you've gone wrong. Fix: test real behavior or question why you're mocking at all.
+
+## Common Rationalizations
+
+| Excuse | Reality |
+|--------|---------|
+| "Too simple to test" | Simple code breaks. Test takes 30 seconds. |
+| "I'll test after" | Tests passing immediately prove nothing. |
+| "Tests after achieve same goals" | Tests-after = "what does this do?" Tests-first = "what should this do?" |
+| "Already manually tested" | Ad-hoc ≠ systematic. No record, can't re-run. |
+| "Deleting X hours is wasteful" | Sunk cost fallacy. Keeping unverified code is technical debt. |
+| "Keep as reference, write tests first" | You'll adapt it. That's testing after. Delete means delete. |
+| "Need to explore first" | Fine. Throw away exploration, then start with TDD. |
+| "Test is hard to write = unclear design" | Listen to the test. Hard to test = hard to use. |
+| "TDD will slow me down" | TDD is faster than debugging. |
+| "Manual test was faster" | Manual doesn't prove edge cases. You'll re-test every change. |
+| "Existing code has no tests" | You're improving it. Add tests for the code you're changing. |
+| "It's about spirit not ritual" | The ritual IS the spirit. Skip the red phase and you lose proof tests work. |
+| "This is just a config change" | Config affects behavior. Test the behavior. |
+| "I'll add tests in a follow-up" | Follow-ups don't happen. Test now. |
+
+## Verification Checklist
+
+Before marking work complete:
+
+- [ ] Every new function/method has a test
+- [ ] Watched each test fail before implementing
+- [ ] Each test failed for the expected reason (feature missing, not typo)
+- [ ] Wrote minimal code to pass each test
+- [ ] All tests pass
+- [ ] Output is clean (no errors, no warnings)
+- [ ] Tests use real code (mocks only if unavoidable)
+- [ ] Edge cases and error paths covered
+
+Can't check all boxes? You skipped TDD. Start over.

@@ -127,22 +127,7 @@ If you wrote code before the test: delete it. The sunk cost fallacy says "keep i
 
 ## Common Rationalizations
 
-| Excuse | Reality |
-|--------|---------|
-| "Too simple to test" | Simple code breaks. Test takes 30 seconds. |
-| "I'll test after" | Tests passing immediately prove nothing. |
-| "Tests after achieve same goals" | Tests-after = "what does this do?" Tests-first = "what should this do?" |
-| "Already manually tested" | Ad-hoc ≠ systematic. No record, can't re-run. |
-| "Deleting X hours is wasteful" | Sunk cost fallacy. Keeping unverified code is technical debt. |
-| "Keep as reference, write tests first" | You'll adapt it. That's testing after. Delete means delete. |
-| "Need to explore first" | Fine. Throw away exploration, then start with TDD. |
-| "Test is hard to write = unclear design" | Listen to the test. Hard to test = hard to use. |
-| "TDD will slow me down" | TDD is faster than debugging. |
-| "Manual test was faster" | Manual doesn't prove edge cases. You'll re-test every change. |
-| "Existing code has no tests" | You're improving it. Add tests for the code you're changing. |
-| "It's about spirit not ritual" | The ritual IS the spirit. Skip the red phase and you lose proof tests work. |
-| "This is just a config change" | Config affects behavior. Test the behavior. |
-| "I'll add tests in a follow-up" | Follow-ups don't happen. Test now. |
+See `reference/anti-patterns.md` for the full rationalization table with rebuttals.
 
 ## Red Flags — STOP and Start Over
 
@@ -174,18 +159,19 @@ If you wrote code before the test: delete it. The sunk cost fallacy says "keep i
 
 ## Verification Checklist
 
-Before marking work complete:
+See `reference/anti-patterns.md` for the full checklist. Summary: every function has a test, each test was watched failing, minimal code was written to pass, all tests pass cleanly.
 
-- [ ] Every new function/method has a test
-- [ ] Watched each test fail before implementing
-- [ ] Each test failed for the expected reason (feature missing, not typo)
-- [ ] Wrote minimal code to pass each test
-- [ ] All tests pass
-- [ ] Output is clean (no errors, no warnings)
-- [ ] Tests use real code (mocks only if unavoidable)
-- [ ] Edge cases and error paths covered
+## Troubleshooting
 
-Can't check all boxes? You skipped TDD. Start over.
+| Problem | Fix |
+|---------|-----|
+| Test fails with error, not assertion failure | Fix syntax/import errors first. RED means assertion failure, not crash. |
+| Test passes immediately on first run | You're testing existing behavior. Rewrite the test to target the missing feature. |
+| Flaky test (passes sometimes, fails sometimes) | Find root cause: timing, shared state, test ordering. Never skip or retry. |
+| Must mock everything to test a function | Code is too coupled. Refactor with dependency injection. See `reference/anti-patterns.md`. |
+| Test setup is longer than test logic | Extract test helpers. If still complex, simplify the design under test. |
+| Unsure what to test first | Write the wished-for API. Start with the assertion, work backward. |
+| Existing codebase has no tests | Add tests for the code you are changing. Do not boil the ocean. |
 
 ## Language Detection
 

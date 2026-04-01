@@ -151,6 +151,18 @@ Detect and use your human partner's preferred language for all conversational ou
 - **With `developing-test-first`**: Full discipline — Orient → TDD → Probe → Guard
 - **Within `ralph` iterations**: Orient before each iteration, Probe after green
 
+## Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| No test command detected during Orient | Check `CLAUDE.md` / `AGENTS.md` first, then project manifests (`package.json`, `pyproject.toml`). Ask human partner to confirm. |
+| Suite has pre-existing failures | Isolate whether failures relate to your current task before proceeding. Document known failures. |
+| Probe finds bugs after green tests | Convert each gap into a regression test, then return to `developing-test-first` for the Red/Green cycle. |
+| Flaky tests block Orient baseline | Find root cause (timing, shared state, ordering). Never skip, delete, or retry-and-ignore. |
+| Slow test suite delays feedback | Run targeted subset during development; full suite before commit. Check for missing test isolation. |
+| Tests are being weakened to pass | STOP. You are changing the specification. Revert the test change and fix the code instead. |
+| Coverage is high but confidence is low | Add assertions around behavior and spec outcomes, not just line execution. Probe manually. |
+
 ## Reference
 
 - `reference/test-design.md` — Multi-layer architecture, test bus, property-based and contract testing
