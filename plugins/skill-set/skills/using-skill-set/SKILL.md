@@ -64,6 +64,16 @@ Comprehensive guide for creating effective Claude skills with structured workflo
 
 Guards directive files against bloat by verifying additions through strict criteria while preserving user authority.
 
+### developing-test-first
+**Use when**: Implementing any feature or bugfix. Always before writing production code. User mentions TDD, test-first, red/green, or starts coding without tests.
+
+Enforces strict Red/Green/Refactor discipline with Iron Law enforcement and rationalization prevention.
+
+### driving-with-tests
+**Use when**: Starting a coding session, designing test strategy, reviewing test changes, assessing coverage, or deciding what type of test to write.
+
+Guides test strategy: orient (run suite first), probe (explore beyond tests), guard (protect tests as spec), and multi-layer test architecture. Pairs with `developing-test-first`.
+
 ### resolving-pr-blockers (agent)
 **Use when**: PR has failing CI checks, merge conflicts, or unresolved review comments. User says "fix my PR", "CI failed", "resolve conflicts", "fix the build", "handle review comments", "PR won't merge".
 
