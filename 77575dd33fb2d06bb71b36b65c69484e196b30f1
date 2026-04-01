@@ -1,0 +1,28 @@
+## Decisions Made
+- Split TDD into two independent skills (developing-test-first for discipline, driving-with-tests for strategy): User wanted TDD to be independently usable, and the report identified two distinct concerns — the Red/Green/Refactor cycle vs the surrounding strategy (Orient/Probe/Guard)
+- No code examples in developing-test-first: This is a discipline skill, not a technique skill — Claude already knows how to write tests; the skill enforces the "test first" rule
+- Keep probing details in reference/probing.md rather than inline: SKILL.md stays focused; CLI examples live in the reference file
+- CLAUDE.md/AGENTS.md moved to top of Framework Detection table: Project-explicit test commands are the most reliable detection source
+- Description uses 3rd person + trigger phrases (not imperative "Use when" only): Follows creating-skills convention for CSO
+- Benchmarked against obra/superpowers repo: Adopted Iron Law pattern, rationalization table, Red Flags section, REQUIRED marker, and Composability section patterns
+
+## Problems Encountered
+- skill-creator was initially unavailable for review: Resolved by proceeding with creating-skills checklist manually, then re-reviewed when skill-creator became available
+- developing-test-first hit 202 lines (2 over 200 target): Accepted as-is because the Verification Checklist is core content that belongs inline
+
+## Constraints Identified
+- SKILL.md must stay under 200 lines (500 hard ceiling): Shared context window resource — drives progressive disclosure into reference/ files
+- Description field must contain only triggering conditions, not behavioral instructions: CSO principle from superpowers benchmark — Claude follows description instead of reading full skill when description contains process steps
+- All skill content must be in English per project policy: Runtime user-facing output adapts to user language
+
+## Open Questions
+- Whether to run eval-driven testing with skill-creator's full benchmark pipeline for these two skills: Deferred for now, qualitative review passed
+
+## Context
+Created two new test discipline skills for the skill-set plugin. The work was driven by a research report on coding agent harness design and benchmarked against the obra/superpowers repository. Both skills passed creating-skills checklist review. Key files: plugins/skill-set/skills/developing-test-first/SKILL.md, plugins/skill-set/skills/driving-with-tests/SKILL.md, and their reference/ subdirectories.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
