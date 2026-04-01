@@ -1,0 +1,21 @@
+## Decisions Made
+- Relocated Common Rationalizations table and Verification Checklist from SKILL.md to reference/anti-patterns.md: maintains the 200-line cap convention while preserving content accessibility via cross-references
+- Used `text` as the language identifier for pseudocode fenced blocks: satisfies MD040 without implying executable syntax
+
+## Problems Encountered
+- None
+
+## Constraints Identified
+- SKILL.md files must stay under 200 lines per repository convention: verbose reference tables must live in reference/ subdirectory with pointers from the main file
+
+## Open Questions
+- None
+
+## Context
+Scanned PR #14 (reading-code-skillfully -> main) for blockers. No merge conflicts or CI failures found. Three actionable CodeRabbit review comments plus one nitpick were resolved: MD040 lint warnings on anti-patterns.md, missing Troubleshooting sections on both TDD skills, and the 200-line cap overshoot on developing-test-first/SKILL.md.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
