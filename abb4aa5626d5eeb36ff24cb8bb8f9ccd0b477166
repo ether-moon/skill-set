@@ -1,0 +1,22 @@
+## Decisions Made
+- Bumped minor version (1.8.1 → 1.9.0) for two new skills: Chosen because developing-test-first and driving-with-tests are new features, warranting a minor-level bump per semver
+- Rebased onto origin/main before bumping: PR #14 was already squash-merged, so cherry-pick was empty — all changes already present in origin/main
+
+## Problems Encountered
+- Rebase conflict on origin/main: PR #14 had already been squash-merged (43fe530), causing add/add conflicts. Resolved by resetting to origin/main since all changes were already included
+- main branch locked by another worktree: Used git reset --hard origin/main on current branch instead of checking out main
+
+## Constraints Identified
+- Pre-commit hook requires memento-commit workflow: Direct git commit is blocked by knowledge-distillery hook
+
+## Open Questions
+- None
+
+## Context
+Version bump session after merging PR #14 (developing-test-first and driving-with-tests skills). Rebased branch onto origin/main, confirmed all PR blocker fixes were included in the squash merge, then bumped 1.8.1 → 1.9.0 with changelog entry.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
