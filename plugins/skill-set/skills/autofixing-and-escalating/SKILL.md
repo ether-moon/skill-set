@@ -91,14 +91,15 @@ Within AMBIGUOUS items, assign severity for grouping and sort order:
 
 ## Resolution Workflow
 
-Four phases — auto-fix, report, discuss, confirm. Read `reference/resolution.md` for the full workflow, formats, and examples.
+Five phases — classify, report, discuss, execute, summarize. All decisions complete before any code changes. Read `reference/resolution.md` for the full workflow, formats, and examples.
 
 | Phase | What happens |
 |-------|-------------|
-| **1. Auto-fix** | Parallelize with subagents (group by file). Failures move to AMBIGUOUS. |
-| **2. Report** | Summarize every auto-applied fix to the user — never skip this. |
-| **3. Discuss** | Present AMBIGUOUS items grouped by severity. Offer: apply all / review individually / skip all. |
-| **4. Confirm** | Show final summary of what will be applied vs skipped. Apply only after explicit confirmation. |
+| **1. Classify** | Classify every item as OBVIOUS / AMBIGUOUS / SKIP. Register each actionable item as a task — do not execute yet. |
+| **2. Report** | Present the full classification to the user: OBVIOUS items queued, AMBIGUOUS items with analysis. |
+| **3. Discuss** | Resolve AMBIGUOUS items (already presented in Phase 2). Offer: apply all / review individually / skip all. Update task status per user decision. |
+| **4. Execute** | Batch-execute all approved tasks (OBVIOUS + user-approved AMBIGUOUS) in parallel via subagents grouped by file. |
+| **5. Summary** | Report results — applied, failed, skipped. |
 
 ## Language Detection
 
@@ -123,13 +124,13 @@ Four phases — auto-fix, report, discuss, confirm. Read `reference/resolution.m
 **Problem:** User sees an ambiguous item but doesn't understand what makes it debatable.
 **Fix:** Always include "Why ambiguous" with each item — what's the trade-off or uncertainty?
 
-### Auto-Applying Without Reporting
-**Problem:** User doesn't know what was changed on their behalf.
-**Fix:** Always present the auto-fix summary before moving to ambiguous discussion.
+### Executing Before All Decisions Are Made
+**Problem:** Applying fixes during classification instead of after — user loses oversight of the full picture.
+**Fix:** Register every actionable item as a task first. Execute only after all classifications and user decisions are finalized.
 
 ### Stopping on Single Failure
-**Problem:** Workflow halts when one item fails.
-**Fix:** If an OBVIOUS fix fails, move it to AMBIGUOUS with explanation. Continue with remaining items.
+**Problem:** Workflow halts when one task fails during batch execution.
+**Fix:** Subagents continue with remaining tasks in the same file group. Failed tasks are reported in the summary with what went wrong.
 
 ### Treating All Sources Equally
 **Problem:** Missing context about who or what raised the issue.
