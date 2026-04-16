@@ -7,23 +7,25 @@ description: Guides the full skill lifecycle — creating, evaluating, and optim
 
 ## Overview
 
-Conventions, quality standards, and reference material for creating effective Claude skills. For the full creation and evaluation workflow, use `skill-creator:skill-creator` when available.
+This skill is the single entry point for all skill creation and modification work. It provides conventions and quality guardrails, and delegates the execution workflow to `skill-creator:skill-creator` when available.
 
 **Core principle**: Start with concrete use cases, define success criteria, then write minimal instructions that address real gaps. Iterate with eval-driven feedback.
 
 ## Workflow
 
-### When skill-creator is available
+### Step 1: Invoke skill-creator
 
-If `skill-creator:skill-creator` is available, use it as the primary workflow. It handles intent capture, file scaffolding, test case generation, parallel evaluation, benchmarking, and description optimization.
+Check if `skill-creator:skill-creator` appears in the available skills list.
 
-Use this skill (`creating-skills`) alongside skill-creator for:
-- **Language and size rules** below — conventions skill-creator does not enforce
-- **Example skills** — real-world references from this project
-- **Red flags** — quick quality gate
-- **Reference files** — detailed structure, patterns, testing, and checklist docs
+**If it exists, invoke it now via the Skill tool** — do not skip this step. Call the Skill tool with `skill-creator:skill-creator` before doing any other work. skill-creator handles intent capture, file scaffolding, test case generation, parallel evaluation, benchmarking, and description optimization.
 
-### When skill-creator is not available
+While following skill-creator's workflow, enforce these guardrails from this skill throughout:
+- **Language and size rules** — see Skill Conventions below
+- **Red flags** — see the checklist below
+- **Example skills** — use this project's skills as real-world references
+- **Reference files** — structure, patterns, testing, and checklist docs
+
+**If skill-creator is not installed**, use the standalone workflow:
 
 1. **Define use cases** — Identify 2-3 concrete scenarios with trigger phrases, steps, and expected results
 2. **Define success criteria** — Quantitative (trigger rate, tool calls) and qualitative (no user correction needed)
