@@ -5,6 +5,20 @@ All notable changes to the skill-set plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.1] - 2026-04-16
+
+### Changed
+
+- **autofixing-and-escalating**: Rework the resolution flow from 4 phases to 5 phases so agents classify and queue all actionable items before editing anything, then batch-execute approved tasks and report applied, failed, and skipped results separately
+
+### Fixed
+
+- **creating-skills**: Make the `skill-creator` handoff explicit by instructing agents to invoke `skill-creator:skill-creator` via the Skill tool before doing any other skill creation work when it is available
+
+### Removed
+
+- **codex-plugin**: Remove `.codex-plugin/plugin.json` because the current Codex marketplace and plugin system cannot use it yet; plan to add it back after that support is fully available
+
 ## [1.9.0] - 2026-04-01
 
 ### Added
