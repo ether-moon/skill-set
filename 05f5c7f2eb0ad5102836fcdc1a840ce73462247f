@@ -1,0 +1,28 @@
+## Decisions Made
+- Replace hardcoded `case` dispatch with a declarative CLI_REGISTRY table: single-row edit to add a new CLI instead of changes across three functions.
+- Use `{PROMPT}` and `{OUT}` template tokens: `{PROMPT}` keeps the prompt as a single argv element (no word splitting); `{OUT}` signals direct-file-writing CLIs so stdout can be discarded.
+- Capture stderr to a sibling `.err` file and surface it only on empty or non-zero exits: preserves diagnosability without polluting successful output.
+- Use `read -ra parts <<< "$template"` instead of `local parts=($template)`: same word-splitting but avoids pathname expansion against registry tokens like `--flag=*`.
+- Scope limited to stderr + declarative registry; multi-round loops, presets, and tool-groups from counselors were explicitly deferred as over-engineering.
+- Exclude CLI-addition-related peer-review findings (unregistered fallback, template expressiveness, doc snippet): new CLI additions are unlikely; revisit if the situation changes.
+
+## Problems Encountered
+- Peer review (codex) flagged that `local parts=($template)` performs pathname expansion: resolved by swapping to `read -ra`.
+- `export -f` did not propagate fake CLI binaries into the `bash script.sh` child for functional testing: resolved by placing fakes on PATH in `/tmp/fake-bin`.
+
+## Constraints Identified
+- Bash 3.2 compatibility (macOS default): no associative arrays, no `${var^^}`, no reference parameters — globals (`BUILT_ARGS`, `TEMPLATE_HAS_OUT`) are used as return values from `build_cli_args`.
+- allowed-tools restricts Bash to `bash *peer-review.sh*` only — direct `gemini`/`codex`/`claude` calls would surface permission prompts and must be routed through the script.
+- Template substitution is whole-token only: quoted literals, embedded `--out={OUT}` forms, or static args with spaces cannot be represented. Acceptable for current registry; documented as a known limitation.
+
+## Open Questions
+- None.
+
+## Context
+Refined `consulting-peer-llms` peer-review.sh dispatch based on a counselors-tool comparison. Two files changed — `scripts/peer-review.sh` (279 lines) and `reference/cli-commands.md` (53 lines). Validated via `bash -n`, `check` subcommand, four functional scenarios (stdout mode, `{OUT}` mode, empty response, non-zero exit), and glob-safety check. Status: complete, ready to commit.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
