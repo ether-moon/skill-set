@@ -18,44 +18,35 @@ Use non-interactive (one-shot) flags. Without these, CLIs enter interactive/REPL
 
 ## Parallel Execution
 
+The bundled script (`scripts/peer-review.sh`) launches every selected CLI as a background process and collects results after `wait`. Invocations are driven by a small **CLI registry** rather than hard-coded `case` branches:
+
 ```bash
-# Bash 3.2+ compatible (macOS + Linux)
-TIMEOUT="1200s"
-TIMEOUT_CMD=""
-command -v timeout &>/dev/null && TIMEOUT_CMD="timeout"
-command -v gtimeout &>/dev/null && TIMEOUT_CMD="gtimeout"
-
-run_cmd() {
-  if [ -n "$TIMEOUT_CMD" ]; then "$TIMEOUT_CMD" "$TIMEOUT" "$@"; else "$@"; fi
-}
-
-TARGET_CLIS=("gemini" "codex" "claude")
-PIDS=()
-FILES=()
-
-for cli in "${TARGET_CLIS[@]}"; do
-  OUTPUT_FILE="/tmp/${cli}-review-$$.txt"
-  FILES+=("$OUTPUT_FILE")
-  case "$cli" in
-    gemini)  run_cmd gemini -p "$PROMPT" > "$OUTPUT_FILE" 2>/dev/null & ;;
-    codex)   run_cmd codex exec -o "$OUTPUT_FILE" "$PROMPT" >/dev/null 2>&1 & ;;
-    claude)  run_cmd claude -p "$PROMPT" > "$OUTPUT_FILE" 2>/dev/null & ;;
-  esac
-  PIDS+=($!)
-done
-
-# Collect results
-i=0
-for cli in "${TARGET_CLIS[@]}"; do
-  if wait "${PIDS[$i]}" && [ -s "${FILES[$i]}" ]; then
-    cat "${FILES[$i]}"
-  else
-    echo "[$cli failed or timed out]"
-  fi
-  rm -f "${FILES[$i]}"
-  i=$((i + 1))
-done
+# "id|command-template" — template tokens are substituted per invocation
+CLI_REGISTRY=(
+    "gemini|gemini -p {PROMPT}"
+    "codex|codex exec -o {OUT} {PROMPT}"
+    "claude|claude -p {PROMPT}"
+)
 ```
+
+**Template rules**
+
+- `{PROMPT}` → prompt as a single argument (no word splitting).
+- `{OUT}` → output file path. When present, the CLI writes the response itself and the script discards stdout; when absent, stdout is redirected to the output file.
+- The first token of the template is the binary name used for `command -v` detection.
+
+**Stderr is always captured** to a sibling `${output_file}.err`. On empty responses or non-zero exits, the script surfaces the stderr block so prompt errors, auth failures, and network issues stay diagnosable instead of vanishing into `/dev/null`.
+
+## Adding a new CLI
+
+Append one entry to `CLI_REGISTRY` in `scripts/peer-review.sh`:
+
+```bash
+"amp|amp --run {PROMPT}"                     # stdout-mode CLI
+"newcli|newcli --exec --out {OUT} {PROMPT}"  # direct-file CLI
+```
+
+Both `check` and `execute` iterate the registry, so no other changes are needed.
 
 **Timeout**: 1200s (20 minutes). Uses `timeout` (Linux) or `gtimeout` (macOS via coreutils). Without either, CLIs run without timeout.
 
