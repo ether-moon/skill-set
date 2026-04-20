@@ -81,6 +81,13 @@ Scans the current branch's PR for all blockers and dispatches specialized sub-ag
 
 **Command**: `/skill-set:pr:fix`
 
+### shipping-pr
+**Use when**: User wants to walk away after creating a PR and have it driven to clean state. Says "ship this PR", "wait for CI and fix", "auto-fix until clean", "PR autopilot".
+
+Drives a PR end-to-end: creates the PR if missing (delegates to `managing-git-workflow`), polls CI checks and CodeRabbit reviews on each new HEAD SHA, dispatches `resolving-pr-blockers` when blockers appear, and re-polls after each fix-push cycle until the PR is clean, max-cycles is reached, or the resolver can't make progress.
+
+**Command**: `/skill-set:pr:ship`
+
 ## Using Skills Effectively
 
 Before starting a task, scan the catalog above for a matching skill. Skills encode workflows that have been tested and refined — they handle edge cases and produce consistent output that improves over time as the skill evolves.
