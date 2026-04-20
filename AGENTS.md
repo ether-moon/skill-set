@@ -18,6 +18,7 @@
 9. **autofixing-and-escalating**: Auto-fixes obvious issues and escalates ambiguous ones for user decision — classifies by clarity of correctness, applies obvious fixes automatically, presents ambiguous items with rationale and recommendations
 10. **developing-test-first**: Enforces strict test-driven development discipline — Iron Law (no production code without a failing test), Red/Green/Refactor cycle, rationalization prevention
 11. **driving-with-tests**: Guides test strategy beyond TDD — orient (run suite first), probe (manual exploration), guard (test governance), multi-layer test architecture
+12. **shipping-pr**: Drives PR end-to-end — creates the PR (delegates to managing-git-workflow), polls CI and CodeRabbit reviews, dispatches resolving-pr-blockers when blockers appear, and re-polls after each fix-push cycle until clean or convergence fails
 
 #### Agents
 1. **resolving-pr-blockers**: Orchestrator that scans a PR for all blockers (CI failures, merge conflicts, review comments) and dispatches specialized sub-agents to resolve them. Each sub-agent commits independently; orchestrator pushes once at the end.
@@ -40,7 +41,8 @@ plugins/
     │   │   ├── push.md           # /skill-set:git:push
     │   │   └── pr.md             # /skill-set:git:pr
     │   ├── pr/
-    │   │   └── fix.md            # /skill-set:pr:fix
+    │   │   ├── fix.md            # /skill-set:pr:fix
+    │   │   └── ship.md           # /skill-set:pr:ship
     │   ├── consulting/
     │   │   └── review.md         # /skill-set:consulting:review
     │   └── ralph/
@@ -104,11 +106,17 @@ plugins/
     │   │   ├── SKILL.md
     │   │   └── reference/
     │   │       └── anti-patterns.md
-    │   └── driving-with-tests/
-    │       ├── SKILL.md
+    │   ├── driving-with-tests/
+    │   │   ├── SKILL.md
+    │   │   └── reference/
+    │   │       ├── test-design.md
+    │   │       └── probing.md
+    │   └── shipping-pr/
+    │       ├── SKILL.md           # PR end-to-end ship loop
     │       └── reference/
-    │           ├── test-design.md
-    │           └── probing.md
+    │           ├── polling.md
+    │           ├── blocker-resolution.md
+    │           └── troubleshooting.md
     ├── agents/                    # Isolated subagents
     │   ├── resolving-pr-blockers.md    # Orchestrator
     │   ├── merge-conflict-resolver.md  # Sub-agent: merge conflicts
