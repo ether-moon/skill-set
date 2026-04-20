@@ -6,8 +6,8 @@ Invoke the `shipping-pr` skill to drive the full PR lifecycle: PR creation (dele
 
 **Flags (all optional):**
 - `--max-cycles N` — max ship cycles (default: 3)
-- `--ci-timeout 30m` — total CI wait budget per cycle (default: 30m)
-- `--review-timeout 10m` — CodeRabbit incremental review wait per cycle (default: 10m)
+- `--ci-timeout 30` — total CI wait budget per cycle in minutes (default: 30)
+- `--review-timeout 10` — CodeRabbit incremental review wait per cycle in minutes (default: 10)
 - `--no-coderabbit` — disable CodeRabbit detection and waiting
 - `--no-create` — fail if no PR exists for the current branch (skip PR creation)
 - `--required-only=BOOL` — wait only on required checks (default: true; pass `--required-only=false` to wait on advisory checks too)

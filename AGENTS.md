@@ -112,7 +112,11 @@ plugins/
     │   │       ├── test-design.md
     │   │       └── probing.md
     │   └── shipping-pr/
-    │       └── SKILL.md           # PR end-to-end ship loop
+    │       ├── SKILL.md           # PR end-to-end ship loop
+    │       └── reference/
+    │           ├── polling.md
+    │           ├── blocker-resolution.md
+    │           └── troubleshooting.md
     ├── agents/                    # Isolated subagents
     │   ├── resolving-pr-blockers.md    # Orchestrator
     │   ├── merge-conflict-resolver.md  # Sub-agent: merge conflicts

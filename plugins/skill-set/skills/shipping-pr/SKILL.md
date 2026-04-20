@@ -27,19 +27,19 @@ Closed-loop orchestrator that takes a PR from creation to clean-merge-ready stat
 ## Examples
 
 **Default — current branch, auto-detect CodeRabbit, 3 cycles:**
-```
+```text
 /skill-set:pr:ship
 ```
 Creates the PR if missing, waits for required CI checks (≤30 min) and CodeRabbit review on the new HEAD (≤10 min), runs `resolving-pr-blockers` if blockers found, then re-polls after the resolver's push. Stops at clean PR, max-cycles=3, or convergence failure.
 
 **Single attempt, fail fast on no-progress:**
-```
+```text
 /skill-set:pr:ship --max-cycles 1
 ```
 One poll-fix-poll round. Useful for "try once, report back."
 
 **Wait on advisory checks too (preview deploys, coverage):**
-```
+```text
 /skill-set:pr:ship --required-only=false
 ```
 Switches `gh pr checks --watch` to also block on advisory states. Use only when the workflow guarantees they finish — otherwise CI never stabilizes.

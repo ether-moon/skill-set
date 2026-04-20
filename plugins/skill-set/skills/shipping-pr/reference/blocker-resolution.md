@@ -44,7 +44,7 @@ PRE_SHA=$TARGET_SHA
 # Brief buffer before reading new HEAD: GitHub's PR view may briefly return the
 # old headRefOid right after the resolver's push. Matches the UNKNOWN-mergeable
 # 3-second retry convention used in Step 5.
-sleep 2
+sleep 3
 POST_SHA=$(gh pr view --json headRefOid -q .headRefOid)
 ```
 
