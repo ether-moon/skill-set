@@ -1,0 +1,22 @@
+## Decisions Made
+- Catalog placement: insert `shipping-pr` immediately after `resolving-pr-blockers` instead of alphabetically. Rationale: the two together form the PR-lifecycle pair (fix → ship), and the user discovers them together in the catalog.
+- Defer fixing `session-start.sh`: leave the vestigial `SKILL_SET_PLUGINS` directory-existence check alone. Rationale: the user's request was specifically about the missing catalog entry; the dead code is a separate cleanup that touches runtime injection logic.
+
+## Problems Encountered
+- `using-skill-set/SKILL.md` was missing the just-built `shipping-pr` skill. Resolved by adding a 7-line entry mirroring the `resolving-pr-blockers` format (Use when / one-paragraph description / Command).
+
+## Constraints Identified
+- `using-skill-set/SKILL.md` is the canonical skill router — every new skill must be registered here, not just in plugin.json or AGENTS.md, otherwise discovery via "what can you do" / "list commands" misses it.
+- The `{{INSTALLED_PLUGINS}}` placeholder in this SKILL.md depends on `session-start.sh` matching plugin directories under `~/.claude/plugins/`. Since the project is now a single unified plugin, that match never fires and the placeholder always renders empty — entries must be hardcoded as static markdown.
+
+## Open Questions
+- Should `session-start.sh` and the `{{INSTALLED_PLUGINS}}` placeholder be removed entirely, or repurposed for something useful in the unified-plugin world? Flagged to the user but deferred for now.
+
+## Context
+Single-file documentation patch on branch `pr-ship-skill`. The user reviewed `plugins/skill-set/skills/using-skill-set/` after the shipping-pr skill was created and noticed it wasn't registered in the central catalog. Added one entry. Session also surfaced a likely-vestigial dead-code path in `session-start.sh` that was deferred.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
