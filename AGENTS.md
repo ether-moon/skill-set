@@ -354,3 +354,12 @@ Without the server prefix, Claude may fail to locate the tool.
 - The summary follows the 5-section format: Decisions Made, Problems Encountered, Constraints Identified, Open Questions, Context
 - See `/knowledge-distillery:memento-commit` for the full workflow and format specification
 - If the PostToolUse hook fires a reminder, follow it — generate the summary and attach the note
+
+## Versioning
+
+The `bumping-version` skill (in `plugins/skill-set/skills/bumping-version/`) reads this section.
+
+- **Base branch**: main
+- **Commit message**: chore: bump version to {version}
+- **Extra version files**: (none)
+- **Changelog categories**: Added, Improved, Fixed

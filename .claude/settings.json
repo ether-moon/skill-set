@@ -5,7 +5,16 @@
       "Bash(sqlite3 .knowledge/vault.db:*)"
     ]
   },
+  "extraKnownMarketplaces": {
+    "ether-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "ether-moon/ether-plugins"
+      }
+    }
+  },
   "enabledPlugins": {
-    "knowledge-distillery@knowledge-distillery": true
+    "skill-set@ether-plugins": true,
+    "knowledge-distillery@ether-plugins": true
   }
 }
