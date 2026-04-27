@@ -5,6 +5,12 @@ All notable changes to the skill-set plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2026-04-27
+
+### Added
+
+- **bumping-version**: New generalized skill that auto-detects version files (`plugin.json`, `package.json`, `pyproject.toml`, `Cargo.toml`, gemspecs, `VERSION`, etc.), reads per-repo policy (base branch, commit message template, extra files, changelog categories) from `CLAUDE.md`/`AGENTS.md`, isolates the bump in a temporary worktree, and pushes directly or falls back to a PR when the base branch is protected.
+
 ## [1.10.0] - 2026-04-20
 
 ### Added
