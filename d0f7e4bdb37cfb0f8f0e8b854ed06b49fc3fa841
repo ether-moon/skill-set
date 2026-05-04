@@ -1,0 +1,31 @@
+## Decisions Made
+- Adapted (not verbatim) versions of mattpocock skills to preserve project voice + avoid file-level MIT attribution overhead in SKILL.md
+- Single root CONTEXT.md only, no multi-context (CONTEXT-MAP.md) support — YAGNI
+- All 4 new skills + tdd boost shipped in a single PR (not phased)
+- Slash commands added for grill + zoom-out only (not for vocabulary or architecture); the latter rely on auto-trigger
+- Attribution lives in README + CHANGELOG, not in SKILL.md headers
+- Deferred evals/ and scripts/ infrastructure to keep skill-set internally consistent (no existing skill ships those)
+- Applied skill-creator audit fixes: pushy descriptions, voodoo-constant justification, MUST/exactly framing softened with why-prefixed reasoning
+
+## Problems Encountered
+- Initial verbatim-copy request conflicted with prior clean-SKILL.md decision — resolved by clarifying it was feature parity, not text reuse
+- Two rounds of audit (creating-skills, then skill-creator) surfaced different gap classes — resolved by triaging via autofixing-and-escalating: OBVIOUS auto-applied, AMBIGUOUS user-approved, low-value/scope-creep deferred
+- Direct git commit blocked by knowledge-distillery pre-commit hook — resolved by switching to memento-commit workflow
+
+## Constraints Identified
+- skill-set has no existing evals/ or scripts/ infrastructure; adding to only the 4 new skills would create inconsistency the project does not want
+- mattpocock content is MIT but verbatim reproduction at scale conflicts with the project's adaptation/voice convention; per-file attribution would be the only license-clean path for verbatim reuse
+- Pre-commit hook in this repo mandates memento-commit; direct git commit fails fast
+
+## Open Questions
+- Whether to retroactively add evals/ across all skill-set skills as a separate project (deferred)
+- Whether to add bundled scripts (LSP wrappers, e.g.) for the repeated-work cases skill-creator flagged (deferred)
+
+## Context
+Session goal: extend skill-set with patterns from mattpocock/skills. Final delivery includes 4 new skills (grilling-plans, building-shared-vocabulary, zooming-out-on-code, improving-architecture), a Horizontal Slicing anti-pattern addition to developing-test-first, two slash commands, and a 1.11.1 to 1.12.0 version bump. Three review rounds tightened triggers, voodoo constants, and imperative framing while keeping all SKILL.md files under the 200-line target.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
