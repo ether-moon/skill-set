@@ -1,7 +1,10 @@
 #!/bin/bash
 # Peer Review Script for consulting-peer-llms skill
-# Executes multiple LLM CLI tools in parallel and collects results
-# Compatible with Bash 3.2+ (macOS default) and Linux
+# Executes multiple LLM CLI tools in parallel and writes per-CLI responses to
+# a persistent output directory. Stdout stays bounded (status only) so that
+# consumers can never lose response data through truncation, paging, or
+# pipes such as `tail`/`head`/`grep`.
+# Compatible with Bash 3.2+ (macOS default) and Linux.
 
 set -e
 
@@ -10,6 +13,11 @@ set -e
 # ============================================================================
 
 TIMEOUT="${TIMEOUT:-1200s}"  # 20 minutes default timeout
+
+# Output directory for per-CLI response files. Override with PEER_REVIEW_DIR.
+# Files inside are not deleted by this script — callers read them with their
+# Read tool and may clean up afterward.
+OUTPUT_DIR="${PEER_REVIEW_DIR:-/tmp/peer-review-$$}"
 
 # CLI registry: "id|command-template"
 # - {PROMPT} is replaced with the review prompt (single argument)
@@ -35,11 +43,6 @@ fi
 # ============================================================================
 # Helpers
 # ============================================================================
-
-# Portable uppercase
-to_upper() {
-    echo "$1" | tr '[:lower:]' '[:upper:]'
-}
 
 # Run a command with timeout if available, otherwise run directly
 run_cmd() {
@@ -138,14 +141,22 @@ build_cli_args() {
 }
 
 # Execute a single CLI with the given prompt.
-# Stdout goes to $output_file (or $output_file via {OUT} flag).
-# Stderr is always captured to a sibling ${output_file}.err so that
-# empty responses and failures remain diagnosable.
+# Stdout goes to $output_file (or via the CLI's own {OUT} flag).
+# Stderr is captured to a sibling ${output_file}.err so that empty responses
+# and failures remain diagnosable.
 execute_cli() {
     local cli="$1"
     local prompt="$2"
     local output_file="$3"
     local err_file="${output_file}.err"
+
+    # Start every invocation with empty files. Shell-redirect mode (`>`) already
+    # truncates, but {OUT}-mode CLIs (e.g. `codex exec -o`) write through the
+    # path themselves — if they fail before writing, content from a prior run
+    # under the same PEER_REVIEW_DIR would otherwise linger and the status
+    # block would point the agent at stale data.
+    : > "$output_file"
+    : > "$err_file"
 
     local template
     if ! template=$(cli_template "$cli"); then
@@ -162,7 +173,33 @@ execute_cli() {
     fi
 }
 
-# Execute all CLIs in parallel
+# Print a short status line for a single CLI after it has been collected.
+# $1=cli  $2=status (OK|EMPTY|FAILED)  $3=output_file  $4=err_file
+print_cli_status() {
+    local cli="$1" status="$2" output_file="$3" err_file="$4"
+    local lines=0 err_summary=""
+
+    if [ -s "$output_file" ]; then
+        lines=$(wc -l < "$output_file" | tr -d ' ')
+    fi
+    if [ "$status" != "OK" ] && [ -s "$err_file" ]; then
+        # First line of stderr — keep status block compact.
+        err_summary=$(head -n1 "$err_file" | tr -d '\r')
+    fi
+
+    if [ -n "$err_summary" ]; then
+        printf '  %-7s %-7s %s  (%d lines, stderr: %s)\n' \
+            "$cli" "$status" "$output_file" "$lines" "$err_summary"
+    else
+        printf '  %-7s %-7s %s  (%d lines)\n' \
+            "$cli" "$status" "$output_file" "$lines"
+    fi
+}
+
+# Execute all CLIs in parallel, then print a bounded status block.
+# Per-CLI response bodies are NEVER streamed through stdout — consumers must
+# read them via the file paths printed below. This is the design that makes
+# the pipeline truncation-proof.
 # Usage: execute_all_clis <prompt> <cli1> [cli2] ...
 execute_all_clis() {
     local prompt="$1"
@@ -172,46 +209,49 @@ execute_all_clis() {
     local files=()
     local cli output_file
 
+    mkdir -p "$OUTPUT_DIR"
+
     # Launch all CLIs in parallel
     for cli in "${clis[@]}"; do
-        output_file="/tmp/${cli}-review-$$.txt"
+        output_file="$OUTPUT_DIR/${cli}.txt"
         files+=("$output_file")
         execute_cli "$cli" "$prompt" "$output_file" &
         pids+=($!)
     done
 
-    # Wait and collect results
-    local i=0 pid err_file cli_upper
+    # Wait for completion and collect statuses
+    local i=0 pid err_file status
+    local -a statuses
     for cli in "${clis[@]}"; do
         pid="${pids[$i]}"
         output_file="${files[$i]}"
         err_file="${output_file}.err"
-        cli_upper=$(to_upper "$cli")
 
-        echo "=== ${cli_upper} REVIEW ==="
         if wait "$pid"; then
             if [ -s "$output_file" ]; then
-                cat "$output_file"
+                status="OK"
             else
-                echo "[Empty response from $cli]"
-                if [ -s "$err_file" ]; then
-                    echo "[stderr]"
-                    cat "$err_file"
-                fi
+                status="EMPTY"
             fi
         else
-            echo "[$cli CLI failed or timed out]"
-            if [ -s "$err_file" ]; then
-                echo "[stderr]"
-                cat "$err_file"
-            fi
+            status="FAILED"
         fi
-        echo ""
-        echo "=== END ${cli_upper} REVIEW ==="
-        echo ""
-
-        rm -f "$output_file" "$err_file"
+        statuses+=("$cli|$status|$output_file|$err_file")
         i=$((i + 1))
+    done
+
+    # Bounded status block — agent reads each response file with the Read tool.
+    echo "PEER_REVIEW_DIR=$OUTPUT_DIR"
+    echo "Responses (read each file individually — do NOT pipe through head/tail/grep):"
+    local entry s_cli s_status s_out s_err
+    for entry in "${statuses[@]}"; do
+        s_cli="${entry%%|*}"
+        local rest="${entry#*|}"
+        s_status="${rest%%|*}"
+        rest="${rest#*|}"
+        s_out="${rest%%|*}"
+        s_err="${rest#*|}"
+        print_cli_status "$s_cli" "$s_status" "$s_out" "$s_err"
     done
 }
 
@@ -252,6 +292,10 @@ usage() {
     echo "Examples:"
     echo "  peer-review.sh check"
     echo "  peer-review.sh execute 'Review prompt here' gemini codex"
+    echo ""
+    echo "Output:"
+    echo "  Each CLI's response is written to \$PEER_REVIEW_DIR/<cli>.txt"
+    echo "  (default /tmp/peer-review-\$\$). Stdout prints status only."
 }
 
 # Main
