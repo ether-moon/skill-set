@@ -35,7 +35,25 @@ CLI_REGISTRY=(
 - `{OUT}` → output file path. When present, the CLI writes the response itself and the script discards stdout; when absent, stdout is redirected to the output file.
 - The first token of the template is the binary name used for `command -v` detection.
 
-**Stderr is always captured** to a sibling `${output_file}.err`. On empty responses or non-zero exits, the script surfaces the stderr block so prompt errors, auth failures, and network issues stay diagnosable instead of vanishing into `/dev/null`.
+**Stderr is always captured** to a sibling `${output_file}.err`. On empty responses or non-zero exits, the script surfaces a one-line stderr summary in the status block and the full stderr remains in the `.err` file so prompt errors, auth failures, and network issues stay diagnosable instead of vanishing into `/dev/null`.
+
+## Output layout
+
+The script does not stream response bodies through stdout. Each CLI's full response is written to its own file under `$PEER_REVIEW_DIR` (default `/tmp/peer-review-$$/`):
+
+```text
+$PEER_REVIEW_DIR/
+├── gemini.txt        # full gemini response
+├── gemini.txt.err    # gemini stderr (often empty)
+├── codex.txt
+├── codex.txt.err
+├── claude.txt
+└── claude.txt.err
+```
+
+Stdout prints a bounded status block referencing those files. The agent reads each file with the Read tool. This makes the pipeline truncation-proof: there is no giant stdout to clip, so `tail`/`head`/`grep` on the bash invocation cannot lose response data.
+
+Files persist after the script exits. Callers may delete `$PEER_REVIEW_DIR` once the responses have been read and synthesized.
 
 ## Adding a new CLI
 

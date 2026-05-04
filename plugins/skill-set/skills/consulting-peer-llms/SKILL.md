@@ -83,27 +83,39 @@ Always use the bundled script rather than calling `gemini`, `codex`, or `claude`
 bash "$SKILL_DIR/scripts/peer-review.sh" execute "$PROMPT"
 ```
 
-Run in background and collect output when complete. The script handles CLI detection, correct flags, parallel execution, and timeout.
+Run in background. The script handles CLI detection, correct flags per CLI, parallel execution, and timeout.
 
 CLI flag semantics are unintuitive and differ between tools — for example, `codex -p` means `--profile` (not prompt), and `codex` without `exec` enters interactive mode. These have caused repeated failures when invoked directly. The script encapsulates the correct invocations. Direct CLI tool permissions are intentionally excluded from `allowed-tools` to prevent bypassing it.
 
+**Output contract**: The script writes each CLI's full response to `$PEER_REVIEW_DIR/<cli>.txt` (default `/tmp/peer-review-$$/`) and prints only a bounded status block to stdout — never response bodies. Do not pipe the script through `head`/`tail`/`grep`; truncating stdout cannot save tokens here, it only loses status lines. Stdout looks like:
+
+```text
+PEER_REVIEW_DIR=/tmp/peer-review-12345
+Responses (read each file individually — do NOT pipe through head/tail/grep):
+  gemini  OK      /tmp/peer-review-12345/gemini.txt  (5421 lines)
+  codex   OK      /tmp/peer-review-12345/codex.txt   (3892 lines)
+  claude  EMPTY   /tmp/peer-review-12345/claude.txt  (0 lines, stderr: ...)
+```
+
 **Details**: See [reference/cli-commands.md](reference/cli-commands.md)
 
-### Step 3: Present Raw Responses
+### Step 3: Read and Present Raw Responses
 
-Show original responses first for transparency:
+After the script finishes, read each per-CLI file directly with the Read tool — one Read call per file. Then present them to the user in sequence for transparency:
 
 ```markdown
 # Gemini Review
-{response}
+{contents of $PEER_REVIEW_DIR/gemini.txt}
 ---
 # Codex Review
-{response}
+{contents of $PEER_REVIEW_DIR/codex.txt}
 ---
 # Claude Review
-{response}
+{contents of $PEER_REVIEW_DIR/claude.txt}
 ---
 ```
+
+If a CLI's status was `EMPTY` or `FAILED`, also surface its stderr file (`<cli>.txt.err`) so the user can diagnose auth or network issues.
 
 ### Step 4: Synthesize Final Report
 
@@ -124,6 +136,10 @@ Apply the `autofixing-and-escalating` skill to the synthesized report items. The
 
 **Integration point**: The synthesized report from Step 4 replaces the raw peer responses as the authoritative item list. Do not re-classify raw CLI output — only the deduplicated, validated synthesis.
 
+### Step 6: Clean Up
+
+After synthesis, `rm -rf "$PEER_REVIEW_DIR"`. The script does not auto-delete; explicit overrides (e.g. `.context/peer-review-...`) accumulate until cleaned.
+
 ## Quick Reference
 
 **Commands:**
@@ -135,11 +151,13 @@ Apply the `autofixing-and-escalating` skill to the synthesized report items. The
 
 **Typical execution time:** 5-30 minutes (parallel)
 
-**Temp files:** `/tmp/{cli-name}-review-$$.txt` (one per CLI, auto-cleaned)
+**Output files:** `$PEER_REVIEW_DIR/<cli>.txt` (response) and `<cli>.txt.err` (stderr). Default `$PEER_REVIEW_DIR` is `/tmp/peer-review-$$/`. Files persist after the script exits — Read them with the Read tool, then optionally clean up.
 
 ## Red Flags - STOP Immediately
 
 - Calling `gemini`, `codex`, or `claude` directly instead of using the bundled script
+- Piping the script through `head`, `tail`, `grep`, `awk`, or any line-cap — response bodies are in files, not stdout. Truncation here only loses status lines and signals you're treating the output incorrectly.
+- Trying to recover responses from stdout instead of reading the per-CLI files
 - Running git commands or reading files to embed context in the prompt (CLIs discover this themselves)
 - Running peer review without explicit user request
 - Showing raw responses without synthesis, or skipping raw responses before synthesis
@@ -172,8 +190,7 @@ Apply the `autofixing-and-escalating` skill to the synthesized report items. The
 - Check network connectivity
 
 **"Response is truncated"**
-- CLIs may have output limits
-- Reduce prompt length
+- Read `$PEER_REVIEW_DIR/<cli>.txt` directly (not bash stdout, which is the status block); if the file itself is short, reduce prompt length and retry.
 
 ## See Also
 
