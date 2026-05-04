@@ -41,7 +41,7 @@ CLI_REGISTRY=(
 
 The script does not stream response bodies through stdout. Each CLI's full response is written to its own file under `$PEER_REVIEW_DIR` (default `/tmp/peer-review-$$/`):
 
-```
+```text
 $PEER_REVIEW_DIR/
 ├── gemini.txt        # full gemini response
 ├── gemini.txt.err    # gemini stderr (often empty)

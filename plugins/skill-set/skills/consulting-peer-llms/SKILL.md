@@ -87,17 +87,15 @@ Run in background. The script handles CLI detection, correct flags per CLI, para
 
 CLI flag semantics are unintuitive and differ between tools — for example, `codex -p` means `--profile` (not prompt), and `codex` without `exec` enters interactive mode. These have caused repeated failures when invoked directly. The script encapsulates the correct invocations. Direct CLI tool permissions are intentionally excluded from `allowed-tools` to prevent bypassing it.
 
-**Output contract**: The script writes each CLI's full response to its own file under `$PEER_REVIEW_DIR` (default `/tmp/peer-review-$$/`) and prints only a bounded status block to stdout. Stdout looks like:
+**Output contract**: The script writes each CLI's full response to `$PEER_REVIEW_DIR/<cli>.txt` (default `/tmp/peer-review-$$/`) and prints only a bounded status block to stdout — never response bodies. Do not pipe the script through `head`/`tail`/`grep`; truncating stdout cannot save tokens here, it only loses status lines. Stdout looks like:
 
-```
+```text
 PEER_REVIEW_DIR=/tmp/peer-review-12345
 Responses (read each file individually — do NOT pipe through head/tail/grep):
   gemini  OK      /tmp/peer-review-12345/gemini.txt  (5421 lines)
   codex   OK      /tmp/peer-review-12345/codex.txt   (3892 lines)
   claude  EMPTY   /tmp/peer-review-12345/claude.txt  (0 lines, stderr: ...)
 ```
-
-**Never** capture peer responses by piping the script through `head`, `tail`, `grep`, or any line-cap. Bodies are not in stdout — they are in the per-CLI files. Truncating stdout cannot save tokens here; it only loses status lines.
 
 **Details**: See [reference/cli-commands.md](reference/cli-commands.md)
 
@@ -140,13 +138,7 @@ Apply the `autofixing-and-escalating` skill to the synthesized report items. The
 
 ### Step 6: Clean Up
 
-Once synthesis is presented and resolutions are dispatched, remove the response directory:
-
-```bash
-rm -rf "$PEER_REVIEW_DIR"
-```
-
-Files are not auto-deleted by the script. Default `/tmp/peer-review-$$/` paths are reaped by the OS eventually, but explicit `PEER_REVIEW_DIR` overrides (e.g., `.context/peer-review-...`) accumulate in the workspace until cleaned.
+After synthesis, `rm -rf "$PEER_REVIEW_DIR"`. The script does not auto-delete; explicit overrides (e.g. `.context/peer-review-...`) accumulate until cleaned.
 
 ## Quick Reference
 
@@ -198,8 +190,7 @@ Files are not auto-deleted by the script. Default `/tmp/peer-review-$$/` paths a
 - Check network connectivity
 
 **"Response is truncated"**
-- First check: are you reading from `$PEER_REVIEW_DIR/<cli>.txt`? If you are reading the bash stdout instead, you are looking at the status block, not the response — switch to the Read tool on the file path.
-- If the file itself is short, the CLI may have hit its own output limit. Reduce prompt length and retry.
+- Read `$PEER_REVIEW_DIR/<cli>.txt` directly (not bash stdout, which is the status block); if the file itself is short, reduce prompt length and retry.
 
 ## See Also
 
