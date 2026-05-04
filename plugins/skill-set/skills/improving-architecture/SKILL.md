@@ -1,6 +1,6 @@
 ---
 name: improving-architecture
-description: Surfaces deep-module refactor candidates across a codebase using domain vocabulary and Ousterhout's depth/seam framing — applies the deletion test, presents candidates with locality and leverage justifications, and hands off to the `grilling-plans` skill for the chosen candidate's design. Use this skill whenever the user mentions architecture, refactoring scope, deep/shallow modules, seams, ports/adapters, modularity, or expresses frustration with tangled code — phrases like "improve architecture", "find refactor opportunities", "deep module", "ball-of-mud area", "this code is a mess", "untangle this", "split this module", "make this testable", "extract a seam", "shallow module", "리팩토링 거리 찾아" — even without the word "architecture". Not for reviewing recently changed code (use `simplify`) or designing new features (use `superpowers:brainstorming`).
+description: Surfaces deep-module refactor candidates across a codebase using domain vocabulary and Ousterhout's depth/seam framing — applies the deletion test, presents candidates with locality and leverage justifications, and hands off to the `grilling-plans` skill for the chosen candidate's design. Use this skill whenever the user mentions architecture, refactoring scope, deep/shallow modules, seams, ports/adapters, modularity, or expresses frustration with tangled code — phrases like "improve architecture", "find refactor opportunities", "deep module", "ball-of-mud area", "this code is a mess", "untangle this", "split this module", "make this testable", "extract a seam", "shallow module" — even without the word "architecture". Not for reviewing recently changed code (use `simplify`) or designing new features (use `superpowers:brainstorming`).
 ---
 
 # Improving Architecture
@@ -16,7 +16,7 @@ Surface architectural friction in a codebase and propose **deepening opportuniti
 - The user wants to schedule architectural improvement work
 - A bug fix or feature surfaces a tangled area worth improving separately
 - Periodic review of an area that has accreted complexity over time
-- User says "improve the architecture", "find refactor opportunities", "리팩토링 거리 찾아", "what should we deepen", "ball of mud"
+- User says "improve the architecture", "find refactor opportunities", "what should we deepen", "ball of mud"
 
 ## Do NOT use for
 

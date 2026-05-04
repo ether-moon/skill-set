@@ -1,6 +1,6 @@
 ---
 name: building-shared-vocabulary
-description: Maintains a project's domain glossary in CONTEXT.md and architecture decisions in docs/adr/ as living artifacts — files are created lazily, updated inline as terms resolve and decisions crystallize, and conflicts with existing entries are surfaced immediately. Use this skill whenever a domain term is being pinned down, a decision sounds ADR-worthy, or vocabulary is about to drift — phrases like "domain glossary", "용어집", "context.md", "ADR 만들자", "도메인 용어 정리", "we should write this down", "let's name this", "what do we call this", "is this worth an ADR", "pin down this term" — and as a side-effect of grilling-plans when terms or decisions surface.
+description: Maintains a project's domain glossary in CONTEXT.md and architecture decisions in docs/adr/ as living artifacts — files are created lazily, updated inline as terms resolve and decisions crystallize, and conflicts with existing entries are surfaced immediately. Use this skill whenever a domain term is being pinned down, a decision sounds ADR-worthy, or vocabulary is about to drift — phrases like "domain glossary", "context.md", "we should write this down", "let's name this", "what do we call this", "is this worth an ADR", "pin down this term" — and as a side-effect of grilling-plans when terms or decisions surface.
 ---
 
 # Building Shared Vocabulary
@@ -18,7 +18,7 @@ A project's **domain glossary** (`CONTEXT.md`) and **architecture decision recor
 - A domain term is being pinned down during conversation (especially during grilling)
 - A term in the user's plan conflicts with how the codebase uses it
 - A decision that is **hard-to-reverse**, **surprising-without-context**, AND **the result of a real trade-off** has been made — record an ADR
-- User explicitly asks to "build a glossary," "set up CONTEXT.md," "add an ADR," "용어집 만들자," "도메인 용어 정리"
+- User explicitly asks to "build a glossary," "set up CONTEXT.md," "add an ADR"
 
 ## Do NOT use for
 

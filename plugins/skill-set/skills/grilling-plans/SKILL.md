@@ -1,6 +1,6 @@
 ---
 name: grilling-plans
-description: Adversarially interrogates an existing plan, design, or proposal before implementation — walks the decision tree one question at a time, provides a recommended answer with each question, prefers codebase exploration over questions, and surfaces contradictions between stated intent and actual code. Use this skill whenever a plan, design doc, RFC, ADR draft, ticket spec, or implementation outline is shared and the user wants review, sanity check, sign-off, or asks "is this ready" — even without the word "grill". Trigger phrases include "grill me", "challenge this plan", "poke holes", "stress test", "내 계획 부숴봐", "구멍 찾아봐". Also use before locking down a spec for implementation.
+description: Adversarially interrogates an existing plan, design, or proposal before implementation — walks the decision tree one question at a time, provides a recommended answer with each question, prefers codebase exploration over questions, and surfaces contradictions between stated intent and actual code. Use this skill whenever a plan, design doc, RFC, ADR draft, ticket spec, or implementation outline is shared and the user wants review, sanity check, sign-off, or asks "is this ready" — even without the word "grill". Trigger phrases include "grill me", "challenge this plan", "poke holes", "stress test". Also use before locking down a spec for implementation.
 ---
 
 # Grilling Plans
@@ -19,7 +19,7 @@ This is a discipline skill. Each rule below corresponds to a specific way grilli
 - Between `superpowers:brainstorming` (creation) and `superpowers:writing-plans` (lock-down)
 - Before invoking `superpowers:executing-plans`
 - Right before a PR description is finalized
-- User says "challenge this", "poke holes", "stress test", "grill me", "내 계획 부숴봐", "구멍 찾아봐"
+- User says "challenge this", "poke holes", "stress test", "grill me"
 - When a candidate is selected from `improving-architecture`
 
 **Do NOT use for:**

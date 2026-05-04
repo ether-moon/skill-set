@@ -1,6 +1,6 @@
 ---
 name: zooming-out-on-code
-description: Draws a higher-level system map of unfamiliar internal/project code in the project's domain vocabulary — describes the module's responsibility, callers, dependencies, and sibling modules without diving into implementation details. Use this skill proactively whenever a user expresses unfamiliarity with a project code area before changing it — phrases like "zoom out", "give me the big picture", "explain this code area", "new to this code", "where does X fit", "what calls this", "tour the module", "before I change this", "이 코드 큰 그림", "이 모듈 어디 쓰여" — even if they don't say "zoom out" explicitly.
+description: Draws a higher-level system map of unfamiliar internal/project code in the project's domain vocabulary — describes the module's responsibility, callers, dependencies, and sibling modules without diving into implementation details. Use this skill proactively whenever a user expresses unfamiliarity with a project code area before changing it — phrases like "zoom out", "give me the big picture", "explain this code area", "new to this code", "where does X fit", "what calls this", "tour the module", "before I change this" — even if they don't say "zoom out" explicitly.
 ---
 
 # Zooming Out On Code
@@ -16,7 +16,7 @@ When dropped into unfamiliar code, the agent's first instinct is often to read t
 - User opens a file or function they don't recognize and asks for context
 - Before proposing changes to an unfamiliar area
 - When a teammate hands off a system you have no prior context on
-- User says "zoom out", "explain this code area", "give me the big picture", "what does this do in context", "이 코드 큰 그림", "이 모듈 어디 쓰여"
+- User says "zoom out", "explain this code area", "give me the big picture", "what does this do in context"
 
 ## Do NOT use for
 
