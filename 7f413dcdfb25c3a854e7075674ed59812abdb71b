@@ -1,0 +1,28 @@
+## Decisions Made
+- Apply OBVIOUS markdown lint fixes immediately: All four MD040 violations (missing language tags on fenced code blocks) qualify as OBVIOUS per the autofixing-and-escalating skill — single, mechanical edit, no ambiguity, satisfies a linter rule. Fixed via `text` language tag.
+- Defer Korean trigger phrase question to user: Although CLAUDE.md states "all repository content must be written in English", the Korean phrases in skill descriptions serve a runtime triggering function for Korean-speaking users. The same pattern exists across all 4 new skills (improving-architecture, zooming-out-on-code, grilling-plans, building-shared-vocabulary), so any change must be applied consistently — escalate to user.
+- Defer checklist-restructuring question to user: CodeRabbit's suggestion to convert process steps into `- [ ]` task items is a substantive structural change to SKILL.md prose, not a mechanical fix. Classified AMBIGUOUS (MAJOR).
+- Recommend SKIP for the MCP-tool-name comment: CodeRabbit flagged ``Agent`` for missing a server prefix, but `Agent` is a built-in Claude Code tool, not an MCP tool. The repo rule about server-qualified MCP names does not apply. Will recommend SKIP to user.
+
+## Problems Encountered
+- No `Agent`/`Task` tool available to dispatch the `pr-review-feedback` sub-agent as the orchestrator workflow expects: Resolved by executing the sub-agent's workflow inline (collect comments via GraphQL, classify, auto-fix obvious, escalate ambiguous).
+- Direct `git commit` blocked by project hook: Resolved by switching to the `knowledge-distillery:memento-commit` skill as the hook directs.
+
+## Constraints Identified
+- Project hook enforces use of `knowledge-distillery:memento-commit` for all commits — direct `git commit` is blocked. Every commit must carry a memento note for the evidence pipeline.
+- Commits must be unsigned/normal (no `--amend`, no `--no-verify`); orchestrator pushes once at the end.
+- The shipping-pr workflow requires pausing on AMBIGUOUS items even though it is described as "PR autopilot" — the user's authorization does not waive the pause.
+
+## Open Questions
+- Korean trigger phrases: keep (runtime triggering for Korean users), remove (strict English-only repo policy), or move to a localized doc? Decision affects all 4 new skills consistently.
+- Should the SKILL.md "Process" section be restructured into copyable `- [ ]` checklists, or does the existing numbered-prose form remain preferable?
+- Confirm SKIP recommendation for the `Agent` tool MCP-name comment — does the user agree this is a CodeRabbit misclassification?
+
+## Context
+Processing 5 CodeRabbit actionable comments on PR #21 (analyze-mattpocock branch) as part of the `/skill-set:pr:ship` workflow. PR has no CI failures and no merge conflicts; only review comments are blocking. This commit lands the 4 OBVIOUS markdown-lint fixes; the remaining 3 AMBIGUOUS items will be presented to the user before any further changes are committed and pushed.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
