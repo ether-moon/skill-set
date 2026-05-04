@@ -1,0 +1,22 @@
+## Decisions Made
+- Remove Korean trigger phrases from all 4 new skills' descriptions and When-to-Use sections, per AGENTS.md "English only" repo policy
+- Skip CodeRabbit's other 2 ambiguous suggestions (checklist restructure, fully-qualified Agent name) — checklist would diverge from repo convention; Agent is a built-in tool not subject to MCP naming rule
+
+## Problems Encountered
+- CodeRabbit flagged Korean trigger phrases as policy violations — initially considered keeping them as runtime triggers but user opted for repo-wide English-only consistency
+
+## Constraints Identified
+- AGENTS.md "Repository Language Policy" overrides convenience of bilingual triggers
+- Korean speakers can still trigger via English phrases or by stating intent in any language (Claude matches semantically, not just lexically)
+
+## Open Questions
+None
+
+## Context
+Session resumed shipping-pr workflow on PR #21. The resolving-pr-blockers agent applied 4 OBVIOUS fixes (markdown lint — text fence labels, commit 7f413dc) and surfaced 3 AMBIGUOUS items. User chose to apply only Item A (remove Korean triggers consistently across 4 skills) and skip B (checklist restructure) and C (Agent name prefix). Result: 8 phrases removed across 4 SKILL.md files.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
