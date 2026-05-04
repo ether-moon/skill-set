@@ -5,6 +5,21 @@ All notable changes to the skill-set plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] - 2026-05-04
+
+### Added
+
+- **grilling-plans**: New skill for adversarial pre-implementation interrogation of an existing plan or design — walks the decision tree one question at a time with recommended answers, prefers codebase exploration over questions, and surfaces contradictions between stated intent and actual code. Inspired by [mattpocock/skills](https://github.com/mattpocock/skills) `grill-me` / `grill-with-docs`.
+- **building-shared-vocabulary**: New skill that maintains a project's domain glossary in `CONTEXT.md` and architecture decisions in `docs/adr/` as living artifacts — files are created lazily, updated inline as terms resolve and decisions crystallize. ADR creation is gated on three criteria (hard-to-reverse, surprising-without-context, real trade-off). Inspired by [mattpocock/skills](https://github.com/mattpocock/skills) `grill-with-docs` (CONTEXT.md / ADR pattern).
+- **zooming-out-on-code**: New skill that draws a higher-level system map of unfamiliar code in the project's domain vocabulary — describes responsibility, callers, dependencies, and sibling modules without diving into implementation. Inspired by [mattpocock/skills](https://github.com/mattpocock/skills) `zoom-out`.
+- **improving-architecture**: New skill that surfaces deep-module refactor candidates across a codebase using Ousterhout's depth/seam framing — applies the deletion test, presents candidates with locality and leverage justifications, and hands off to `grilling-plans` for the chosen candidate's design. Inspired by [mattpocock/skills](https://github.com/mattpocock/skills) `improve-codebase-architecture`.
+- **/skill-set:plan:grill**: Slash command for `grilling-plans`.
+- **/skill-set:code:zoom-out**: Slash command for `zooming-out-on-code`.
+
+### Improved
+
+- **developing-test-first**: Added "Anti-Pattern: Horizontal Slicing" section after the Iron Law to forbid the bulk RED→RED→RED→...→GREEN→GREEN→GREEN pattern that produces tests of imagined rather than actual behavior. Inspired by [mattpocock/skills](https://github.com/mattpocock/skills) `tdd`.
+
 ## [1.11.1] - 2026-05-04
 
 ### Fixed
