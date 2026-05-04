@@ -42,7 +42,7 @@ When deepening shallow modules:
 
 ## Choosing the strategy in practice
 
-```
+```text
 Pure computation?                       → Category 1. Just merge.
 Has a local stand-in?                   → Category 2. Use it.
 Network-bounded, you own both sides?    → Category 3. Port + 2 adapters.

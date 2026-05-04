@@ -67,7 +67,7 @@ Apply the **deletion test** to anything you suspect is shallow: imagine deleting
 
 Number them. For each:
 
-```
+```text
 **N. <Candidate name in domain vocabulary>**
 
 - **Files:** <paths>
@@ -84,7 +84,7 @@ Number them. For each:
 
 **Filled example:**
 
-```
+```text
 **1. Order Intake validation cluster**
 
 - **Files:** src/orders/intake/promotion-check.ts, inventory-check.ts,
@@ -134,7 +134,7 @@ After grilling, ADRs and `CONTEXT.md` updates are owned by `building-shared-voca
 
 ## Process Flow
 
-```
+```text
 orient (read CONTEXT.md and relevant ADRs)
   → explore codebase for friction (optionally via Explore subagents)
   → apply deletion test to suspect shallow modules
