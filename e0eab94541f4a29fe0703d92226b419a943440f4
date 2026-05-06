@@ -1,0 +1,28 @@
+## Decisions Made
+- Apply CodeRabbit's exact diffs for the 4 OBVIOUS fixture issues (line numbers, preamble, empty-dir guards): all four met the autofixing-and-escalating skill's OBVIOUS criteria — single correct fix, verifiable evidence, no design choice.
+- Drop `async` on `adminCreateOrder` rather than add a forward-looking comment: cleaner fixture, no callers depend on the Promise return, and the eval grades on depth/shallow vocabulary not async semantics.
+- Consolidate `module.exports = {...}; exports.version = '...';` to a single object literal in the staged-change fixture: fixes the stale-reference anti-pattern; the seed-history commit narrative is preserved unchanged.
+- Address nitpicks 1, 2, 3 with one canonical EVALS.md at `plugins/skill-set/skills/EVALS.md` plus three slim per-skill README pointers, instead of duplicating doc content across each evals/ directory: keeps the schema doc DRY and discoverable.
+- Skip nitpick 4 (per-expectation `rationale` field): CodeRabbit itself rated it 💤 Low value; current DISCRIMINATING expectations are self-documenting.
+
+## Problems Encountered
+- The parent shipping-pr prompt described one of the inline comments as a "git-config anti-pattern" but the actual CodeRabbit thread at line 66 was about a CommonJS `module.exports` stale-reference anti-pattern: resolved by reading the comment body directly rather than relying on the upstream paraphrase.
+- Two AMBIGUOUS items had reasonable arguments for "preserve as fixture noise" (the gratuitous `async` and the stale CommonJS exports could plausibly be intentional realism): resolved by escalating with rationale + recommendation; user approved both consolidations.
+
+## Constraints Identified
+- The `commit-with-conventional-style` fixture's seed-history commit (`exports.version = '0.1.0';` on line 39) must remain in the *historical* commit — only the *final staged state* is consolidated. Touching the historical commit would invalidate the eval's "5 conventional-style commits" precondition.
+- `adminCreateOrder` has no callers in the fixture, so removing `async` was safe; if a future fixture adds an awaiting caller, the return type change would propagate.
+- Repository policy mandates English for all repo content (CLAUDE.md / AGENTS.md): commit messages, the new EVALS.md, README pointers, and the upcoming PR comment all stay in English even though the user's git output is Korean.
+
+## Open Questions
+- Whether `outputs_dir` should become a real evals.json field consumed by the harness (CodeRabbit's stronger suggestion) — deferred; current change only documents the convention.
+- Whether `base_dir` should become a real evals.json field for path resolution — deferred for the same reason.
+
+## Context
+Resolved CodeRabbit review feedback on PR #23 (`feat: add functional evals for 7 phase-1 skills`). Acting as the resolving-pr-blockers orchestrator with only the pr-review-feedback path active (CI clean, no merge conflicts). Applied 4 OBVIOUS fixture corrections directly, escalated 2 AMBIGUOUS items + 4 nitpicks via AskUserQuestion, then applied the user-approved subset. Files touched: 5 modified fixture files plus 1 new top-level EVALS.md and 3 new per-skill evals/README.md pointers.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
