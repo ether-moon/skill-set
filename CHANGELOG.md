@@ -5,6 +5,15 @@ All notable changes to the skill-set plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.0] - 2026-05-06
+
+### Added
+
+- **applying-coding-baseline**: New skill that applies a curated, pre-vetted set of 6 baseline behavioral discipline rules (Think Before Coding, Simplicity First, Surgical Changes, Goal-Driven Execution, Fail Fast vs Graceful Handling, Documentation Priority) to coding agent directive files (`CLAUDE.md`, `AGENTS.md`, referenced documents). Replaces semantically similar existing content with canonical wording so coverage stays complete and consistent across projects. Skips the `guarding-agent-directives` verification because the rule set is pre-vetted.
+- **/skill-set:baseline:apply**: Slash command for `applying-coding-baseline`.
+- **Functional eval suite**: Added `evals/evals.json` + input fixtures under `plugins/skill-set/skills/<name>/evals/` for 7 phase-1 skills — `applying-coding-baseline`, `autofixing-and-escalating`, `bumping-version`, `building-shared-vocabulary`, `guarding-agent-directives`, `managing-git-workflow`, `improving-architecture`. Each skill has 2 test prompts with structural assertions plus `DISCRIMINATING:` assertions targeting canonical wording, fixed Q1–Q5 labels, OBVIOUS/AMBIGUOUS severity classes, deletion-test framing, and other artifacts only the skill is known to produce consistently.
+- **`plugins/skill-set/skills/EVALS.md`**: Canonical eval schema documentation covering the `DISCRIMINATING:` prefix, files-path resolution, and `outputs/` directory convention.
+
 ## [1.12.0] - 2026-05-04
 
 ### Added
