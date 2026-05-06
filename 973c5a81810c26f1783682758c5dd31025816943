@@ -1,0 +1,34 @@
+## Decisions Made
+- Phase 1 scope = 7 testable skills (the objectively gradeable subset of 18): chosen over running all 18 to keep one-session cost feasible. Skipped: writing-clear-prose (subjective), using-skill-set / creating-skills (meta), ralph / shipping-pr (multi-iteration), consulting-peer-llms (external CLI deps).
+- Deterministic Python grader instead of LLM grader subagents: chosen because the assertions are regex/file-presence checks and an LLM grader would have added ~28 more subagent calls for marginal benefit.
+- Add DISCRIMINATING assertions per skill (canonical wording, exact Q1-Q5 labels, OBVIOUS/AMBIGUOUS severity, deletion-test phrase, etc.): chosen after iteration-1 showed identical 100% pass rates because original assertions only checked file structure.
+- Workspaces under .context/skill-evals/ (transient, gitignored), durable artifacts under each skill's evals/ (committed): chosen so eval infrastructure ships with the skill but runs/grading/viewers stay throwaway.
+- Run 28 parallel subagents in one batch instead of skill-by-skill: chosen to minimize wall-clock; relied on Cowork's parallel agent capacity rather than batching.
+
+## Problems Encountered
+- aggregate_benchmark.py expected <eval>/<config>/run-K/grading.json layout but skill-creator SKILL.md only described <eval>/<config>/outputs/. Resolved by recreating workspace dirs with run-1 layer.
+- benchmark.md showed tokens like 4479 instead of 49377 because aggregate_benchmark fell back to output_chars when grading.json carried timing.total_duration_seconds. Resolved by removing the timing field from grading.json so the script falls back to timing.json which has both seconds and tokens.
+- Grader regex for "Each of the 6 canonical rule headings" was preempted by a more generic "### N." matcher and never ran. Resolved by reordering the specific check before the generic regex.
+- Grader false-positive on autofixing eval-0: intro/summary prose mentioning "unused import" and "typo" was flagged as if those items had been classified ambiguous. Resolved by parsing only the numbered ambiguous-section item titles, not the entire document.
+- Direct `git commit` was blocked by the pre-commit-memento hook. Resolved by switching to the memento-commit workflow (this commit).
+
+## Constraints Identified
+- aggregate_benchmark.py expects exactly <bench>/eval-N/<config>/run-K/grading.json plus <bench>/eval-N/eval_metadata.json — no flexibility.
+- Cowork environment has no display: generate_review.py must be invoked with --static <output_path>, not server mode.
+- Conductor harness gitignores .context/ implicitly even though it isn't in .gitignore — relied on this to keep transient runs/viewers/grader out of the commit.
+- Memento-commit hook enforces that every commit goes through `/knowledge-distillery:memento-commit`; direct `git commit` is rejected with hook exit code.
+
+## Open Questions
+- Whether to promote .context/skill-evals/_grader.py to a committed artifact (e.g. plugins/skill-set/skills/_eval-grader.py) for reuse across future eval iterations. Currently lives only in the transient workspace.
+- For the 3 zero-delta skills (bumping-version, managing-git-workflow, improving-architecture), should iteration-2 redesign evals to target skill-unique behavior (CHANGELOG categories from CLAUDE.md, language detection from non-English repo, CONTEXT.md vocabulary use) instead of industry-standard outputs?
+- Should we add an LLM-based qualitative grader for skills with subjective outputs (writing-clear-prose) that the deterministic grader cannot evaluate?
+- Should the DISCRIMINATING assertions be hard requirements or "nice-to-have"? They reflect canonical-wording strictness that downstream tools (parsers, dashboards) need but human readers may not.
+
+## Context
+This session built a functional eval suite for 7 of the 18 skills in skill-set, executed 28 parallel general-purpose subagent runs to compare with-skill vs without-skill behavior on 14 test cases, built a deterministic per-skill grader, and ran two grading passes — first with structural-only assertions (showed identical 100% pass rates), then after adding DISCRIMINATING assertions targeting canonical wording (showed clear differentiation: 4 skills with measurable gain, 3 with no gain because they codify well-known industry standards). Key paths: plugins/skill-set/skills/*/evals/ (durable, committed), .context/skill-evals/ (transient runs, grader, viewers).
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
