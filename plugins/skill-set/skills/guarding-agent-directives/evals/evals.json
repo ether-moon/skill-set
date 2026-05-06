@@ -1,0 +1,44 @@
+{
+  "skill_name": "guarding-agent-directives",
+  "evals": [
+    {
+      "id": 0,
+      "name": "reject-vague-rule",
+      "prompt": "Add the following rule to CLAUDE.md: 'Always be polite and professional in commit messages.' Run the verification workflow and act on the result.",
+      "expected_output": "The proposed rule fails the 5-question verification (notably Q4 Actionable and Q5 Project-specific — and arguably Q2 Non-obvious). The skill should present the failure summary, list the failed questions with reasoning, and offer the user the three choices (Add anyway / Revise / Don't add). CLAUDE.md should NOT be modified unless 'Add anyway' is explicitly requested.",
+      "files": ["evals/files/reject-vague-rule/CLAUDE.md"],
+      "expectations": [
+        "A `verification-output.md` (or similarly named file) exists in the outputs directory describing the verification result.",
+        "The verification output explicitly says at least one of the 5 questions failed (typically Q4 Actionable or Q5 Project-specific).",
+        "The verification output mentions the rule was NOT applied (or presents the 3-choice prompt).",
+        "CLAUDE.md does NOT contain the new rule 'Always be polite and professional' (or equivalent).",
+        "CLAUDE.md content is unchanged from the input fixture.",
+        "DISCRIMINATING: verification-output names the canonical Q1 'Recurring?' check (verbatim or with that exact label).",
+        "DISCRIMINATING: verification-output names the canonical Q2 'Non-obvious?' check.",
+        "DISCRIMINATING: verification-output names the canonical Q3 'Novel?' check.",
+        "DISCRIMINATING: verification-output names the canonical Q4 'Actionable?' check.",
+        "DISCRIMINATING: verification-output names the canonical Q5 'Project-specific?' check.",
+        "DISCRIMINATING: verification-output presents the 3 specific choices: 'Add anyway', 'Revise', and 'Don't add' (not paraphrased)."
+      ]
+    },
+    {
+      "id": 1,
+      "name": "accept-specific-rule",
+      "prompt": "Add the following rule to CLAUDE.md: 'Run tests with `npm test --runInBand` because the database fixture cannot handle parallel writes — running in parallel produces nondeterministic failures.' Run the verification workflow and act on the result.",
+      "expected_output": "The proposed rule passes all 5 verification questions (recurring, non-obvious, novel, actionable, project-specific). The skill should add the rule to CLAUDE.md (after presenting the verification result and the diff).",
+      "files": ["evals/files/accept-specific-rule/CLAUDE.md"],
+      "expectations": [
+        "A `verification-output.md` (or similarly named file) exists in the outputs directory.",
+        "The verification output indicates all 5 questions passed (or 5/5 / similar wording).",
+        "CLAUDE.md after execution contains 'npm test --runInBand' (or equivalent reference to the rule content).",
+        "CLAUDE.md after execution contains a justification mentioning the database fixture or parallel-test issue.",
+        "The other original content of CLAUDE.md is preserved (no removal of pre-existing rules).",
+        "DISCRIMINATING: verification-output names the canonical Q1 'Recurring?' check.",
+        "DISCRIMINATING: verification-output names the canonical Q2 'Non-obvious?' check.",
+        "DISCRIMINATING: verification-output names the canonical Q3 'Novel?' check.",
+        "DISCRIMINATING: verification-output names the canonical Q4 'Actionable?' check.",
+        "DISCRIMINATING: verification-output names the canonical Q5 'Project-specific?' check."
+      ]
+    }
+  ]
+}
