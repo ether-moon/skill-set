@@ -1,0 +1,24 @@
+## Decisions Made
+- Classify all 3 CodeRabbit comments as OBVIOUS: factual rule-count corrections and a markdownlint MD040 compliance fix all met the autofixing-and-escalating OBVIOUS criteria (correctness clear, scope localized, reversible, no design judgment).
+- Commit scope tag chosen as `applying-coding-baseline`: both files document the same skill, so a single skill-scoped commit is more informative than `docs:` alone.
+- Use code fence language `text` (not `markdown`): the block contains a plan listing, not markdown syntax.
+
+## Problems Encountered
+- Initial git status showed `plugins/skill-set/skills/applying-coding-baseline/` as untracked, but verifying after fetch confirmed the directory was already part of HEAD b3f457c — only the two edited files were pending.
+
+## Constraints Identified
+- Project requires `/knowledge-distillery:memento-commit` workflow (pre-commit hook blocks plain `git commit`): drove use of memento-commit skill instead of direct commit.
+- Orchestrator pushes once at the end: this commit must NOT push; push is deferred to the parent shipping-pr session.
+- Repository content stays in English per project policy (CLAUDE.md/AGENTS.md): commit message and memento written in English.
+
+## Open Questions
+- None
+
+## Context
+Resolving CodeRabbit review blockers on PR #22 (`feat: add applying-coding-baseline skill`). Three actionable inline comments were collected via GraphQL, all classified as OBVIOUS, and fixed in two files: `AGENTS.md` (skill summary line 18) and `plugins/skill-set/skills/applying-coding-baseline/SKILL.md` (frontmatter description line 3 + Plan code fence at line 64). PR is otherwise CI-clean and conflict-free; this commit completes the only remaining blockers prior to the orchestrator's final push.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
