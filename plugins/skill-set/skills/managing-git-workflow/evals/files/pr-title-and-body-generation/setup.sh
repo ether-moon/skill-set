@@ -3,6 +3,11 @@
 # Branch name uses ticket prefix PROJ-123 to test ticket extraction.
 set -euo pipefail
 
+if [[ -d .git ]] || [[ -n "$(ls -A 2>/dev/null)" ]]; then
+  echo "Error: run setup.sh in an empty directory (no .git, no existing files)." >&2
+  exit 1
+fi
+
 git init -q -b main
 git config user.email "fixture@example.com"
 git config user.name "Fixture User"

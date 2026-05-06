@@ -3,6 +3,11 @@
 # Run this from inside an empty work directory before invoking the skill.
 set -euo pipefail
 
+if [[ -d .git ]] || [[ -n "$(ls -A 2>/dev/null)" ]]; then
+  echo "Error: run setup.sh in an empty directory (no .git, no existing files)." >&2
+  exit 1
+fi
+
 git init -q -b main
 git config user.email "fixture@example.com"
 git config user.name "Fixture User"
@@ -62,8 +67,7 @@ function normalizeNestedArrays(v) {
   return v;
 }
 
-module.exports = { parse, normalizeNestedArrays };
-exports.version = '0.1.0';
+module.exports = { parse, normalizeNestedArrays, version: '0.1.0' };
 EOF
 git add -A
 

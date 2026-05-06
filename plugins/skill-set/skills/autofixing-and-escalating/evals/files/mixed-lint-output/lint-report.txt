@@ -1,5 +1,5 @@
 src/user.js:1:1: error: 'path' is defined but never used (no-unused-vars)
 src/user.js:5:6: warning: typo in comment: "recieves" should be "receives" (spell)
-src/user.js:8:1: info: prefer snake_case over camelCase for function names (style/naming-convention)
+src/user.js:14:3: info: prefer snake_case over camelCase for function names (style/naming-convention)
 src/order.js:12:3: suggestion: consider extracting validateOrder() into a separate validation module for better separation of concerns (design)
-src/order.js:25:1: info: function getOrderTotal() — could be more performant with memoization (performance)
+src/order.js:18:3: info: function getOrderTotal() — could be more performant with memoization (performance)
