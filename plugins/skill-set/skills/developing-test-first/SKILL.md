@@ -49,6 +49,33 @@ Write code before the test? Delete it. Start over.
 
 Implement fresh from tests. Period.
 
+## Anti-Pattern: Horizontal Slicing
+
+The Iron Law forbids production code without a failing test, but it does not by itself forbid writing five tests up front and then five implementations. That sequence — **horizontal slicing** — is the most common way TDD silently fails.
+
+```
+WRONG (horizontal):
+  RED  RED  RED  RED  RED  →  GREEN GREEN GREEN GREEN GREEN
+
+RIGHT (vertical / tracer bullet):
+  RED → GREEN, RED → GREEN, RED → GREEN, ...
+```
+
+Why horizontal slicing produces bad tests:
+
+- **Tests written in bulk verify *imagined* behavior, not actual behavior.** The implementation hasn't been built yet, so the tests can only assert against guesses.
+- **They test the *shape* of things** — data structures, function signatures, return types — instead of user-facing behavior.
+- **They become insensitive to real changes.** They pass when the system breaks in ways the bulk-author didn't anticipate; they fail when behavior is fine but a signature shifted.
+- **You out-run your headlights.** Committing to test structure before any implementation feedback locks you into assumptions you haven't validated.
+
+Why vertical slicing works:
+
+- Each test responds to what the previous cycle taught you
+- You write the test you actually need, because you just felt the implementation
+- Tests stay honest because they were written against working code, not imagination
+
+**Rule:** one test, one implementation, one cycle. Then the next.
+
 ## Red-Green-Refactor
 
 ```dot

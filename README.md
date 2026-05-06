@@ -109,6 +109,8 @@ Skills are automatically available after installing the plugin. Claude will use 
 /skill-set:ralph:execute
 /skill-set:pr-review:fix
 /skill-set:consulting:review
+/skill-set:plan:grill
+/skill-set:code:zoom-out
 ```
 
 ## Project Structure
@@ -163,6 +165,16 @@ Contributions welcome! Please see [AGENTS.md](AGENTS.md) for development guideli
 ## License
 
 MIT
+
+## Acknowledgements
+
+The following skills were inspired by [mattpocock/skills](https://github.com/mattpocock/skills) (MIT license):
+
+- `grilling-plans` ← `grill-me` / `grill-with-docs`
+- `building-shared-vocabulary` ← `grill-with-docs` (CONTEXT.md / ADR pattern)
+- `zooming-out-on-code` ← `zoom-out`
+- `improving-architecture` ← `improve-codebase-architecture`
+- `developing-test-first` (Horizontal Slicing section) ← `tdd`
 
 ## Changelog
 
