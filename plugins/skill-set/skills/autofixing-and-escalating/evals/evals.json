@@ -1,0 +1,50 @@
+{
+  "skill_name": "autofixing-and-escalating",
+  "evals": [
+    {
+      "id": 0,
+      "name": "mixed-lint-output",
+      "prompt": "Process this lint report and apply the appropriate fixes. The lint output is in lint-report.txt and the source files are in the same fixture directory. For OBVIOUS items, fix them directly in the files. For AMBIGUOUS items, do NOT modify code — produce a markdown file `escalation.md` summarizing each ambiguous item with rationale and recommendation. Save modified source files and `escalation.md` to the outputs directory.",
+      "expected_output": "Source files contain the auto-fixed obvious items. An escalation.md file lists the ambiguous items with 'Why ambiguous' explanations and severity (CRITICAL/MAJOR/MINOR).",
+      "files": [
+        "evals/files/mixed-lint-output/lint-report.txt",
+        "evals/files/mixed-lint-output/src/user.js",
+        "evals/files/mixed-lint-output/src/order.js"
+      ],
+      "expectations": [
+        "src/user.js no longer contains the unused import line `const path = require('path');`.",
+        "src/user.js comment typo 'recieves' is corrected to 'receives'.",
+        "An `escalation.md` file is produced in the outputs directory.",
+        "escalation.md mentions the style/naming preference issue (camelCase vs snake_case) as ambiguous.",
+        "escalation.md mentions the architectural suggestion ('consider extracting validateOrder') as ambiguous.",
+        "escalation.md does NOT classify the unused-import or typo as ambiguous (those should have been auto-fixed).",
+        "src/order.js was not modified to extract validateOrder (ambiguous items are not auto-applied).",
+        "DISCRIMINATING: escalation.md uses the canonical 'Why ambiguous' label (verbatim).",
+        "DISCRIMINATING: escalation.md assigns canonical severity (CRITICAL, MAJOR, or MINOR) to at least one ambiguous item.",
+        "DISCRIMINATING: escalation.md uses the canonical 'OBVIOUS' / 'AMBIGUOUS' classification labels (verbatim, uppercase)."
+      ]
+    },
+    {
+      "id": 1,
+      "name": "mixed-pr-review-comments",
+      "prompt": "A reviewer left comments on this PR. The comments are in `review-comments.md` and the changed file is `src/auth.js`. Process the comments: auto-apply OBVIOUS fixes to `src/auth.js` and produce `escalation.md` for AMBIGUOUS items. Save the modified `src/auth.js` and `escalation.md` to the outputs directory.",
+      "expected_output": "src/auth.js is patched to fix the null-check bug (OBVIOUS). escalation.md lists the design-pattern suggestion and the hedged 'maybe extract' comment as ambiguous, each with a 'Why ambiguous' explanation.",
+      "files": [
+        "evals/files/mixed-pr-review-comments/review-comments.md",
+        "evals/files/mixed-pr-review-comments/src/auth.js"
+      ],
+      "expectations": [
+        "src/auth.js contains a null/undefined check on `user` before `user.id` is dereferenced (OBVIOUS bug fix applied).",
+        "escalation.md exists in the outputs directory.",
+        "escalation.md mentions the 'consider using strategy pattern' comment as AMBIGUOUS.",
+        "escalation.md mentions the 'maybe extract password validation' hedged comment as AMBIGUOUS.",
+        "escalation.md provides a 'Why ambiguous' rationale for at least one item.",
+        "src/auth.js does NOT have a strategy pattern refactor applied (ambiguous suggestion was correctly not auto-applied).",
+        "src/auth.js does NOT have password validation extracted into a separate function (hedged suggestion was correctly not auto-applied).",
+        "DISCRIMINATING: escalation.md uses the canonical 'Why ambiguous' label (verbatim).",
+        "DISCRIMINATING: escalation.md assigns canonical severity (CRITICAL, MAJOR, or MINOR) to at least one ambiguous item.",
+        "DISCRIMINATING: escalation.md notes hedging language ('maybe', 'consider', 'could') as a reason at least one item is ambiguous (per the skill's ALWAYS-AMBIGUOUS rule)."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+a1b2c3d feat: add streaming response mode for long-running queries
+e4f5g6h feat(cli): support `--json` output format
+i7j8k9l fix: handle null values in nested objects gracefully
+m1n2o3p fix(parser): off-by-one in array index calculation
+q4r5s6t feat: new `--dry-run` flag for safer execution

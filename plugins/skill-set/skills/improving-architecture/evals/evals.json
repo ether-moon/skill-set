@@ -1,0 +1,53 @@
+{
+  "skill_name": "improving-architecture",
+  "evals": [
+    {
+      "id": 0,
+      "name": "shallow-validators-cluster",
+      "prompt": "Look at the `src/orders/` directory in this fixture. Find architectural improvement opportunities — produce a numbered list of refactor candidates. For each, include: Files, Problem, Solution, Locality gain, Leverage gain, Test impact. Save the candidates list to `outputs/candidates.md`. Stop after presenting candidates — do NOT invoke grilling-plans or design new interfaces. The fixture has a known shallow-module problem.",
+      "expected_output": "candidates.md lists at least one candidate. The top candidate identifies the cluster of three shallow validators using domain vocabulary and the deep/shallow framing. Each candidate includes the 6 required fields.",
+      "files": [
+        "evals/files/shallow-validators-cluster/src/orders/route.ts",
+        "evals/files/shallow-validators-cluster/src/orders/admin.ts",
+        "evals/files/shallow-validators-cluster/src/orders/promotion-check.ts",
+        "evals/files/shallow-validators-cluster/src/orders/inventory-check.ts",
+        "evals/files/shallow-validators-cluster/src/orders/credit-check.ts"
+      ],
+      "expectations": [
+        "outputs/candidates.md exists.",
+        "candidates.md identifies at least one candidate (numbered as `**1.`, `## 1.`, `### 1.`, or similar).",
+        "candidates.md mentions at least two of the three validators by name (promotion-check, inventory-check, credit-check).",
+        "candidates.md includes a `Files:` (or similar) field listing source paths.",
+        "candidates.md includes a `Problem:` (or similar) field describing the friction.",
+        "candidates.md includes a `Solution:` (or similar) field describing the proposed change.",
+        "candidates.md mentions 'Locality' or 'locality gain' for at least one candidate.",
+        "candidates.md mentions 'Leverage' or 'leverage gain' for at least one candidate.",
+        "candidates.md mentions test impact (matches case-insensitive regex `test impact|test:`).",
+        "DISCRIMINATING: candidates.md uses the canonical depth/shallow vocabulary ('shallow', 'deep', or 'depth').",
+        "DISCRIMINATING: candidates.md uses 'seam' or 'interface' as canonical architectural vocabulary (not just 'service' / 'component').",
+        "DISCRIMINATING: candidates.md frames the solution in terms of collapsing/hiding behind a single interface (canonical 'deep module' framing)."
+      ]
+    },
+    {
+      "id": 1,
+      "name": "deletion-test-on-thin-wrapper",
+      "prompt": "Apply the deletion test to `src/utils/string-helper.ts` in this fixture. Decide whether the module is shallow (and should be inlined) or deep (and should stay). Save your reasoning to `outputs/deletion-test-result.md`, with a clear final verdict (one of: KEEP / DELETE-AND-INLINE / NEEDS-MORE-INFO).",
+      "expected_output": "deletion-test-result.md walks through the deletion test. The verdict should be DELETE-AND-INLINE because string-helper.ts only re-exports a one-line function. The reasoning should reference at least one caller and explain why complexity does NOT reappear if it's inlined.",
+      "files": [
+        "evals/files/deletion-test-on-thin-wrapper/src/utils/string-helper.ts",
+        "evals/files/deletion-test-on-thin-wrapper/src/feature-a.ts",
+        "evals/files/deletion-test-on-thin-wrapper/src/feature-b.ts"
+      ],
+      "expectations": [
+        "outputs/deletion-test-result.md exists.",
+        "deletion-test-result.md contains the verdict 'DELETE-AND-INLINE' (case-insensitive match acceptable).",
+        "deletion-test-result.md references at least one caller (feature-a or feature-b).",
+        "deletion-test-result.md explains why complexity does NOT reappear when inlined (reasoning, not just verdict).",
+        "deletion-test-result.md does NOT recommend KEEP.",
+        "DISCRIMINATING: deletion-test-result.md explicitly invokes the canonical 'deletion test' framing (uses the phrase 'deletion test' or walks the test's steps).",
+        "DISCRIMINATING: deletion-test-result.md uses canonical depth vocabulary ('shallow', 'deep', or 'depth').",
+        "DISCRIMINATING: deletion-test-result.md notes that complexity 'does not reappear' (or 'no complexity reappears') across callers — the canonical pass-through detection."
+      ]
+    }
+  ]
+}
