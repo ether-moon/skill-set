@@ -1,6 +1,6 @@
 ---
 name: applying-coding-baseline
-description: Applies a curated, pre-vetted set of baseline behavioral discipline rules (Think Before Coding, Simplicity First, Surgical Changes, Goal-Driven Execution) to coding agent directive files such as CLAUDE.md, AGENTS.md, and their referenced documents. Replaces semantically similar existing content with the standard canonical wording so coverage stays complete and consistent. Use whenever the user wants to seed a new project's directive files, supplement an existing CLAUDE.md/AGENTS.md with baseline coding discipline, normalize ad-hoc rules to canonical wording, or audit a repo against the standard set. Trigger phrases include "apply baseline rules", "install coding baseline", "supplement CLAUDE.md with standard rules", "seed AGENTS.md with discipline directives", "add baseline coding rules", "normalize agent directives". Skips guarding-agent-directives verification because the rule set is already pre-vetted.
+description: Applies a curated, pre-vetted set of baseline behavioral discipline rules (Think Before Coding, Simplicity First, Surgical Changes, Goal-Driven Execution, Fail Fast vs Graceful Handling, Documentation Priority) to coding agent directive files such as CLAUDE.md, AGENTS.md, and their referenced documents. Replaces semantically similar existing content with the standard canonical wording so coverage stays complete and consistent. Use whenever the user wants to seed a new project's directive files, supplement an existing CLAUDE.md/AGENTS.md with baseline coding discipline, normalize ad-hoc rules to canonical wording, or audit a repo against the standard set. Trigger phrases include "apply baseline rules", "install coding baseline", "supplement CLAUDE.md with standard rules", "seed AGENTS.md with discipline directives", "add baseline coding rules", "normalize agent directives". Skips guarding-agent-directives verification because the rule set is already pre-vetted.
 ---
 
 # Applying Coding Baseline
@@ -61,7 +61,7 @@ Build an ordered plan: `[rule, action, target file, location]`.
 
 Show the user the plan in their language. Example:
 
-```
+```text
 Plan:
 1. Rule 1 (Think Before Coding)               INSERT into CLAUDE.md
 2. Rule 2 (Simplicity First)                  REPLACE existing "Don't over-engineer" in CLAUDE.md
