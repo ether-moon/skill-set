@@ -15,10 +15,11 @@
 6. **ralph**: Plans and executes implementation work via Ralph Wiggum loop with Task subagents — two modes (PLANNING/BUILDING), fresh context per iteration, declarative spec with acceptance criteria, gap analysis per iteration
 7. **writing-clear-prose**: Guides writing and revision of explanatory text, persuasive proposals, and technical documents with 4 core principles
 8. **guarding-agent-directives**: Guards agent directive files against bloat by verifying additions through strict criteria while preserving user authority
-9. **autofixing-and-escalating**: Auto-fixes obvious issues and escalates ambiguous ones for user decision — classifies by clarity of correctness, applies obvious fixes automatically, presents ambiguous items with rationale and recommendations
-10. **developing-test-first**: Enforces strict test-driven development discipline — Iron Law (no production code without a failing test), Red/Green/Refactor cycle, rationalization prevention
-11. **driving-with-tests**: Guides test strategy beyond TDD — orient (run suite first), probe (manual exploration), guard (test governance), multi-layer test architecture
-12. **shipping-pr**: Drives PR end-to-end — creates the PR (delegates to managing-git-workflow), polls CI and CodeRabbit reviews, dispatches resolving-pr-blockers when blockers appear, and re-polls after each fix-push cycle until clean or convergence fails
+9. **applying-coding-baseline**: Applies a curated, pre-vetted set of baseline behavioral discipline rules (Think Before Coding, Simplicity First, Surgical Changes, Goal-Driven Execution) to coding agent directive files — replaces semantically similar existing content with canonical wording; skips guarding verification because the set is pre-vetted
+10. **autofixing-and-escalating**: Auto-fixes obvious issues and escalates ambiguous ones for user decision — classifies by clarity of correctness, applies obvious fixes automatically, presents ambiguous items with rationale and recommendations
+11. **developing-test-first**: Enforces strict test-driven development discipline — Iron Law (no production code without a failing test), Red/Green/Refactor cycle, rationalization prevention
+12. **driving-with-tests**: Guides test strategy beyond TDD — orient (run suite first), probe (manual exploration), guard (test governance), multi-layer test architecture
+13. **shipping-pr**: Drives PR end-to-end — creates the PR (delegates to managing-git-workflow), polls CI and CodeRabbit reviews, dispatches resolving-pr-blockers when blockers appear, and re-polls after each fix-push cycle until clean or convergence fails
 
 #### Agents
 1. **resolving-pr-blockers**: Orchestrator that scans a PR for all blockers (CI failures, merge conflicts, review comments) and dispatches specialized sub-agents to resolve them. Each sub-agent commits independently; orchestrator pushes once at the end.
@@ -102,6 +103,10 @@ plugins/
     │   │   ├── SKILL.md
     │   │   └── reference/
     │   │       └── verification.md
+    │   ├── applying-coding-baseline/
+    │   │   ├── SKILL.md
+    │   │   └── reference/
+    │   │       └── baseline-rules.md
     │   ├── developing-test-first/
     │   │   ├── SKILL.md
     │   │   └── reference/
