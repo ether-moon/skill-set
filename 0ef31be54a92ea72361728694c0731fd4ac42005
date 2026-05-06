@@ -1,0 +1,27 @@
+## Decisions Made
+- Bump level: minor (1.12.0 -> 1.13.0): chosen because PRs #22 (applying-coding-baseline skill) and #23 (functional eval suite for 7 skills) since 1.12.0 are both backwards-compatible feature additions.
+- Use the bumping-version skill's worktree pattern (origin/main checkout): avoids touching the user's strengthen-skill-validation working tree and ensures the changelog reflects only merged commits.
+- Excluded the eval-fixture plugin.json from version detection: plugins/skill-set/skills/bumping-version/evals/files/minor-bump-plugin-json/.claude-plugin/plugin.json is a test input (name=example-plugin) for the bumping-version skill itself, not a real project manifest.
+- Open a PR rather than push directly to main: branch policy expectation (main protected on origin); branch bump-version-1.13.0 will host the PR.
+
+## Problems Encountered
+- Worktree creation under .git/worktrees-tmp/ failed because Conductor's .git is a file (gitdir link), not a directory. Resolved by creating the worktree as a sibling path: ../bump-wt-1778057531/.
+- The current version on origin/main is 1.12.0, but the most recent chore: bump commit on main is 1.11.1. The 1.12.0 bump was performed inside PR #21 rather than as its own chore: bump commit, slightly violating the skill rule "Bump commit is always its own commit". This bump corrects the cadence by isolating 1.13.0 as a standalone chore: bump commit.
+- Initial direct `git -C "$WT_PATH" commit` was blocked by the pre-commit-memento hook even though it included the heredoc note attachment. Resolved by re-entering the memento-commit skill so the hook permits the next commit attempt.
+
+## Constraints Identified
+- Pre-commit-memento hook blocks direct git commit on this repo unless invoked from within the memento-commit skill flow. The bumping-version skill's plain `git -C "$WT" commit -m "..."` cannot run as-is and must be wrapped in memento-commit.
+- main is likely protected on origin; PR fallback path is the realistic one for the bumping-version skill's Step 8.
+
+## Open Questions
+- Should the bumping-version skill be patched to detect and exclude eval-fixture plugin.json files (e.g., by skipping anything under */evals/files/* or matching a different "name" field)? Currently relies on operator judgment.
+- Should the project tighten "bump commit is its own commit" to a CI check, given that 1.12.0 was bumped inside a feature PR rather than separately?
+
+## Context
+This commit bumps the skill-set plugin version from 1.12.0 to 1.13.0 (minor) and prepends a Keep-a-Changelog [1.13.0] - 2026-05-06 entry to CHANGELOG.md covering PR #22 (applying-coding-baseline skill + slash command) and PR #23 (functional eval suite for 7 skills + EVALS.md schema doc). Performed in a temporary worktree at ../bump-wt-1778057531/ checked out at origin/main on a new branch bump-version-1.13.0; the user's strengthen-skill-validation working tree was not touched. Next step: push the branch + open a PR against main.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
