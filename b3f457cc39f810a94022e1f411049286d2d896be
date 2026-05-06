@@ -1,0 +1,34 @@
+## Decisions Made
+- Skill name `applying-coding-baseline` (gerund pattern): chosen over `supplementing-agent-directives` to avoid trigger ambiguity with `guarding-agent-directives`
+- Skip `guarding-agent-directives` verification on insertion: the curated set is pre-vetted by construction; user authority preserved via per-rule opt-out at Step 4
+- On duplicate detection: REPLACE with canonical wording (not insert-only): user requirement to normalize ad-hoc rules across projects
+- Data-driven extension via `reference/baseline-rules.md`: new rules added by appending a `## Rule N` section, no code changes needed
+- Started with 4 rules, expanded to 6: Rule 5 (Fail Fast vs Graceful Handling) and Rule 6 (Documentation Priority) added on user request after initial implementation
+- Generalize framework-specific wording (Rails / YARD): replace with framework-neutral terms ("API doc comments at class/module/function level") and keep tool-specific names only as detection keywords (javadoc, doxygen, jsdoc, docstring)
+- Keep existing "No error handling for impossible scenarios" alongside new "No over-defending" bullet: removing the original would drop detection-keyword coverage for projects that already have it phrased that way
+
+## Problems Encountered
+- skill-creator's `aggregate_benchmark.py` expects `eval-N/<config>/run-1/grading.json` directory layout; my evals were at `eval-N/<config>/grading.json`. Resolved by writing `benchmark.json` directly using the documented schema in `references/schemas.md`.
+- Eval 3 (already-canonical) was non-discriminating: both configurations correctly skipped because the test prompt explicitly contained "only change what's needed". Noted as a limitation in benchmark.json analyst notes.
+- Eval 2 with-skill changed section ordering when applying replacements (moved "Use existing libraries" to before the new section). All assertions still passed but exact layout preservation could be tightened in a follow-up iteration.
+
+## Constraints Identified
+- Directive content (CLAUDE.md / AGENTS.md / referenced docs) must be in English: project policy stated in AGENTS.md and user memory
+- Reference files over 100 lines should include a table of contents at the top: per skill-creator's `reference/structure.md`
+- macOS shells without GNU coreutils need `gtimeout` (Homebrew) instead of `timeout`: skill-creator's shipping-pr workflow detects and falls back
+- The skill must coexist with `guarding-agent-directives` without invoking it: justified in SKILL.md "Skipping verification" section
+
+## Open Questions
+- Eval fixtures for `eval-3-canonical` are now stale after Rule 2/5/6 additions; need refresh before any iteration-2 re-run
+- Cross-model testing (Sonnet, Haiku) deferred — only Opus 4.7 was used during eval execution
+- Description trigger optimization via `run_loop.py` deferred — current functional eval already shows reliable triggering, but trigger-rate metrics not measured
+- Version bump policy unclear: project pattern is bump-after-merge (separate `chore: bump version` commit), so no version change in this PR
+
+## Context
+Created `plugins/skill-set/skills/applying-coding-baseline/`, a new skill that inserts a curated set of behavioral discipline rules into coding agent directive files. Files: `SKILL.md` (120 lines), `reference/baseline-rules.md` (258 lines), with `AGENTS.md` updated to register the skill. Validation: ran a 3-case skill-creator eval loop with 6 parallel subagents (3 with-skill, 3 baseline), giving 100% pass rate with-skill vs 46% baseline. Validated against `creating-skills` checklist (one issue found and fixed: missing TOC on a >100-line reference file). Iterated twice to add Rules 5 and 6 with framework-neutral wording. Outcome: completed and ready for PR.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
