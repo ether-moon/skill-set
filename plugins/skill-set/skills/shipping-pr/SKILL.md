@@ -30,7 +30,7 @@ Closed-loop orchestrator that takes a PR from creation to clean-merge-ready stat
 ```text
 /skill-set:pr:ship
 ```
-Creates the PR if missing, waits for required CI checks (≤30 min) and CodeRabbit review on the new HEAD (≤10 min), runs `resolving-pr-blockers` if blockers found, then re-polls after the resolver's push. Stops at clean PR, max-cycles=3, or convergence failure.
+Creates the PR if missing, waits for required CI checks (≤30 min) and CodeRabbit's review-completion status on the new HEAD (≤30 min), runs `resolving-pr-blockers` if blockers found, then re-polls after the resolver's push. Stops at clean PR, max-cycles=3, or convergence failure.
 
 **Single attempt, fail fast on no-progress:**
 ```text
@@ -57,7 +57,7 @@ Always keep in English: bash commands, file paths, technical identifiers.
 |------|---------|---------|
 | `--max-cycles N` | 3 | Hard cap on poll→fix cycles before giving up |
 | `--ci-timeout MIN` | 30 | Per-cycle wall clock cap for CI stabilization |
-| `--review-timeout MIN` | 10 | Per-cycle wall clock cap for CodeRabbit incremental review |
+| `--review-timeout MIN` | 30 | Per-cycle safety cap on waiting for CodeRabbit's review-completion status |
 | `--no-coderabbit` | off | Force-disable CodeRabbit waiting regardless of detection |
 | `--no-create` | off | Error out if no PR exists for current branch (don't create) |
 | `--required-only=BOOL` | true | Wait only on required checks (false = wait on advisory checks too) |
@@ -131,7 +131,7 @@ while [ $cycle -le $MAX_CYCLES ]; do
   echo "=== ship cycle $cycle / $MAX_CYCLES ==="
   # [Step 2] Wait for new HEAD's check-runs to register
   # [Step 3] CI stabilization (chunked)
-  # [Step 4] CodeRabbit incremental review wait
+  # [Step 4] CodeRabbit review-completion wait
   # [Step 5] Blocker assessment
   # [Step 6] Dispatch resolving-pr-blockers
   # [Step 7] Convergence check (may exit 0 clean / exit 1 stuck)
@@ -157,12 +157,13 @@ This skill adds **only** the polling loop, SHA tracking, and convergence guard.
 
 ## Common Mistakes
 
-See `reference/troubleshooting.md` for the full Problem/Fix list — six common pitfalls including stale check reads, missing `commit_id` filters, advisory-check waits, and `mergeable == UNKNOWN` mishandling.
+See `reference/troubleshooting.md` for the full Problem/Fix list — six common pitfalls including stale check reads, CodeRabbit review timeouts misjudged as clean, advisory-check waits, and `mergeable == UNKNOWN` mishandling.
 
 ## Success Criteria
 
 - Loop terminates with one of: clean PR, max-cycles reached, convergence failure, CI timeout, or PR closed/merged
 - Each cycle's report includes: cycle number, CI failure count, conflict status, HEAD SHA before/after fix
 - No spurious early-clean exits from stale checks or stale reviews
+- A pending or incomplete CodeRabbit review never yields a clean verdict — Step 7 reports "not verified" (`exit 1`) instead
 - Interactive AMBIGUOUS prompts from `pr-review-feedback` reach the user and the loop resumes after their response
 - Bash tool's 10-min limit never causes data loss (chunked re-entry preserves cycle state)

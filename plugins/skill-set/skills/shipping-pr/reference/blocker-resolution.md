@@ -30,6 +30,11 @@ HARD_BLOCKERS=false
 # Review comments are assessed inside resolving-pr-blockers — don't pre-scan here
 ```
 
+`REVIEW_VERIFIED` (set in Step 4) is carried through to Step 7 unchanged. A
+pending CodeRabbit review is not a blocker to *fix* — it is an unverified
+condition — so it stays out of `HARD_BLOCKERS` and gates the "clean" verdict
+separately in Step 7.
+
 If `FAIL_CT == 0` AND `CONFLICT == false`: invoke `resolving-pr-blockers` once anyway so it can scan for unresolved review comments. If that agent then finds no review work either, it exits with no commit, which Step 7 will detect (via `HARD_BLOCKERS=false`) and treat as terminal "clean".
 
 ## Step 6: Dispatch resolving-pr-blockers
@@ -59,15 +64,23 @@ if [ "$PRE_SHA" = "$POST_SHA" ]; then
     echo "No new commit produced by resolving-pr-blockers — fix cannot make progress"
     echo "Last-cycle blockers: CI failures=$FAIL_CT, conflicts=$CONFLICT"
     exit 1
+  elif [ "$WAIT_CR" = "true" ] && [ "$REVIEW_VERIFIED" = "false" ]; then
+    # CodeRabbit is active for this repo but its review for HEAD never completed
+    # within --review-timeout. "No new commit" here means "nothing to fix YET",
+    # not "nothing to fix" — declaring clean would be the premature-exit bug.
+    echo "CodeRabbit review for HEAD ($TARGET_SHA) did not complete within --review-timeout min"
+    echo "PR is NOT verified clean — re-run /skill-set:pr:ship later to finish the review"
+    exit 1
   else
-    # No CI failures, no conflicts, and no review comments to act on — PR is clean.
+    # CI green, no conflicts, and CodeRabbit's completed review produced no
+    # actionable fix (or CodeRabbit is not in use) — PR is genuinely clean.
     echo "PR is clean — cycle $cycle done"
     exit 0
   fi
 fi
 ```
 
-This single signal replaces blocker-set diffing. If the resolver pushed a commit, the situation has changed enough to warrant another cycle. If it didn't, the `HARD_BLOCKERS` flag from Step 5 disambiguates "nothing to do" (clean exit) from "tried and failed" (stuck exit).
+This single signal replaces blocker-set diffing. If the resolver pushed a commit, the situation has changed enough to warrant another cycle. If it didn't, two flags disambiguate the three no-commit cases: `HARD_BLOCKERS` (from Step 5) separates "tried and failed" (stuck, exit 1) from the rest, and `REVIEW_VERIFIED` (from Step 4) separates "CodeRabbit hasn't finished reviewing yet" (unverified, exit 1) from a genuine clean exit. A clean exit therefore requires CI green, no conflicts, **and** a completed CodeRabbit review whenever CodeRabbit is active.
 
 ## Step 8: Cycle bookkeeping
 
