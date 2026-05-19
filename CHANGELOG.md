@@ -5,6 +5,12 @@ All notable changes to the skill-set plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.1] - 2026-05-19
+
+### Fixed
+
+- **shipping-pr**: No longer declares a PR clean before CodeRabbit finishes reviewing a pushed fix. Step 4 previously used a fixed 10-minute review timeout — shorter than CodeRabbit's real latency (~15 min observed) — and on timeout Step 7 treated the absent review as "nothing to fix" and exited clean. Step 4 now polls the `CodeRabbit` commit status until it leaves `pending` (a real per-commit completion signal), chunked under the Bash 10-minute limit; Step 7 refuses a clean verdict unless that review completed, exiting "not verified" otherwise. `--review-timeout` default raised 10 → 30 min as a safety cap.
+
 ## [1.13.0] - 2026-05-06
 
 ### Added
