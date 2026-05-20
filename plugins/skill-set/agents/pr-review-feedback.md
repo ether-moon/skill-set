@@ -50,7 +50,8 @@ This agent applies the `autofixing-and-escalating` skill to PR review comments.
 - Include reviewer name and bot/human status with each classified item
 - If auto-fix of an OBVIOUS item fails, move to AMBIGUOUS with explanation
 - Resolution report includes `(reviewer: @name)` attribution
-- Bot resolution: if items came from CodeRabbit, prepend `@coderabbitai resolve` to PR comment
+- **Summary comment is universal**: post the Phase 5.2 summary whenever ≥1 review comment was collected, regardless of reviewer (human, Codex, Claude, CodeRabbit, etc.) and regardless of how many fixes were applied — it is the procedural acknowledgement reviewers expect
+- **CodeRabbit resolve header is additive**: prepend `@coderabbitai resolve` to the summary only when CodeRabbit appears in the PR's *actual reviewer/commenter set* (detected via the GitHub API, not the post-filter collected items)
 
 ## Language Detection
 
@@ -200,17 +201,35 @@ Continue the resolution workflow:
 
 ### Phase 5: Completion
 
-**Step 5.1 — Commit:**
-Stage all modified files and create a commit with a descriptive message summarizing what was addressed. Do NOT push — the orchestrator handles the final push.
+Steps 5.1 and 5.2 are **independent**. 5.1 commits code changes (and no-ops cleanly when none exist); 5.2 posts the procedural summary comment whenever review activity existed. A no-op 5.1 must never cause 5.2 to be skipped.
 
-**Step 5.2 — Post PR Summary Comment:**
-Generate a PR comment summarizing all actions taken:
-- **Auto-applied** (OBVIOUS): list with file paths
-- **Applied after discussion** (AMBIGUOUS): list with file paths
-- **Skipped**: list with brief rationale
+**Step 5.1 — Commit (only if fixes were applied):**
+If Phase 4 produced file changes, stage all modified files and create a commit with a descriptive message summarizing what was addressed. Do NOT push — the orchestrator handles the final push. If no files were modified, skip the commit and proceed directly to 5.2.
+
+**Step 5.2 — Post PR Summary Comment (MANDATORY when ≥1 review comment was collected):**
+
+Run this step whenever Phase 1 collected at least one review comment (count taken *before* filtering). It runs regardless of whether any fixes were applied — a "0 items applied, all already-resolved / non-actionable" summary is still the procedural acknowledgement the reviewer (human or bot) expects. Skip Phase 5.2 entirely only when the PR has literally zero review activity from anyone.
+
+Generate the PR comment body summarizing all actions taken:
+- **Auto-applied** (OBVIOUS): list with file paths, or `(none)`
+- **Applied after discussion** (AMBIGUOUS): list with file paths, or `(none)`
+- **Skipped**: list with brief rationale, or `(none)`
 - **Statistics**: total reviewed, auto-applied, discussed & applied, skipped
 
-**Bot resolution detection:** If any collected comments were authored by `coderabbitai[bot]` or similar CodeRabbit accounts, prepend `@coderabbitai resolve` to the PR comment. Do NOT include this tag if CodeRabbit was not among the reviewers.
+**CodeRabbit resolve header (additive, orthogonal to body):**
+
+Detect CodeRabbit from the PR's *actual reviewer/commenter set* via the GitHub API — never from the post-filter collected-items list, because comments may have been stripped by resolution markers, summaries, or already-resolved threads:
+
+```bash
+HAS_CR=$(gh pr view "$PR_NUMBER" \
+  --json reviews,comments,reviewThreads \
+  --jq '[(.reviews[]?.author.login // ""),
+         (.comments[]?.author.login // ""),
+         (.reviewThreads[]?.comments[]?.author.login // "")]
+        | map(select(test("coderabbitai"; "i"))) | length')
+```
+
+If `HAS_CR > 0`, prepend `@coderabbitai resolve` as the first line of the comment body. The summary itself is always posted; the header is purely additive when CodeRabbit reviewed.
 
 Post the comment:
 ```bash
@@ -224,9 +243,26 @@ sleep 2
 # Confirm comment exists
 LAST_COMMENT=$(gh pr view "$PR_NUMBER" --json comments --jq '.comments[-1].body')
 echo "$LAST_COMMENT" | head -5
+
+# If CodeRabbit header was included, verify it's the first line
+if [ "$HAS_CR" -gt 0 ]; then
+  FIRST_LINE=$(echo "$LAST_COMMENT" | head -1)
+  if ! echo "$FIRST_LINE" | grep -q "@coderabbitai resolve"; then
+    echo "Warning: CodeRabbit resolve header missing. Re-posting..."
+    gh pr comment "$PR_NUMBER" --body "$COMMENT_BODY"
+    sleep 2
+    LAST_COMMENT=$(gh pr view "$PR_NUMBER" --json comments --jq '.comments[-1].body')
+    FIRST_LINE=$(echo "$LAST_COMMENT" | head -1)
+    if ! echo "$FIRST_LINE" | grep -q "@coderabbitai resolve"; then
+      echo "Error: CodeRabbit resolve header still missing after retry." >&2
+      exit 1
+    fi
+    echo "Header confirmed after retry: $FIRST_LINE"
+  fi
+fi
 ```
 
-If CodeRabbit resolution tag was included, verify it is present in the posted comment.
+The script above implements the full verify-and-retry contract: when `HAS_CR > 0` it extracts the first line of the just-posted comment, checks for the `@coderabbitai resolve` marker, re-posts once if absent, re-verifies after the retry, and surfaces a non-zero exit if the header is still missing.
 
 Mark all remaining tasks as completed. Run `TaskList` to confirm zero pending tasks.
 
@@ -240,6 +276,14 @@ Mark all remaining tasks as completed. Run `TaskList` to confirm zero pending ta
 **Problem:** Treating human and bot comments identically without noting who said what
 **Fix:** Group comments by reviewer, note if reviewer is human or bot — human comments may need different discussion approach
 
+### Skipping Phase 5.2 When No Fixes Were Applied
+**Problem:** When all collected comments are non-actionable (LGTM-only, all already resolved) or every AMBIGUOUS item is skipped, Phase 4 produces no file changes. The agent then treats the whole completion phase as "nothing to do" and never posts the summary comment — reviewers (human or bot) get no acknowledgement, and CodeRabbit threads stay open forever.
+**Fix:** Phase 5.2 runs whenever Phase 1 collected ≥1 review comment (count taken before filtering), independent of Phase 5.1's outcome. A "0 applied" summary is still the correct procedural reply.
+
+### Detecting CodeRabbit From the Filtered Comment Set
+**Problem:** Checking `coderabbitai[bot]` authorship on the *post-filter* collected items misses cases where CodeRabbit's comments were stripped by resolution markers (`fixed`, `applied`, checkmarks) or because all its threads are already resolved. The agent concludes CodeRabbit wasn't a reviewer and skips the resolve header — even though stale CodeRabbit threads are exactly what `@coderabbitai resolve` is meant to close.
+**Fix:** Detect CodeRabbit via the PR's actual reviewer/commenter identities (`gh pr view --json reviews,comments,reviewThreads`), before any filtering. Detection and resolve-header injection are orthogonal to whether CodeRabbit had actionable items in this cycle.
+
 ## Success Criteria
 
 - All tasks created at workflow start
@@ -248,6 +292,7 @@ Mark all remaining tasks as completed. Run `TaskList` to confirm zero pending ta
 - All OBVIOUS items auto-applied and reported to user before discussion
 - AMBIGUOUS items presented with "why ambiguous" + recommendation + rationale
 - Only user-approved AMBIGUOUS changes applied
-- Changes committed (orchestrator handles push)
-- PR comment posted (with `@coderabbitai resolve` if CodeRabbit was a reviewer)
+- Changes committed when fixes were applied (orchestrator handles push); commit step cleanly no-ops when no changes
+- Summary PR comment posted whenever ≥1 review comment was collected — independent of fix outcome, reviewer type (human / Codex / Claude / CodeRabbit / other), or whether the commit step ran
+- `@coderabbitai resolve` header included whenever CodeRabbit appears in the PR's actual reviewer/commenter set (detected via GitHub API, not the filtered collected items)
 - All tasks show `completed` in TaskList
