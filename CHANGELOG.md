@@ -5,6 +5,13 @@ All notable changes to the skill-set plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.2] - 2026-05-20
+
+### Fixed
+
+- **pr-review-feedback**: PR summary comment is now posted whenever Phase 1 collected ≥1 review comment, independent of fix outcome and reviewer type (human / Codex / Claude / CodeRabbit / other). Previously Phase 5.2 was implicitly gated on having items to commit, so PRs reviewed by anyone produced no acknowledgement when every collected comment was non-actionable or skipped. The `@coderabbitai resolve` header is now reframed as an additive injection — detected from the PR's actual reviewer/commenter set via `gh pr view --json reviews,comments,reviewThreads`, not the post-filter collected items — so it appears whenever CodeRabbit was a reviewer, regardless of whether its comments survived filtering.
+- **pr-review-feedback**: Step 5.3 verification now programmatically enforces the resolve header instead of just printing the comment. When `HAS_CR > 0` it extracts the first line, checks for `@coderabbitai resolve`, re-posts once if absent, re-verifies after retry, and exits non-zero if still missing — surfacing enforcement failures to the orchestrator instead of leaving them invisible.
+
 ## [1.13.1] - 2026-05-19
 
 ### Fixed
