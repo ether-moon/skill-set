@@ -1,0 +1,27 @@
+## Decisions Made
+- Resolve-comment posting stays in `pr-review-feedback`, not pushed up to `shipping-pr`: keeps `/skill-set:pr:fix` standalone-correct. Owner discussed and rejected the orchestrator-side approach as responsibility leakage.
+- Summary PR comment is treated as universal procedure (any reviewer: human/Codex/Claude/CodeRabbit), while `@coderabbitai resolve` is reframed as an additive header. Reason: posting feedback for review activity is the review-loop's procedural acknowledgement; CodeRabbit's resolve command is orthogonal cleanup of its threads.
+- Phase 5.1 (commit) and 5.2 (summary comment) split into *independent* steps. A no-op 5.1 must not skip 5.2.
+- CodeRabbit presence detected from the PR's actual reviewer/commenter set (`gh pr view --json reviews,comments,reviewThreads`), not from the post-filter collected items.
+
+## Problems Encountered
+- `@coderabbitai resolve` comment frequently missing after `/skill-set:pr:ship` -> `pr:fix` cycles: rooted in two coupled defects (Phase 5 gated on fix outcome; bot detection ran on filtered comment set). Resolved by the split + reviewer-set detection.
+- Initial proposal moved resolve-header injection into `shipping-pr`: rejected mid-discussion when owner pointed out `pr:fix` must work standalone. Replaced with a single-owner fix inside `pr-review-feedback`.
+
+## Constraints Identified
+- `/skill-set:pr:fix` must remain standalone-correct: any review-comment behavior must live in `pr-review-feedback` (the single owner of review-comment handling), not in higher-level orchestrators.
+- Filter rules (`resolved`/`fixed`/`applied`/checkmark) are needed for actionable triage but cannot be the source of reviewer-presence detection — too many false negatives.
+- The summary comment is the procedural acknowledgement reviewers (human or bot) expect, independent of whether the cycle produced fixes.
+
+## Open Questions
+- Should Phase 5.2 still post a comment when Phase 1 collected zero review comments? Current decision: skip (no-op exit). Worth revisiting if reviewers expect a heartbeat even on truly empty PRs.
+- Should `shipping-pr` add a defensive verification that the resolve header exists in the latest comment, and retry posting via `pr-review-feedback` if missing? Listed as optional in the discussion; not implemented in this commit.
+
+## Context
+Edited `plugins/skill-set/agents/pr-review-feedback.md` to decouple PR summary comment posting from fix outcome and to move CodeRabbit detection onto the GitHub API's actual reviewer set. Affects all callers — `/skill-set:pr:fix` standalone and the `shipping-pr` -> `resolving-pr-blockers` -> `pr-review-feedback` chain. No code outside the agent doc changed.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
