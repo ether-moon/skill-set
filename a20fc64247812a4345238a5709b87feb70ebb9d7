@@ -1,0 +1,22 @@
+## Decisions Made
+- Patch-level bump (1.13.1 -> 1.13.2): the merged PR #25 is a behavioral fix to `pr-review-feedback` only, no new skills or API changes -> patch per SemVer.
+- CHANGELOG `Fixed` section gets two bullets (universal summary comment + Step 5.3 verify-and-retry script) because both shipped in the same merged PR but address distinct symptoms.
+
+## Problems Encountered
+- None.
+
+## Constraints Identified
+- Direct `git commit` blocked by repo policy; commit goes through the memento-commit pattern with a session note on `refs/notes/commits`.
+- Version files in this repo: only `plugins/skill-set/.claude-plugin/plugin.json`. `marketplace.json` has no version field. CHANGELOG.md is the human-readable companion.
+
+## Open Questions
+- None.
+
+## Context
+Post-merge version bump for PR #25 (5038418) on the `main` worktree at `/Users/ether/workspace/personal/skill-set`. Updated `plugin.json` 1.13.1 -> 1.13.2 and prepended a `## [1.13.2] - 2026-05-20` section to `CHANGELOG.md` with two `Fixed` bullets covering the pr-review-feedback patch (unconditional Phase 5.2 + reviewer-set-based CodeRabbit detection + verify-and-retry resolve header enforcement). Next step: push main and refs/notes/commits.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
