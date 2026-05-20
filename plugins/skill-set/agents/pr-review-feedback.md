@@ -243,9 +243,26 @@ sleep 2
 # Confirm comment exists
 LAST_COMMENT=$(gh pr view "$PR_NUMBER" --json comments --jq '.comments[-1].body')
 echo "$LAST_COMMENT" | head -5
+
+# If CodeRabbit header was included, verify it's the first line
+if [ "$HAS_CR" -gt 0 ]; then
+  FIRST_LINE=$(echo "$LAST_COMMENT" | head -1)
+  if ! echo "$FIRST_LINE" | grep -q "@coderabbitai resolve"; then
+    echo "Warning: CodeRabbit resolve header missing. Re-posting..."
+    gh pr comment "$PR_NUMBER" --body "$COMMENT_BODY"
+    sleep 2
+    LAST_COMMENT=$(gh pr view "$PR_NUMBER" --json comments --jq '.comments[-1].body')
+    FIRST_LINE=$(echo "$LAST_COMMENT" | head -1)
+    if ! echo "$FIRST_LINE" | grep -q "@coderabbitai resolve"; then
+      echo "Error: CodeRabbit resolve header still missing after retry." >&2
+      exit 1
+    fi
+    echo "Header confirmed after retry: $FIRST_LINE"
+  fi
+fi
 ```
 
-If the CodeRabbit resolve header was included (`HAS_CR > 0`), verify it appears as the first line of the posted comment. If missing, re-post once and re-verify.
+The script above implements the full verify-and-retry contract: when `HAS_CR > 0` it extracts the first line of the just-posted comment, checks for the `@coderabbitai resolve` marker, re-posts once if absent, re-verifies after the retry, and surfaces a non-zero exit if the header is still missing.
 
 Mark all remaining tasks as completed. Run `TaskList` to confirm zero pending tasks.
 
