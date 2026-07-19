@@ -1,0 +1,23 @@
+schema_version: "1.1"
+name: writing-clear-prose-trigger-positive-05
+description: Should select writing-clear-prose for a representative request
+tags:
+  - writing-clear-prose
+  - trigger-positive
+execution:
+  prompt: "Revise this architecture narrative for a context-zero reader, preserving technical meaning."
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 3
+graders:
+  - type: tool_used
+    name: selected-writing-clear-prose
+    tool: Skill
+    input_match: "writing-clear-prose"
+    min: 1
+  - type: llm
+    name: workflow-outcome
+    criteria: "Pass only if the response improves substantive nonfiction for clarity, structure, specificity, and concision while preserving facts, requirements, and technical meaning and adding no unsupported claims."
+    focus: last_message

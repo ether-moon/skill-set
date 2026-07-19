@@ -15,11 +15,11 @@ usage() {
     '' \
     'Options:' \
     '  --candidate PATH       Candidate plugin directory (default: current plugin)' \
-    '  --baseline-ref REF     Baseline git ref (default: 95c1b2a)' \
+    '  --baseline-ref REF     Compatibility option; only 95c1b2a is accepted' \
     '  --output-dir PATH      Result directory (default: evals/results/<timestamp>)' \
-    '  --model MODEL          Override the evaluated model' \
-    '  --judge-model MODEL    Override the LLM grader model' \
-    '  --max-cost-usd USD     Stop after the configured cost ceiling' \
+    '  --model MODEL          Evaluated model (default: haiku)' \
+    '  --judge-model MODEL    Independent LLM grader (default: sonnet)' \
+    '  --max-cost-usd USD     Split a total target into two bounded CLI ceilings' \
     '  --runs N               Override runs per case' \
     '  --case GLOB            Restrict cases by name' \
     '  --tag TAG              Restrict cases by tag; repeatable' \
@@ -34,11 +34,24 @@ require_command() {
   }
 }
 
+snapshot_candidate() {
+  local source=$1
+  local destination=$2
+  cp -R -- "$source" "$destination"
+  rm -rf -- "$destination/.git" "$destination/evals/results"
+  git -C "$destination" init -q
+  git -C "$destination" add -f -- .
+  git -C "$destination" write-tree
+  rm -rf -- "$destination/.git"
+}
+
 candidate=$plugin_dir
-baseline_ref=95c1b2a
+deletion_baseline_ref=95c1b2a
+deletion_baseline_sha=95c1b2a56b7b972f25bb9b5ae4c3cc942734b674
+baseline_ref=$deletion_baseline_ref
 output_dir=
-model=
-judge_model=
+model=haiku
+judge_model=sonnet
 max_cost_usd=
 runs=
 case_glob=
@@ -74,20 +87,59 @@ while (($#)); do
   esac
 done
 
-for dependency in bash git jq claude; do
+for dependency in bash git jq claude rg tar; do
   require_command "$dependency"
 done
+[[ -n $model ]] || { printf 'The evaluated model identifier cannot be empty.\n' >&2; exit 2; }
+[[ -n $judge_model ]] || { printf 'The LLM judge model identifier cannot be empty.\n' >&2; exit 2; }
+if [[ -n $runs ]]; then
+  case $runs in ''|*[!0-9]*) printf 'Runs must be a positive integer.\n' >&2; exit 2 ;; esac
+  ((runs > 0)) || { printf 'Runs must be a positive integer.\n' >&2; exit 2; }
+fi
+if [[ -n $max_cost_usd ]] && ! jq -en --arg value "$max_cost_usd" \
+  '$value | tonumber | isfinite and . > 0' >/dev/null 2>&1; then
+  printf 'The cost target must be a positive finite number.\n' >&2
+  exit 2
+fi
+normalized_model=$(printf '%s' "$model" | tr '[:upper:]' '[:lower:]')
+normalized_judge=$(printf '%s' "$judge_model" | tr '[:upper:]' '[:lower:]')
+if [[ -n $model && -n $judge_model && $normalized_model == "$normalized_judge" ]]; then
+  printf 'The evaluated model and LLM judge model must be different.\n' >&2
+  exit 2
+fi
+case $normalized_judge in
+  *haiku*)
+    printf 'The LLM judge must be Sonnet-tier or larger; Haiku is not accepted as a trusted grader.\n' >&2
+    exit 2
+    ;;
+esac
 [[ -d "$candidate/evals" ]] || { printf 'Candidate has no evals directory: %s\n' "$candidate" >&2; exit 2; }
 candidate=$(cd -- "$candidate" && pwd -P)
-git -C "$repo_dir" rev-parse --verify "$baseline_ref^{commit}" >/dev/null
+[[ $baseline_ref == "$deletion_baseline_ref" ]] || {
+  printf 'The deletion baseline is pinned to %s; refusing ref %s.\n' \
+    "$deletion_baseline_ref" "$baseline_ref" >&2
+  exit 2
+}
+resolved_baseline_sha=$(git -C "$repo_dir" rev-parse --verify "$deletion_baseline_ref^{commit}")
+[[ $resolved_baseline_sha == "$deletion_baseline_sha" ]] || {
+  printf 'Deletion baseline %s resolved to %s, expected %s.\n' \
+    "$deletion_baseline_ref" "$resolved_baseline_sha" "$deletion_baseline_sha" >&2
+  exit 2
+}
+safety_contract=$candidate/evals/safety-contract.json
+[[ -s $safety_contract ]] || { printf 'Candidate has no safety contract: %s\n' "$safety_contract" >&2; exit 2; }
+jq -e '.schema_version == 1 and (.checks | type) == "array" and
+  .operator_grants == ["Bash", "Write", "Edit"]' "$safety_contract" >/dev/null || {
+  printf 'Candidate safety contract is invalid: %s\n' "$safety_contract" >&2
+  exit 2
+}
 
 if [[ -z $output_dir ]]; then
   output_dir=$candidate/evals/results/$(date -u +%Y%m%dT%H%M%SZ)
 fi
 
-common_args=(--scaffold --threshold 0 --allow-tools Bash Write Edit Skill)
-[[ -n $model ]] && common_args+=(--model "$model")
-[[ -n $judge_model ]] && common_args+=(--judge-model "$judge_model")
+common_args=(--scaffold --keep-temp --threshold 0 --allow-tools Bash Write Edit)
+common_args+=(--model "$model" --judge-model "$judge_model")
 [[ -n $runs ]] && common_args+=(--runs "$runs")
 [[ -n $case_glob ]] && common_args+=(--case "$case_glob")
 if ((${#tags[@]})); then
@@ -110,7 +162,8 @@ candidate_command=(claude plugin eval "$candidate" --ablation with-without "${ca
 if [[ $plan_only == true ]]; then
   printf 'Candidate/no-plugin: '
   printf '%q ' "${candidate_command[@]}"
-  printf '\nBaseline plugin: materialize %s, overlay candidate evals, then run with --ablation none.\n' "$baseline_ref"
+  printf '\nBaseline plugin: materialize %s (%s), overlay candidate evals, then run with --ablation none.\n' \
+    "$deletion_baseline_ref" "$deletion_baseline_sha"
   exit 0
 fi
 
@@ -119,12 +172,38 @@ mkdir -p "$output_dir"
 temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/skill-set-evals.XXXXXX")
 trap 'rm -rf "$temporary_dir"' EXIT
 
-git -C "$repo_dir" archive "$baseline_ref" plugins/skill-set | tar -x -C "$temporary_dir"
+candidate_sha=$(git -C "$candidate" rev-parse HEAD 2>/dev/null || printf 'unversioned')
+candidate_dirty=true
+if candidate_git_root=$(git -C "$candidate" rev-parse --show-toplevel 2>/dev/null); then
+  candidate_scope=$(git -C "$candidate" rev-parse --show-prefix)
+  candidate_scope=${candidate_scope%/}
+  candidate_state=$(mktemp "$temporary_dir/candidate-state.XXXXXX")
+  candidate_pathspec=(.)
+  if [[ -n $candidate_scope ]]; then candidate_pathspec=("$candidate_scope"); fi
+  git -C "$candidate_git_root" diff --binary HEAD -- "${candidate_pathspec[@]}" >"$candidate_state"
+  while IFS= read -r -d '' untracked_file; do
+    executable=false
+    [[ -x $candidate_git_root/$untracked_file ]] && executable=true
+    printf 'untracked\0%s\0%s\0%s\0' "$untracked_file" \
+      "$(git -C "$candidate_git_root" hash-object -- "$untracked_file")" "$executable" >>"$candidate_state"
+  done < <(git -C "$candidate_git_root" ls-files --others --exclude-standard -z -- "${candidate_pathspec[@]}")
+  if [[ ! -s $candidate_state ]]; then candidate_dirty=false; fi
+fi
+
+candidate_snapshot=$temporary_dir/candidate-plugin
+candidate_fingerprint=$(snapshot_candidate "$candidate" "$candidate_snapshot")
+snapshot_safety_contract=$candidate_snapshot/evals/safety-contract.json
+[[ -s $snapshot_safety_contract ]] || { printf 'Candidate snapshot lost its safety contract.\n' >&2; exit 1; }
+safety_contract_hash=$(git hash-object --no-filters "$snapshot_safety_contract")
+cp -- "$snapshot_safety_contract" "$output_dir/safety-contract.json"
+
+candidate_command=(claude plugin eval "$candidate_snapshot" --ablation with-without "${candidate_args[@]}" --output-dir "$output_dir/candidate" --json "$output_dir/candidate.json")
+
+git -C "$repo_dir" archive "$deletion_baseline_sha" plugins/skill-set | tar -x -C "$temporary_dir"
 baseline_plugin=$temporary_dir/plugins/skill-set
 rm -rf "$baseline_plugin/evals"
-cp -R "$candidate/evals" "$baseline_plugin/evals"
+cp -R "$candidate_snapshot/evals" "$baseline_plugin/evals"
 rm -rf "$baseline_plugin/evals/results"
-rm -f "$baseline_plugin/.mcp.json"
 
 baseline_command=(claude plugin eval "$baseline_plugin" --ablation none "${baseline_args[@]}" --output-dir "$output_dir/baseline" --json "$output_dir/baseline.json")
 
@@ -151,27 +230,45 @@ run_eval_arm() {
 }
 
 run_eval_arm candidate-and-no-plugin "${candidate_command[@]}"
-run_eval_arm deletion-baseline "${baseline_command[@]}"
-
 [[ -s "$output_dir/candidate.json" ]] || { printf 'Candidate eval produced no JSON result.\n' >&2; exit 1; }
-[[ -s "$output_dir/baseline.json" ]] || { printf 'Baseline eval produced no JSON result.\n' >&2; exit 1; }
+"$script_dir/retain-eval-traces" \
+  --result "$output_dir/candidate.json" \
+  --trace-dir "$output_dir/traces" \
+  --with-arm candidate \
+  --without-arm no-plugin
 
-candidate_sha=$(git -C "$candidate" rev-parse HEAD 2>/dev/null || printf 'unversioned')
-candidate_dirty=true
-candidate_fingerprint=unversioned
-if candidate_git_root=$(git -C "$candidate" rev-parse --show-toplevel 2>/dev/null); then
-  candidate_scope=$(git -C "$candidate" rev-parse --show-prefix)
-  candidate_scope=${candidate_scope%/}
-  candidate_state=$(mktemp "$temporary_dir/candidate-state.XXXXXX")
-  git -C "$candidate_git_root" diff --binary HEAD -- "$candidate_scope" >"$candidate_state"
-  while IFS= read -r -d '' untracked_file; do
-    printf 'untracked\0%s\0%s\0' "$untracked_file" \
-      "$(git -C "$candidate_git_root" hash-object -- "$untracked_file")" >>"$candidate_state"
-  done < <(git -C "$candidate_git_root" ls-files --others --exclude-standard -z -- "$candidate_scope")
-  candidate_fingerprint=$(git hash-object "$candidate_state")
-  if [[ ! -s $candidate_state ]]; then candidate_dirty=false; fi
+run_eval_arm deletion-baseline "${baseline_command[@]}"
+[[ -s "$output_dir/baseline.json" ]] || { printf 'Baseline eval produced no JSON result.\n' >&2; exit 1; }
+"$script_dir/retain-eval-traces" \
+  --result "$output_dir/baseline.json" \
+  --trace-dir "$output_dir/traces" \
+  --with-arm deletion-baseline
+
+post_candidate_snapshot=$temporary_dir/post-candidate-plugin
+post_candidate_fingerprint=$(snapshot_candidate "$candidate" "$post_candidate_snapshot")
+post_candidate_sha=$(git -C "$candidate" rev-parse HEAD 2>/dev/null || printf 'unversioned')
+post_safety_contract=$candidate/evals/safety-contract.json
+post_safety_contract_hash=missing
+if [[ -s $post_safety_contract ]]; then
+  post_safety_contract_hash=$(git hash-object --no-filters "$post_safety_contract")
 fi
-baseline_sha=$(git -C "$repo_dir" rev-parse "$baseline_ref^{commit}")
+candidate_sha_changed=false
+candidate_fingerprint_changed=false
+safety_contract_changed=false
+[[ $post_candidate_sha == "$candidate_sha" ]] || candidate_sha_changed=true
+[[ $post_candidate_fingerprint == "$candidate_fingerprint" ]] || candidate_fingerprint_changed=true
+[[ $post_safety_contract_hash == "$safety_contract_hash" ]] || safety_contract_changed=true
+if [[ $candidate_sha_changed == true || $candidate_fingerprint_changed == true || $safety_contract_changed == true ]]; then
+  jq -n \
+    --argjson candidate_sha_changed "$candidate_sha_changed" \
+    --argjson candidate_fingerprint_changed "$candidate_fingerprint_changed" \
+    --argjson safety_contract_changed "$safety_contract_changed" \
+    '{error: "eval-input-drift", candidate_sha_changed: $candidate_sha_changed, candidate_fingerprint_changed: $candidate_fingerprint_changed, safety_contract_changed: $safety_contract_changed, acceptance: "discard"}' \
+    >"$output_dir/provenance-drift.json"
+  jq . "$output_dir/provenance-drift.json" >&2
+  exit 1
+fi
+baseline_sha=$deletion_baseline_sha
 claude_version=$(claude --version)
 partial_budget=false
 if rg -q $'\tpartial-budget$' "$output_dir/arm-status.tsv"; then partial_budget=true; fi
@@ -190,26 +287,29 @@ jq -n \
   --arg runs "$runs" \
   --arg case_glob "$case_glob" \
   --arg tags "$(IFS=,; printf '%s' "${tags[*]-}")" \
+  --arg safety_contract_hash "$safety_contract_hash" \
   --argjson partial_budget "$partial_budget" \
   --arg generated_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  '{candidate_sha: $candidate_sha, candidate_dirty: $candidate_dirty, candidate_fingerprint: $candidate_fingerprint, baseline_ref: $baseline_ref, baseline_sha: $baseline_sha, claude_version: $claude_version, model: $model, judge_model: $judge_model, max_cost_usd: $max_cost_usd, cost_allocation: {candidate_and_no_plugin: $candidate_budget, deletion_baseline: $baseline_budget, semantics: "per-arm target; each CLI invocation may overrun by one agent run"}, partial_budget: $partial_budget, runs: $runs, filters: {case: $case_glob, tags: ($tags | split(",") | map(select(length > 0)))}, generated_at: $generated_at, operator_tool_grants: ["Bash", "Write", "Edit", "Skill"], baseline_normalization: ["remove unused .mcp.json"], arms: ["candidate", "no-plugin", "baseline"], review_required: true}' \
+  '{candidate_sha: $candidate_sha, candidate_dirty: $candidate_dirty, candidate_fingerprint: $candidate_fingerprint, baseline_ref: $baseline_ref, baseline_sha: $baseline_sha, claude_version: $claude_version, model: $model, judge_model: $judge_model, resolved_model_snapshot: null, resolved_judge_snapshot: null, model_resolution_note: "Claude plugin eval JSON schema 1 reports requested model identifiers but does not expose resolved model snapshot IDs", max_cost_usd: $max_cost_usd, cost_allocation: {candidate_and_no_plugin: $candidate_budget, deletion_baseline: $baseline_budget, semantics: "per-invocation ceilings; each Claude CLI invocation may overrun by one agent run"}, partial_budget: $partial_budget, runs: $runs, filters: {case: $case_glob, tags: ($tags | split(",") | map(select(length > 0)))}, generated_at: $generated_at, operator_tool_grants: ["Bash", "Write", "Edit"], operator_tool_grant_note: "Claude CLI applies operator grants to every case in an invocation; case allowed_tools are not an isolation boundary, so mutation acceptance also requires explicit safety graders and retained-trace policies", baseline_normalization: [], arms: ["candidate", "no-plugin", "baseline"], safety_contract: {path: "safety-contract.json", hash_algorithm: "git-hash-object", hash: $safety_contract_hash}, trace_retention: {path: "traces", source: "Claude agent stream-json", cleanup: "verified claude-eval-* roots only"}, human_review_required: true}' \
   >"$output_dir/metadata.json"
+
+"$script_dir/summarize-evals" \
+  --candidate "$output_dir/candidate.json" \
+  --baseline "$output_dir/baseline.json" \
+  --metadata "$output_dir/metadata.json" \
+  --safety-contract "$output_dir/safety-contract.json" \
+  --output "$output_dir/acceptance-summary.json"
 
 jq -n \
   --slurpfile metadata "$output_dir/metadata.json" \
   --slurpfile candidate "$output_dir/candidate.json" \
   --slurpfile baseline "$output_dir/baseline.json" \
+  --slurpfile acceptance "$output_dir/acceptance-summary.json" \
   '{
     metadata: $metadata[0],
     candidate_and_no_plugin: $candidate[0],
     deletion_baseline: $baseline[0],
-    acceptance_review: {
-      status: "pending-human-review",
-      safety_violations_required: 0,
-      trigger_precision_required: 0.9,
-      trigger_recall_required: 0.9,
-      baseline_regression_allowed: false
-    }
+    acceptance_review: $acceptance[0]
   }' >"$output_dir/combined-results.json"
 
 run_status='runs-finished'

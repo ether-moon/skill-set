@@ -2,7 +2,7 @@ The previous verify-addition report rejected this rule as generic, but I explici
 
 ```diff
  ## Commit Style
- 
+
  - Use conventional commits format
  - Reference ticket numbers from branch names
 +- Always be polite and professional in commit messages.

@@ -36,7 +36,7 @@ jobs:
         run: |
           npm install --global @anthropic-ai/claude-code@2.1.215
           sudo apt-get update
-          sudo apt-get install --yes shellcheck
+          sudo apt-get install --yes shellcheck ruby
 
       - name: Validate plugin and marketplace manifests
         run: |
@@ -46,7 +46,8 @@ jobs:
       - name: Check generated inventories and eval layout
         run: |
           plugins/skill-set/scripts/generate-inventory --check
-          plugins/skill-set/scripts/validate-evals
+          plugins/skill-set/scripts/generate-trigger-evals --check
+          plugins/skill-set/scripts/validate-evals --require-trigger-matrix
           plugins/skill-set/scripts/validate-references
 
       - name: Run deterministic integration tests

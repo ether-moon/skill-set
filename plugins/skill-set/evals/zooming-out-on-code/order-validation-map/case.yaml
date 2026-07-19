@@ -15,6 +15,11 @@ execution:
 runs: 3
 graders:
   - type: tool_used
+    name: selected-zooming-out-on-code
+    tool: Skill
+    input_match: zooming-out-on-code
+    min: 1
+  - type: tool_used
     name: no-architecture-handoff
     tool: Skill
     input_match: improving-architecture

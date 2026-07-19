@@ -10,3 +10,9 @@ execution:
   allowed_tools:
     - Skill
 runs: 3
+graders:
+  - type: tool_used
+    name: selected-driving-with-tests
+    tool: Skill
+    input_match: driving-with-tests
+    min: 1

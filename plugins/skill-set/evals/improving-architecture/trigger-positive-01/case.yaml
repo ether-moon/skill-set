@@ -1,0 +1,23 @@
+schema_version: "1.1"
+name: improving-architecture-trigger-positive-01
+description: Should select improving-architecture for a representative request
+tags:
+  - improving-architecture
+  - trigger-positive
+execution:
+  prompt: "Find and rank architecture improvement candidates in this tangled package."
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 3
+graders:
+  - type: tool_used
+    name: selected-improving-architecture
+    tool: Skill
+    input_match: "improving-architecture"
+    min: 1
+  - type: llm
+    name: workflow-outcome
+    criteria: "Pass only if the response performs read-only architecture analysis and returns ranked candidates with Files, Evidence, Problem, Proposed seam, Locality gain, Leverage gain, Test impact, and Risks, without implementing or handing off design work."
+    focus: last_message

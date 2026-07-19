@@ -2,6 +2,15 @@
 
 Use this checklist to validate your skill before and after upload.
 
+## Table of Contents
+
+- [Before You Start](#before-you-start)
+- [During Development](#during-development)
+- [Before Handoff](#before-handoff)
+- [After Release](#after-release)
+- [Quick Validation Commands](#quick-validation-commands)
+- [Common Issues Checklist](#common-issues-checklist)
+
 ## Before You Start
 
 - [ ] Identified 2-3 concrete use cases

@@ -36,7 +36,7 @@ Ensure every sentence communicates unambiguously to a context-zero reader.
 Polish prose after structure and clarity are solid.
 
 - [ ] **Active voice**: Default to active; passive only when the actor is unknown or irrelevant
-- [ ] **No AI cliches**: Check against vocabulary and phrase lists in `anti-patterns.md`
+- [ ] **No AI cliches**: Remove stock phrases, inflated vocabulary, filler words, and unsupported claims of importance
 - [ ] **No -ing filler**: Delete trailing participle phrases that add no evidence ("highlighting its importance")
 - [ ] **No negative parallelism**: Remove "It's not X — it's Y" patterns; state the point directly
 - [ ] **Brevity applied**: Every sentence earns its place; no filler words or phrases

@@ -1,0 +1,239 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+plugin_dir=$(cd -- "$script_dir/.." && pwd)
+catalog=$plugin_dir/evals/trigger-cases.json
+
+usage() {
+  printf '%s\n' \
+    'Usage: generate-trigger-evals [--check|--write]' \
+    '' \
+    'Generate official plugin eval cases from evals/trigger-cases.json.' \
+    '--check exits non-zero when the generated trigger matrix has drifted.'
+}
+
+mode='check'
+case ${1:-} in
+  ''|--check) mode='check' ;;
+  --write) mode='write' ;;
+  -h|--help) usage; exit 0 ;;
+  *) printf 'Unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
+esac
+
+fail() {
+  printf 'Trigger eval generation failed: %s\n' "$*" >&2
+  exit 1
+}
+
+json_string() {
+  jq -Rn --arg value "$1" '$value | @json' -r
+}
+
+outcome_criteria() {
+  case $1 in
+    autofixing-and-escalating)
+      printf '%s' 'Pass only if the response classifies the external findings, fixes only unambiguous items when resolution was explicitly authorized, and escalates judgment-dependent items without publishing or orchestrating follow-up work.'
+      ;;
+    bumping-version)
+      printf '%s' 'Pass only if the response follows the release preparation contract: detect and reconcile manifests, update the changelog, use the release executor, and preserve the explicit approval gate before publishing.'
+      ;;
+    creating-skills)
+      printf '%s' 'Pass only if the response applies the complete skill lifecycle: define use cases and triggers, design the structure and scripts, create representative evaluations, benchmark, and iterate without depending on another authoring skill.'
+      ;;
+    driving-with-tests)
+      printf '%s' 'Pass only if the response selects the appropriate testing mode and follows Orient, a proportional Red/Green/Refactor loop, Probe, and Guard while respecting existing implementation and project constraints.'
+      ;;
+    grilling-plans)
+      printf '%s' 'Pass only if the response begins a bounded adversarial plan review with exactly one decision question, maintains confirmed, rejected, and unresolved decisions, and does not design or implement the solution.'
+      ;;
+    guarding-agent-directives)
+      printf '%s' 'Pass only if the response applies the directive verification questions, including correct placement, and either verifies the proposed addition or audits existing directives without editing unless an exact change was authorized.'
+      ;;
+    improving-architecture)
+      printf '%s' 'Pass only if the response performs read-only architecture analysis and returns ranked candidates with Files, Evidence, Problem, Proposed seam, Locality gain, Leverage gain, Test impact, and Risks, without implementing or handing off design work.'
+      ;;
+    managing-git-workflow)
+      printf '%s' 'Pass only if the response uses the deterministic Git executor, preserves unrelated work, distinguishes inspect from commit, push, and PR creation authority, and reports the resulting state without expanding scope.'
+      ;;
+    shipping-pr)
+      printf '%s' 'Pass only if the response follows the bounded PR state machine, accounts for checks, reviews, pagination, head changes and no-progress convergence, and uses resolvers only within explicit mutation authority.'
+      ;;
+    writing-clear-prose)
+      printf '%s' 'Pass only if the response improves substantive nonfiction for clarity, structure, specificity, and concision while preserving facts, requirements, and technical meaning and adding no unsupported claims.'
+      ;;
+    zooming-out-on-code)
+      printf '%s' 'Pass only if the response performs read-only orientation and reports exactly Responsibility, Callers, Dependencies, Siblings, and Unknowns without recommendations, edits, or architecture redesign.'
+      ;;
+    *) fail "missing outcome criteria for active skill: $1" ;;
+  esac
+}
+
+[[ -f $catalog ]] || fail "missing catalog: $catalog"
+jq -e 'type == "object" and length > 0' "$catalog" >/dev/null || fail 'catalog must be a non-empty JSON object'
+jq -e '
+  all(to_entries[];
+    (.key | test("^[a-z0-9]+(-[a-z0-9]+)*$")) and
+    (.value | type) == "object" and
+    (.value | keys | sort) == ["negative", "positive"] and
+    (.value.positive | type) == "array" and
+    (.value.negative | type) == "array" and
+    all(.value.positive[]; type == "string" and length > 0 and (contains("\n") | not)) and
+    all(.value.negative[]; type == "string" and length > 0 and (contains("\n") | not)) and
+    (.value.positive | length) >= 8 and (.value.positive | length) <= 10 and
+    (.value.negative | length) >= 8 and (.value.negative | length) <= 10)
+' "$catalog" >/dev/null || fail 'each skill needs exactly positive/negative arrays with 8-10 non-empty single-line prompts'
+
+temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/skill-set-trigger-evals.XXXXXX")
+trap 'rm -rf "$temp_dir"' EXIT
+
+find "$plugin_dir/skills" -mindepth 2 -maxdepth 2 -type f -name SKILL.md \
+  -exec dirname {} \; | while IFS= read -r skill_dir; do basename "$skill_dir"; done | sort >"$temp_dir/active-skills"
+jq -r 'keys[]' "$catalog" | sort >"$temp_dir/catalog-skills"
+if ! cmp -s "$temp_dir/active-skills" "$temp_dir/catalog-skills"; then
+  diff -u "$temp_dir/active-skills" "$temp_dir/catalog-skills" >&2 || true
+  fail 'catalog keys do not exactly match active skills'
+fi
+
+jq -r 'to_entries[] | .value.positive[], .value.negative[]' "$catalog" | sort | uniq -d >"$temp_dir/duplicate-prompts"
+[[ ! -s $temp_dir/duplicate-prompts ]] || fail "duplicate trigger prompts: $(tr '\n' ';' <"$temp_dir/duplicate-prompts")"
+
+while IFS= read -r skill; do
+  criteria=$(outcome_criteria "$skill")
+  for polarity in positive negative; do
+    index=0
+    while IFS= read -r prompt; do
+      index=$((index + 1))
+      case_id=$(printf 'trigger-%s-%02d' "$polarity" "$index")
+      case_dir=$temp_dir/generated/$skill/$case_id
+      mkdir -p "$case_dir"
+      prompt_json=$(json_string "$prompt")
+      criteria_json=$(json_string "$criteria")
+      if [[ $polarity == positive ]]; then
+        cat >"$case_dir/case.yaml" <<EOF
+schema_version: "1.1"
+name: $skill-$case_id
+description: Should select $skill for a representative request
+tags:
+  - $skill
+  - trigger-positive
+execution:
+  prompt: $prompt_json
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 3
+graders:
+  - type: tool_used
+    name: selected-$skill
+    tool: Skill
+    input_match: "$skill"
+    min: 1
+  - type: llm
+    name: workflow-outcome
+    criteria: $criteria_json
+    focus: last_message
+EOF
+      else
+        negative_criteria="Pass only if the response does not invoke or recommend $skill and instead handles the request directly or identifies a more appropriate workflow without forcing it into this skill's scope."
+        negative_criteria_json=$(json_string "$negative_criteria")
+        cat >"$case_dir/case.yaml" <<EOF
+schema_version: "1.1"
+name: $skill-$case_id
+description: Should not select $skill for a near-miss request
+tags:
+  - $skill
+  - trigger-negative
+execution:
+  prompt: $prompt_json
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 3
+graders:
+  - type: tool_used
+    name: did-not-select-$skill
+    tool: Skill
+    input_match: "$skill"
+    min: 0
+    max: 0
+    arm: both
+  - type: llm
+    name: appropriate-scope
+    criteria: $negative_criteria_json
+    focus: last_message
+EOF
+      fi
+    done < <(jq -r --arg skill "$skill" --arg polarity "$polarity" '.[$skill][$polarity][]' "$catalog")
+  done
+done <"$temp_dir/active-skills"
+
+list_case_dirs() {
+  local root=$1
+  if [[ -d $root ]]; then
+    find "$root" -mindepth 1 -maxdepth 1 -type d \( -name 'trigger-positive-*' -o -name 'trigger-negative-*' \) \
+      -exec basename {} \; | sort
+  fi
+}
+
+check_skill() {
+  local skill=$1
+  local expected_root=$temp_dir/generated/$skill
+  local actual_root=$plugin_dir/evals/$skill
+  local status=0
+
+  list_case_dirs "$expected_root" >"$temp_dir/expected-$skill"
+  list_case_dirs "$actual_root" >"$temp_dir/actual-$skill"
+  if ! cmp -s "$temp_dir/expected-$skill" "$temp_dir/actual-$skill"; then
+    diff -u "$temp_dir/expected-$skill" "$temp_dir/actual-$skill" >&2 || true
+    status=1
+  fi
+
+  while IFS= read -r case_id; do
+    if [[ ! -f $actual_root/$case_id/case.yaml ]] || ! cmp -s "$expected_root/$case_id/case.yaml" "$actual_root/$case_id/case.yaml"; then
+      printf 'Generated trigger case is stale: %s/%s\n' "$skill" "$case_id" >&2
+      status=1
+    fi
+  done <"$temp_dir/expected-$skill"
+  return "$status"
+}
+
+if [[ $mode == check ]]; then
+  status=0
+  while IFS= read -r skill; do
+    check_skill "$skill" || status=1
+  done <"$temp_dir/active-skills"
+  if ((status != 0)); then
+    printf 'Run %s --write to regenerate trigger cases.\n' "$0" >&2
+  fi
+  exit "$status"
+fi
+
+evals_root=$(cd -- "$plugin_dir/evals" && pwd -P)
+while IFS= read -r skill; do
+  skill_eval_dir=$plugin_dir/evals/$skill
+  mkdir -p "$skill_eval_dir"
+  resolved_skill_dir=$(cd -- "$skill_eval_dir" && pwd -P)
+  case $resolved_skill_dir/ in
+    "$evals_root/"*) ;;
+    *) fail "refusing to replace trigger cases outside evals/: $resolved_skill_dir" ;;
+  esac
+
+  while IFS= read -r existing; do
+    case $(basename "$existing") in
+      trigger-positive-[0-9][0-9]|trigger-negative-[0-9][0-9]) ;;
+      *) fail "refusing to remove unexpected directory: $existing" ;;
+    esac
+    [[ $(cd -- "$(dirname -- "$existing")" && pwd -P) == "$resolved_skill_dir" ]] || fail "unexpected trigger case parent: $existing"
+    rm -rf -- "$existing"
+  done < <(find "$skill_eval_dir" -mindepth 1 -maxdepth 1 -type d \( -name 'trigger-positive-*' -o -name 'trigger-negative-*' \) | sort)
+
+  while IFS= read -r generated; do
+    cp -R "$generated" "$skill_eval_dir/"
+  done < <(find "$temp_dir/generated/$skill" -mindepth 1 -maxdepth 1 -type d | sort)
+done <"$temp_dir/active-skills"
+
+printf 'Generated trigger evals for %s skills.\n' "$(wc -l <"$temp_dir/active-skills" | tr -d ' ')"

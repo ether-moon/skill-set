@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+if [[ ${0##*/} == skill-set-git ]]; then
+  printf 'skill-set-git %s\n' "$*" >>"$MOCK_GH_LOG"
+  printf 'the no-code shipping eval must never invoke skill-set-git\n' >&2
+  exit 97
+fi
+
+printf '%s\n' "$*" >>"$MOCK_GH_LOG"
+head_sha=$(<"$MOCK_GH_HEAD_FILE")
+
+if [[ ${1:-} == pr && ${2:-} == view ]]; then
+  jq -cn --arg head "$head_sha" --arg base "$MOCK_GH_BASE_SHA" '
+    {number:17,headRefOid:$head,headRefName:"feature",
+      headRepository:{nameWithOwner:"owner/repo"},baseRefOid:$base,baseRefName:"main",
+      mergeable:"MERGEABLE",mergeStateStatus:"CLEAN",state:"OPEN",
+      url:"https://example.test/owner/repo/pull/17"}
+  '
+  exit 0
+fi
+
+if [[ ${1:-} == pr && ${2:-} == checks ]]; then
+  printf '%s\n' '[{"bucket":"pass","name":"verify","state":"SUCCESS","link":"https://example.test/check/verify","workflow":"CI"}]'
+  exit 0
+fi
+
+if [[ ${1:-} == api && ${2:-} == graphql ]]; then
+  if [[ -f $MOCK_GH_DIR/publication-complete ]]; then
+    printf '%s\n' '{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}'
+  else
+    printf '%s\n' '{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[{"id":"thread-1","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"comment-1","author":{"login":"reviewer"},"body":"Please verify this request","path":"fixture.txt","line":1}]}}],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}'
+  fi
+  exit 0
+fi
+
+if [[ ${1:-} == api && ${2:-} == repos/*/issues/*/comments* ]]; then
+  if [[ -f $MOCK_GH_DIR/comment.body ]]; then
+    jq -Rs '[{body:.}]' <"$MOCK_GH_DIR/comment.body"
+  else
+    printf '%s\n' '[]'
+  fi
+  exit 0
+fi
+
+if [[ ${1:-} == pr && ${2:-} == comment ]]; then
+  body_file=
+  while (($#)); do
+    if [[ $1 == --body-file ]]; then
+      [[ $# -ge 2 ]] || exit 64
+      body_file=$2
+      shift 2
+    else
+      shift
+    fi
+  done
+  [[ -n $body_file && -f $body_file ]] || {
+    printf 'mock gh requires --body-file\n' >&2
+    exit 64
+  }
+  cp -- "$body_file" "$MOCK_GH_DIR/comment.body"
+  : >"$MOCK_GH_DIR/publication-complete"
+  printf '%s\n' '{"url":"https://example.test/comment/1"}'
+  exit 0
+fi
+
+printf 'unsupported mock gh invocation: %s\n' "$*" >&2
+exit 64

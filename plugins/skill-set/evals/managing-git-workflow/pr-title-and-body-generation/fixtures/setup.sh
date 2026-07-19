@@ -71,3 +71,7 @@ git commit -q -m "feat(middleware): wire rate limiter into HTTP path"
 
 echo "Feature branch ready: PROJ-123-rate-limiter (3 commits ahead of main)"
 git log --oneline main..HEAD
+
+mkdir -p outputs
+printf '%s\n' 'PR_TITLE_REPLACE_ME' >outputs/pr-title.txt
+printf '%s\n' 'PR_BODY_REPLACE_ME' >outputs/pr-body.md

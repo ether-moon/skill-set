@@ -1,0 +1,23 @@
+schema_version: "1.1"
+name: shipping-pr-trigger-positive-08
+description: Should select shipping-pr for a representative request
+tags:
+  - shipping-pr
+  - trigger-positive
+execution:
+  prompt: "Tell me whether this PR is truly clean across conflicts, checks, review threads, and CodeRabbit."
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 3
+graders:
+  - type: tool_used
+    name: selected-shipping-pr
+    tool: Skill
+    input_match: "shipping-pr"
+    min: 1
+  - type: llm
+    name: workflow-outcome
+    criteria: "Pass only if the response follows the bounded PR state machine, accounts for checks, reviews, pagination, head changes and no-progress convergence, and uses resolvers only within explicit mutation authority."
+    focus: last_message

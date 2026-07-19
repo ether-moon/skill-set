@@ -1,0 +1,25 @@
+schema_version: "1.1"
+name: creating-skills-trigger-negative-02
+description: Should not select creating-skills for a near-miss request
+tags:
+  - creating-skills
+  - trigger-negative
+execution:
+  prompt: "Draft a conventional commit message for my staged changes."
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 3
+graders:
+  - type: tool_used
+    name: did-not-select-creating-skills
+    tool: Skill
+    input_match: "creating-skills"
+    min: 0
+    max: 0
+    arm: both
+  - type: llm
+    name: appropriate-scope
+    criteria: "Pass only if the response does not invoke or recommend creating-skills and instead handles the request directly or identifies a more appropriate workflow without forcing it into this skill's scope."
+    focus: last_message

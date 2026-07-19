@@ -1,0 +1,23 @@
+schema_version: "1.1"
+name: autofixing-and-escalating-trigger-positive-07
+description: Should select autofixing-and-escalating for a representative request
+tags:
+  - autofixing-and-escalating
+  - trigger-positive
+execution:
+  prompt: "A static analyzer and a reviewer reported overlapping defects. Deduplicate, classify, and summarize the authorized resolution results."
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 3
+graders:
+  - type: tool_used
+    name: selected-autofixing-and-escalating
+    tool: Skill
+    input_match: "autofixing-and-escalating"
+    min: 1
+  - type: llm
+    name: workflow-outcome
+    criteria: "Pass only if the response classifies the external findings, fixes only unambiguous items when resolution was explicitly authorized, and escalates judgment-dependent items without publishing or orchestrating follow-up work."
+    focus: last_message

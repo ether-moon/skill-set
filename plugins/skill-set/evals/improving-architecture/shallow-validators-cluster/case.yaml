@@ -16,6 +16,11 @@ execution:
 runs: 3
 graders:
   - type: tool_used
+    name: selected-improving-architecture
+    tool: Skill
+    input_match: improving-architecture
+    min: 1
+  - type: tool_used
     name: no-grilling-handoff
     tool: Skill
     input_match: grilling-plans

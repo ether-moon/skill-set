@@ -53,13 +53,14 @@ if rg -n 'superpowers:|`simplify`|handoff to|hand off to|auto(matically)? (invok
 fi
 assert_equals '1' "$(rg -l '^  - functional$' "$plugin_dir/evals/zooming-out-on-code" -g case.yaml | wc -l | tr -d ' ')" 'zoom functional eval count'
 assert_equals '2' "$(rg -l '^  - functional$' "$plugin_dir/evals/improving-architecture" -g case.yaml | wc -l | tr -d ' ')" 'architecture functional eval count'
-assert_equals '1' "$(rg -l '^  - functional$' "$plugin_dir/evals/grilling-plans" -g case.yaml | wc -l | tr -d ' ')" 'grilling functional eval count'
+assert_equals '2' "$(rg -l '^  - functional$' "$plugin_dir/evals/grilling-plans" -g case.yaml | wc -l | tr -d ' ')" 'grilling functional eval count'
 assert_equals '4' "$(rg -l '^  - functional$' "$plugin_dir/evals/guarding-agent-directives" -g case.yaml | wc -l | tr -d ' ')" 'directive functional eval count'
 
 for read_only_case in \
   "$plugin_dir/evals/zooming-out-on-code/order-validation-map" \
   "$plugin_dir/evals/improving-architecture/deletion-test-on-thin-wrapper" \
   "$plugin_dir/evals/improving-architecture/shallow-validators-cluster" \
+  "$plugin_dir/evals/grilling-plans/early-stop-ledger" \
   "$plugin_dir/evals/guarding-agent-directives/audit-existing"; do
   if rg -q -- '- Write|- Edit|outputs/' "$read_only_case"; then
     fail "read-only eval grants or requests mutation: $read_only_case"

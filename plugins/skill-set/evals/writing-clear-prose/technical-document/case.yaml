@@ -16,6 +16,11 @@ execution:
     - Edit
 runs: 3
 graders:
+  - type: tool_used
+    name: selected-writing-clear-prose
+    tool: Skill
+    input_match: writing-clear-prose
+    min: 1
   - type: file_exists
     name: revision-created
     path: outputs/revised.md

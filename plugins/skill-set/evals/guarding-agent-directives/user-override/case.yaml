@@ -15,6 +15,11 @@ execution:
     - Edit
 runs: 3
 graders:
+  - type: tool_used
+    name: selected-guarding-agent-directives
+    tool: Skill
+    input_match: guarding-agent-directives
+    min: 1
   - type: regex
     name: override-applied
     target:

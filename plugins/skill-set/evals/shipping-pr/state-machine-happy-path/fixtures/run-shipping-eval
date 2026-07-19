@@ -1,0 +1,160 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+fail() {
+  printf 'shipping eval wrapper: %s\n' "$*" >&2
+  exit 64
+}
+
+arg_value() {
+  local target=$1
+  shift
+  while (($#)); do
+    if [[ $1 == "$target" ]]; then
+      [[ $# -ge 2 ]] || return 1
+      printf '%s\n' "$2"
+      return 0
+    fi
+    shift
+  done
+  return 1
+}
+
+[[ $# -ge 2 ]] || fail 'expected RUNNER SUBCOMMAND [ARGUMENTS]'
+runner=$1
+shift
+subcommand=$1
+shift
+
+[[ -n ${CLAUDE_PLUGIN_ROOT:-} ]] || fail 'CLAUDE_PLUGIN_ROOT is required'
+plugin_root=$(cd -- "$CLAUDE_PLUGIN_ROOT" 2>/dev/null && pwd -P) || \
+  fail 'CLAUDE_PLUGIN_ROOT is not a readable directory'
+expected_runner=$plugin_root/bin/skill-set-pr
+[[ -x $expected_runner ]] || fail 'canonical bundled skill-set-pr is not executable'
+[[ $runner == /* && -x $runner ]] || fail 'runner must be an executable absolute path'
+physical_runner=$(cd -- "$(dirname -- "$runner")" && pwd -P)/${runner##*/}
+[[ $physical_runner == "$expected_runner" ]] || \
+  fail 'runner must exactly match CLAUDE_PLUGIN_ROOT/bin/skill-set-pr'
+
+workspace=$(git rev-parse --show-toplevel 2>/dev/null) || fail 'run from the disposable Git fixture'
+workspace=$(cd -- "$workspace" && pwd -P)
+[[ $(pwd -P) == "$workspace" ]] || fail 'run from the disposable repository root'
+
+phase_file=$workspace/.eval-state/workflow-phase
+[[ -s $phase_file ]] || fail 'workflow phase is missing'
+phase=$(<"$phase_file")
+expected_phase=
+next_phase=
+stage=
+output_file=
+
+case $subcommand in
+  init)
+    expected_phase=start
+    next_phase=initialized
+    stage=init
+    output_file=01-init.json
+    [[ $(arg_value --pr "$@" || true) == 17 ]] || fail 'init must target PR 17'
+    [[ $(arg_value --repo "$@" || true) == owner/repo ]] || fail 'init must target owner/repo'
+    [[ $(arg_value --now "$@" || true) == 100 ]] || fail 'init must use --now 100'
+    ;;
+  snapshot)
+    snapshot_now=$(arg_value --now "$@" || true)
+    case $snapshot_now in
+      101)
+        expected_phase=initialized
+        next_phase=blocked
+        stage=snapshot-blocked
+        output_file=02-blocked-snapshot.json
+        ;;
+      102)
+        expected_phase=polling
+        next_phase=clean
+        stage=snapshot-clean
+        output_file=06-clean-snapshot.json
+        ;;
+      *) fail 'snapshot must use --now 101 or --now 102' ;;
+    esac
+    ;;
+  transition)
+    transition_from=$(arg_value --from "$@" || true)
+    transition_to=$(arg_value --to "$@" || true)
+    case $transition_from:$transition_to in
+      blocked:resolving)
+        expected_phase=blocked
+        next_phase=resolving
+        stage=transition-resolving
+        output_file=03-resolving-transition.json
+        ;;
+      resolving:polling)
+        expected_phase=published
+        next_phase=polling
+        stage=transition-polling
+        output_file=05-polling-transition.json
+        ;;
+      *) fail 'transition must be blocked -> resolving or resolving -> polling' ;;
+    esac
+    ;;
+  publish)
+    expected_phase=resolving
+    next_phase=published
+    stage=publish
+    output_file=04-publication.json
+    [[ $(arg_value --now "$@" || true) == 101 ]] || fail 'publish must use --now 101'
+    ;;
+  finish)
+    expected_phase=clean
+    next_phase=finished
+    stage=finish-clean
+    output_file=07-clean-finish.json
+    [[ $(arg_value --from "$@" || true) == clean ]] || fail 'finish must use --from clean'
+    [[ $(arg_value --status "$@" || true) == clean ]] || fail 'finish must use --status clean'
+    ;;
+  *) fail "unsupported runner subcommand: $subcommand" ;;
+esac
+
+[[ $phase == "$expected_phase" ]] || \
+  fail "out-of-order $stage operation: expected $expected_phase, found $phase"
+
+export MOCK_GH_DIR=$workspace/.eval-state
+export MOCK_GH_LOG=$workspace/outputs/mock-gh.log
+export MOCK_GH_HEAD_FILE=$workspace/.eval-state/remote-head
+export MOCK_GH_BASE_SHA
+MOCK_GH_BASE_SHA=$(git rev-parse HEAD)
+export SKILL_SET_GIT_RUNNER=$workspace/.eval-bin/skill-set-git
+export PATH=$workspace/.eval-bin:$PATH
+
+if ! output=$("$physical_runner" "$subcommand" "$@"); then
+  fail "$stage runner invocation failed"
+fi
+jq -e '.ok == true' >/dev/null 2>&1 <<<"$output" || fail "$stage returned invalid runner JSON"
+
+case $stage in
+  init) jq -e '.status == "polling" and .cycle == 0' >/dev/null <<<"$output" ;;
+  snapshot-blocked)
+    jq -e '.status == "blocked" and .unresolved_actionable_threads == 1' >/dev/null <<<"$output"
+    ;;
+  transition-resolving)
+    jq -e '.status == "resolving" and .cycle == 1 and
+      .resolution.expected_agents == ["pr-review-feedback"]' >/dev/null <<<"$output"
+    ;;
+  publish)
+    jq -e '.resolution.publication.phase == "complete" and
+      .resolution.publication.pushed == false' >/dev/null <<<"$output"
+    ;;
+  transition-polling) jq -e '.status == "polling"' >/dev/null <<<"$output" ;;
+  snapshot-clean)
+    jq -e '.status == "clean" and .unresolved_actionable_threads == 0' >/dev/null <<<"$output"
+    ;;
+  finish-clean) jq -e '.command == "finish" and .status == "clean"' >/dev/null <<<"$output" ;;
+esac
+
+printf '%s\n' "$output" >"$workspace/outputs/$output_file"
+{
+  printf '%s\t' "$stage"
+  printf '%q ' "$physical_runner" "$subcommand" "$@"
+  printf '\n'
+} >>"$workspace/outputs/runner-invocations.log"
+printf '%s\n' "$next_phase" >"$phase_file"
+printf '%s\n' "$output"

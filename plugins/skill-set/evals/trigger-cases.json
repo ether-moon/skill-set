@@ -1,0 +1,244 @@
+{
+  "autofixing-and-escalating": {
+    "positive": [
+      "Process these six CodeRabbit review comments: classify every item, show what is obvious versus ambiguous, and do not edit anything yet.",
+      "The linter produced a mixed batch of unused imports, naming preferences, and complexity warnings. Triage the findings and apply only what I have authorized.",
+      "Resolve the actionable findings in this security scan, but stop for any policy or dependency decision.",
+      "Review these eight failing-test diagnostics from CI and separate mechanically correct fixes from decisions that need me.",
+      "Audit this external accessibility report in review-only mode and give me a severity-ordered decision record.",
+      "Fix the obvious issues in these PR review comments; record ambiguous design suggestions for my decision and do not publish anything.",
+      "A static analyzer and a reviewer reported overlapping defects. Deduplicate, classify, and summarize the authorized resolution results.",
+      "Triage this batch of audit findings with explicit edit=false, commit=false, push=false, and comment=false capabilities."
+    ],
+    "negative": [
+      "Explore this package and suggest architecture improvements you notice.",
+      "Rename the local variable on line 12 to customerId.",
+      "Draft a concise pull request title and body for these commits.",
+      "Explain why this single test assertion is failing; I am still investigating the bug.",
+      "Challenge this implementation plan one decision at a time.",
+      "Give me a big-picture map of the payments module and its callers.",
+      "Rewrite this technical report so the claims are clearer.",
+      "Prepare a minor version bump and changelog entry."
+    ]
+  },
+  "bumping-version": {
+    "positive": [
+      "Prepare a patch version bump for this project, including the changelog, but wait for approval before publishing.",
+      "Inspect all version manifests and tell me whether they agree before we cut a release.",
+      "The last release added features and fixes. Prepare the appropriate semantic version bump in an isolated worktree.",
+      "Create a minor release preparation and show the exact files and diff before any direct base push.",
+      "Publish the already prepared release only if origin/main still matches the recorded base SHA.",
+      "Clean up the successful release worktree and temporary release branch.",
+      "The release push was rejected by branch protection; report the preserved recovery state without opening a PR.",
+      "Compare package.json, pyproject.toml, and the plugin manifest, then prepare one consistent release version."
+    ],
+    "negative": [
+      "Update the lodash dependency to its newest compatible version.",
+      "Write release notes from these commits without changing any version.",
+      "Commit my currently staged source changes.",
+      "Deploy version 2.4.0 to production now.",
+      "Explain how semantic versioning distinguishes major and minor releases.",
+      "Create a pull request for the commits already on this branch.",
+      "Add a missing changelog sentence to the current unreleased section only.",
+      "Tag the existing HEAD as v2.4.0; all manifests are already published."
+    ]
+  },
+  "creating-skills": {
+    "positive": [
+      "Create a new Claude skill for incident triage, including trigger cases and functional evals.",
+      "Improve this existing SKILL.md because it over-triggers on nearby documentation requests.",
+      "Benchmark the current skill against a no-skill baseline and iterate on the failures.",
+      "Design positive and negative trigger cases for my deployment skill.",
+      "Review this skill's structure, references, bundled scripts, and error handling before upload.",
+      "The skill-creator plugin is unavailable; build and validate this skill with the complete local lifecycle.",
+      "Optimize this skill description for recall without reducing near-miss precision.",
+      "Diagnose whether these skill eval failures come from instructions, graders, fixtures, or triggering."
+    ],
+    "negative": [
+      "Rewrite this architecture proposal so it is clearer and shorter.",
+      "Draft a conventional commit message for my staged changes.",
+      "Add a concise code comment explaining this regex.",
+      "Write a fantasy short story about a debugging wizard.",
+      "Create a reusable shell function in our application code.",
+      "Explain how the Skill tool works at a high level; I am not authoring one.",
+      "Audit the repository's CLAUDE.md for duplicated directives.",
+      "Design a unit-test strategy for this parser feature."
+    ]
+  },
+  "driving-with-tests": {
+    "positive": [
+      "Implement this new behavior test-first and show the Red, Green, and Refactor evidence.",
+      "Fix the empty-input crash by first adding a failing regression test.",
+      "Run the tests first, establish the baseline, and then make the change.",
+      "This is a pure refactor; tell me how to preserve behavior with characterization coverage.",
+      "What test layer should prove this database-backed API contract?",
+      "Review these test changes for weakened assertions and specification drift.",
+      "The teammate's implementation already exists without tests; add coverage without deleting their work.",
+      "Probe the now-green CLI for edge cases and turn any gap into a regression test."
+    ],
+    "negative": [
+      "Classify these five CI failure messages as obvious or ambiguous findings.",
+      "Write a project status report summarizing our test metrics.",
+      "Explain what this test file does in the larger module; do not change it.",
+      "Prepare a version bump after all tests have passed.",
+      "Grill this test migration plan before we implement it.",
+      "Audit AGENTS.md for a duplicated rule about running tests.",
+      "List architectural seams that could make this package more testable.",
+      "Push the existing commits after checking the remote SHA."
+    ]
+  },
+  "grilling-plans": {
+    "positive": [
+      "Grill this implementation plan and ask me one decision at a time.",
+      "Challenge this RFC before we lock it for implementation.",
+      "Poke holes in this proposal and keep a Confirmed, Rejected, and Unresolved ledger.",
+      "Is this design ready? Stress-test its assumptions against the repository.",
+      "Sanity-check this migration plan; stop after five questions and show what remains unresolved.",
+      "Walk the decision tree for this ADR draft with a recommendation on each question.",
+      "Review this ticket specification adversarially before engineers start coding.",
+      "The plan says partial success is standard. Force that term into one precise decision."
+    ],
+    "negative": [
+      "I have only a blank idea for a collaboration app; brainstorm possible products.",
+      "Turn this approved specification into implementation tasks.",
+      "Implement the attached plan exactly as written.",
+      "Review the code diff for correctness and maintainability.",
+      "Give me the big-picture module map before I read this plan.",
+      "Find ranked architecture refactor candidates in this package.",
+      "Audit this directive file for bloat and poor placement.",
+      "Draft a proposal from these notes; there is no plan yet."
+    ]
+  },
+  "guarding-agent-directives": {
+    "positive": [
+      "Add this rule to AGENTS.md, but verify that it belongs there first.",
+      "Audit our CLAUDE.md and its references for duplicate or vague instructions.",
+      "Review this proposed agent directive with the five-question gate.",
+      "An agent wants to edit AGENTS.md autonomously; check the addition before allowing it.",
+      "Use audit-existing mode and recommend keep, revise, or remove for every rule in scope.",
+      "This directive failed one check, but I may override it; show the evidence and exact diff first.",
+      "Find the correct narrow location for this database-migration instruction.",
+      "Check whether this new CLAUDE.md rule duplicates a referenced workflow document."
+    ],
+    "negative": [
+      "Review this product requirements document for clarity.",
+      "Create a new skill with a strong trigger description.",
+      "Explain the existing AGENTS.md to a new teammate without changing it.",
+      "Add a runtime validation rule to the application source code.",
+      "Commit the directive changes I already reviewed and staged.",
+      "Challenge the architecture plan recorded in this ADR.",
+      "Find refactor opportunities in the agent orchestration code.",
+      "Write a normal README section describing installation."
+    ]
+  },
+  "improving-architecture": {
+    "positive": [
+      "Find and rank architecture improvement candidates in this tangled package.",
+      "Apply the deletion test to these shallow modules and show evidence-backed seams.",
+      "Where could we deepen modules to improve locality and caller leverage?",
+      "This area is a ball of mud; give me a bounded refactor shortlist with risks.",
+      "Identify testability seams without designing the final APIs.",
+      "Analyze repeated ordering knowledge across callers as a possible architecture candidate.",
+      "Rank modularity improvements using files, evidence, locality gain, and leverage gain.",
+      "Find one-PR architecture refactors that reduce leaked implementation knowledge."
+    ],
+    "negative": [
+      "Explain where this unfamiliar module sits in the system; no recommendations.",
+      "Implement the chosen refactor candidate now.",
+      "Design the exact interface and method signatures for this new service.",
+      "Grill this already-written refactor plan one question at a time.",
+      "Review this small diff for naming and formatting issues.",
+      "Debug the null-pointer crash in the current request path.",
+      "Create a test strategy for the new payment calculation.",
+      "Write an ADR documenting the architecture decision we already made."
+    ]
+  },
+  "managing-git-workflow": {
+    "positive": [
+      "Commit only my currently staged changes with a message derived from the staged diff.",
+      "Commit these two explicit paths and leave every other working-tree change alone.",
+      "I explicitly want all current changes committed; show the scope before doing it.",
+      "Push the existing commits only if the remote branch SHA has not changed.",
+      "Create a PR from the committed branch and show which dirty files will be excluded.",
+      "Check whether a PR already exists and return its URL instead of creating another.",
+      "Inspect staged, unstaged, and untracked paths plus ahead and behind state.",
+      "Generate the PR title and body from origin/main...HEAD and publish only the committed range."
+    ],
+    "negative": [
+      "Bump all manifests to the next minor release and prepare the changelog.",
+      "Ship this PR and keep polling checks and reviews until it is clean.",
+      "Resolve the CI failures and review comments on PR 42.",
+      "Explain what the latest three commits changed without mutating Git.",
+      "Rewrite this pull request description for clarity only.",
+      "Recover my branch by rebasing it onto main.",
+      "Delete the obsolete remote branch.",
+      "Design a branching strategy for the engineering team."
+    ]
+  },
+  "shipping-pr": {
+    "positive": [
+      "Ship this PR end to end and keep polling until checks and reviews are clean.",
+      "Resume the existing shipping run for PR 42 from its state file.",
+      "Ship PR 42 end to end: keep polling, resolve every authorized blocker, resnapshot each new HEAD, and do not stop until the PR is clean or the shipping state machine reaches a terminal stop.",
+      "Wait for delayed checks, unresolved threads, and CodeRabbit on the current HEAD.",
+      "Run /pr:ship with the existing flags and stop if the blocker fingerprint makes no progress.",
+      "Resolve the merge conflict as the sole cycle, push, then resnapshot the new HEAD.",
+      "Handle CI failures and review feedback sequentially and push once if every resolver succeeds.",
+      "Tell me whether this PR is truly clean across conflicts, checks, review threads, and CodeRabbit."
+    ],
+    "negative": [
+      "Create a PR for my already committed branch and return immediately.",
+      "Commit the staged changes but do not push them.",
+      "Explain why one GitHub Actions job failed; do not resolve it yet.",
+      "Rewrite the PR body so reviewers can understand the change.",
+      "Prepare a release and push its commit directly to main after approval.",
+      "Review these external findings in review-only mode.",
+      "Show the architecture of our PR automation code.",
+      "List the open pull requests in the repository."
+    ]
+  },
+  "writing-clear-prose": {
+    "positive": [
+      "Rewrite this technical document for clarity while preserving every requirement.",
+      "Draft a decision proposal from these supplied facts and constraints.",
+      "Tighten this long research report without inventing metrics or changing its claims.",
+      "Improve the structure and specificity of this explanatory article.",
+      "Revise this architecture narrative for a context-zero reader, preserving technical meaning.",
+      "Turn these evidence-backed notes into a concise non-fiction report.",
+      "Edit this proposal so the strongest counterargument is represented fairly.",
+      "Proofread and materially reorganize this operations guide while retaining all obligations."
+    ],
+    "negative": [
+      "Improve this SKILL.md and add trigger evaluations.",
+      "Write a conventional commit message for this diff.",
+      "Draft a pull request title and checklist body.",
+      "Add a one-line code comment explaining this branch.",
+      "Write a poem about distributed systems.",
+      "Reply casually to this Slack message.",
+      "Suggest a variable name for this function argument.",
+      "Audit AGENTS.md for directive bloat and duplication."
+    ]
+  },
+  "zooming-out-on-code": {
+    "positive": [
+      "Zoom out and explain where this unfamiliar module fits in the system.",
+      "Give me the big picture for this file before I change it.",
+      "What calls this package, what does it depend on, and what sits beside it?",
+      "Tour this code area in domain language; I am new to the project.",
+      "Map the responsibility, callers, dependencies, siblings, and unknowns for this service.",
+      "Where does OrderValidation fit in the larger request flow? No recommendations.",
+      "Explain this function at the containing-module level rather than line by line.",
+      "Orient me to this top-level package and stop at its product role."
+    ],
+    "negative": [
+      "Find ranked refactor candidates in this module.",
+      "Debug why this function returns null in production.",
+      "Review the latest code changes for correctness.",
+      "Design a new interface for this package.",
+      "Implement the feature described in this file.",
+      "Explain how to use this external framework API.",
+      "Grill the migration plan associated with this module.",
+      "Write an ADR describing where this module belongs."
+    ]
+  }
+}

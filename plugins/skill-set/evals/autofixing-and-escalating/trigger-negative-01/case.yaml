@@ -1,0 +1,25 @@
+schema_version: "1.1"
+name: autofixing-and-escalating-trigger-negative-01
+description: Should not select autofixing-and-escalating for a near-miss request
+tags:
+  - autofixing-and-escalating
+  - trigger-negative
+execution:
+  prompt: "Explore this package and suggest architecture improvements you notice."
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 3
+graders:
+  - type: tool_used
+    name: did-not-select-autofixing-and-escalating
+    tool: Skill
+    input_match: "autofixing-and-escalating"
+    min: 0
+    max: 0
+    arm: both
+  - type: llm
+    name: appropriate-scope
+    criteria: "Pass only if the response does not invoke or recommend autofixing-and-escalating and instead handles the request directly or identifies a more appropriate workflow without forcing it into this skill's scope."
+    focus: last_message

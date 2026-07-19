@@ -18,6 +18,11 @@ execution:
     - Bash
 runs: 3
 graders:
+  - type: tool_used
+    name: selected-autofixing-and-escalating
+    tool: Skill
+    input_match: autofixing-and-escalating
+    min: 1
   - type: file_exists
     name: escalation-created
     path: outputs/escalation.md

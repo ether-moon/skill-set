@@ -285,7 +285,7 @@ These patterns are legitimate in moderation. The problem is overuse or mechanica
 
 | Anti-Pattern | Problem | Fix |
 |---|---|---|
-| **Style-first revision** | Polishing sentences before fixing structure | Always revise structure first (see `revising.md`) |
+| **Style-first revision** | Polishing sentences before fixing structure | Move, merge, or delete sections before polishing sentences |
 | **Rewriting instead of editing** | Generating new text rather than cutting | Editing = subtracting; draft new text only to fill structural gaps |
 | **Consistency blindness** | Ignoring terminology drift during revision | Ctrl+F each key term; verify consistent usage |
 | **Feedback accumulation** | Collecting feedback without acting on it | Process feedback in real-time, one pass per category |

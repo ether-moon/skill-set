@@ -1,0 +1,19 @@
+schema_version: "1.1"
+name: grilling-plans-early-stop-ledger
+description: Returns the final decision ledger when the user explicitly stops a grilling round early
+tags:
+  - grilling-plans
+  - functional
+  - read-only
+execution:
+  max_turns: 5
+  timeout_seconds: 240
+  allowed_tools:
+    - Skill
+runs: 3
+graders:
+  - type: tool_used
+    name: selected-grilling-plans
+    tool: Skill
+    input_match: grilling-plans
+    min: 1

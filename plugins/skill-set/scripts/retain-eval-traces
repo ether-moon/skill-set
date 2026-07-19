@@ -1,0 +1,231 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+usage() {
+  printf '%s\n' \
+    'Usage: retain-eval-traces --result FILE --trace-dir DIR --with-arm NAME [--without-arm NAME]' \
+    '' \
+    'Copy Claude eval agent traces into the durable result artifact, rewrite' \
+    'tracePath values to those copies, and remove only verified claude-eval-*' \
+    'sandboxes below the process temporary directory.'
+}
+
+is_safe_component() {
+  local value=$1
+  case $value in
+    [A-Za-z0-9]*) ;;
+    *) return 1 ;;
+  esac
+  case $value in
+    *[!A-Za-z0-9._-]*) return 1 ;;
+  esac
+  [[ $value != . && $value != .. ]]
+}
+
+result=
+trace_dir=
+with_arm=
+without_arm=
+
+while (($#)); do
+  case $1 in
+    --result|--trace-dir|--with-arm|--without-arm)
+      (($# >= 2)) || { printf '%s requires a value\n' "$1" >&2; exit 2; }
+      option=$1
+      value=$2
+      shift 2
+      case $option in
+        --result) result=$value ;;
+        --trace-dir) trace_dir=$value ;;
+        --with-arm) with_arm=$value ;;
+        --without-arm) without_arm=$value ;;
+      esac
+      ;;
+    -h|--help) usage; exit 0 ;;
+    *) printf 'Unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+[[ -n $result && -s $result ]] || { printf 'Missing or empty --result file: %s\n' "$result" >&2; exit 2; }
+[[ -n $trace_dir ]] || { printf 'Missing --trace-dir.\n' >&2; exit 2; }
+[[ -n $with_arm ]] || { printf 'Missing --with-arm.\n' >&2; exit 2; }
+is_safe_component "$with_arm" || { printf 'Unsafe --with-arm: %s\n' "$with_arm" >&2; exit 2; }
+if [[ -n $without_arm ]]; then
+  is_safe_component "$without_arm" || { printf 'Unsafe --without-arm: %s\n' "$without_arm" >&2; exit 2; }
+fi
+jq -e '.schemaVersion == 1 and (.cases | type) == "array"' "$result" >/dev/null || {
+  printf 'Result is not Claude plugin eval JSON schema 1: %s\n' "$result" >&2
+  exit 2
+}
+
+mkdir -p -- "$trace_dir"
+trace_dir=$(cd -- "$trace_dir" && pwd -P)
+result_dir=$(cd -- "$(dirname -- "$result")" && pwd -P)
+temporary_root=$(cd -- "${TMPDIR:-/tmp}" && pwd -P)
+mapping_file=$(mktemp "${TMPDIR:-/tmp}/skill-set-trace-map.XXXXXX")
+roots_file=$(mktemp "${TMPDIR:-/tmp}/skill-set-trace-roots.XXXXXX")
+registry_file=$(mktemp "${TMPDIR:-/tmp}/skill-set-trace-registry.XXXXXX")
+registry_next=$(mktemp "${TMPDIR:-/tmp}/skill-set-trace-registry-next.XXXXXX")
+rewritten_result=$(mktemp "$(dirname -- "$result")/.trace-result.XXXXXX")
+trap 'rm -f -- "$mapping_file" "$roots_file" "$registry_file" "$registry_next" "$rewritten_result"' EXIT
+printf '{}\n' >"$mapping_file"
+printf '{"identities": {}, "sources": {}}\n' >"$registry_file"
+
+validate_unique_arm() {
+  local json_arm=$1
+  local artifact_arm=$2
+  local case_name
+  local run_number
+  local source_trace
+  local identity
+  local canonical_trace
+
+  while IFS=$'\t' read -r case_name run_number source_trace; do
+    is_safe_component "$case_name" || {
+      printf 'Unsafe case name in eval result: %s\n' "$case_name" >&2
+      exit 1
+    }
+    case $run_number in ''|*[!0-9]*) printf 'Invalid run number: %s\n' "$run_number" >&2; exit 1 ;; esac
+
+    identity=$artifact_arm/$case_name/run-$run_number
+    if jq -e --arg identity "$identity" '.identities[$identity] == true' \
+      "$registry_file" >/dev/null; then
+      printf 'Duplicate eval trace identity: %s\n' "$identity" >&2
+      exit 1
+    fi
+    jq --arg identity "$identity" '.identities[$identity] = true' \
+      "$registry_file" >"$registry_next"
+    mv -- "$registry_next" "$registry_file"
+
+    [[ -n $source_trace ]] || continue
+    [[ -f $source_trace && ! -L $source_trace ]] || {
+      printf 'Retained eval trace is missing or is a symlink: %s\n' "$source_trace" >&2
+      exit 1
+    }
+    canonical_trace=$(cd -- "$(dirname -- "$source_trace")" && pwd -P)/$(basename -- "$source_trace")
+    if jq -e --arg source "$canonical_trace" '.sources[$source] == true' \
+      "$registry_file" >/dev/null; then
+      printf 'Duplicate eval source trace: %s\n' "$canonical_trace" >&2
+      exit 1
+    fi
+    jq --arg source "$canonical_trace" '.sources[$source] = true' \
+      "$registry_file" >"$registry_next"
+    mv -- "$registry_next" "$registry_file"
+  done < <(jq -r --arg arm "$json_arm" '
+    .cases[]
+    | .name as $case
+    | (.arms[$arm] // [])
+    | to_entries[]
+    | [$case, (.key + 1), (.value.tracePath // "")]
+    | @tsv
+  ' "$result")
+}
+
+retain_arm() {
+  local json_arm=$1
+  local artifact_arm=$2
+  local case_name
+  local run_number
+  local source_trace
+  local source_root
+  local canonical_root
+  local canonical_trace
+  local destination_dir
+  local canonical_destination_dir
+  local destination_trace
+  local artifact_trace
+  local next_mapping
+
+  while IFS=$'\t' read -r case_name run_number source_trace; do
+    [[ -n $source_trace ]] || continue
+    is_safe_component "$case_name" || {
+      printf 'Unsafe case name in eval result: %s\n' "$case_name" >&2
+      exit 1
+    }
+    case $run_number in ''|*[!0-9]*) printf 'Invalid run number: %s\n' "$run_number" >&2; exit 1 ;; esac
+    [[ -f $source_trace && ! -L $source_trace ]] || {
+      printf 'Retained eval trace is missing or is a symlink: %s\n' "$source_trace" >&2
+      exit 1
+    }
+
+    source_root=$(dirname -- "$(dirname -- "$source_trace")")
+    canonical_root=$(cd -- "$source_root" && pwd -P)
+    canonical_trace=$(cd -- "$(dirname -- "$source_trace")" && pwd -P)/$(basename -- "$source_trace")
+    case $(basename -- "$canonical_root") in claude-eval-*) ;; *)
+      printf 'Refusing to clean unrecognized eval sandbox: %s\n' "$canonical_root" >&2
+      exit 1
+      ;;
+    esac
+    [[ $(dirname -- "$canonical_root") == "$temporary_root" ]] || {
+      printf 'Refusing to clean eval sandbox outside %s: %s\n' "$temporary_root" "$canonical_root" >&2
+      exit 1
+    }
+    [[ $canonical_trace == "$canonical_root/out/trace.jsonl" ]] || {
+      printf 'Unexpected eval trace location: %s\n' "$canonical_trace" >&2
+      exit 1
+    }
+    case $trace_dir/ in
+      "$canonical_root"/*)
+        printf 'Refusing trace destination inside cleanup root: %s\n' "$trace_dir" >&2
+        exit 1
+        ;;
+    esac
+
+    destination_dir=$trace_dir/$artifact_arm/$case_name
+    mkdir -p -- "$destination_dir"
+    canonical_destination_dir=$(cd -- "$destination_dir" && pwd -P)
+    case $canonical_destination_dir/ in
+      "$trace_dir"/*) ;;
+      *)
+        printf 'Trace destination escaped its artifact root: %s\n' "$canonical_destination_dir" >&2
+        exit 1
+        ;;
+    esac
+    destination_trace=$canonical_destination_dir/run-$run_number.jsonl
+    cp -p -- "$canonical_trace" "$destination_trace"
+    printf '%s\n' "$canonical_root" >>"$roots_file"
+    artifact_trace=$destination_trace
+    case $destination_trace in
+      "$result_dir"/*) artifact_trace=${destination_trace#"$result_dir"/} ;;
+    esac
+
+    next_mapping=$(mktemp "${TMPDIR:-/tmp}/skill-set-trace-map-next.XXXXXX")
+    jq --arg source "$source_trace" --arg destination "$artifact_trace" \
+      '. + {($source): $destination}' "$mapping_file" >"$next_mapping"
+    mv -- "$next_mapping" "$mapping_file"
+  done < <(jq -r --arg arm "$json_arm" '
+    .cases[]
+    | .name as $case
+    | (.arms[$arm] // [])
+    | to_entries[]
+    | [$case, (.key + 1), (.value.tracePath // "")]
+    | @tsv
+  ' "$result")
+}
+
+validate_unique_arm with "$with_arm"
+if [[ -n $without_arm ]]; then validate_unique_arm without "$without_arm"; fi
+
+retain_arm with "$with_arm"
+if [[ -n $without_arm ]]; then retain_arm without "$without_arm"; fi
+
+jq --slurpfile mapping "$mapping_file" '
+  .cases |= map(
+    .arms.with |= map(.tracePath = ($mapping[0][.tracePath] // .tracePath))
+    | if (.arms.without | type) == "array" then
+        .arms.without |= map(.tracePath = ($mapping[0][.tracePath] // .tracePath))
+      else . end
+  )
+' "$result" >"$rewritten_result"
+mv -- "$rewritten_result" "$result"
+
+if [[ -s $roots_file ]]; then
+  sort -u "$roots_file" | while IFS= read -r sandbox_root; do
+    [[ -n $sandbox_root ]] || continue
+    rm -rf -- "$sandbox_root"
+  done
+fi
+
+trap - EXIT
+rm -f -- "$mapping_file" "$roots_file" "$registry_file" "$registry_next"

@@ -73,3 +73,9 @@ git add -A
 
 echo "Fixture ready. Staged change: nested array support added to parser."
 git status --short
+
+# Capture only a commit produced after the fixture is ready. The model cannot
+# write the graded artifact directly; the repository hook owns that evidence.
+fixture_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+cp -- "$fixture_dir/.eval-hooks/post-commit" .git/hooks/post-commit
+chmod +x .git/hooks/post-commit

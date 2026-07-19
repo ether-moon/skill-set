@@ -1,0 +1,23 @@
+schema_version: "1.1"
+name: bumping-version-trigger-positive-02
+description: Should select bumping-version for a representative request
+tags:
+  - bumping-version
+  - trigger-positive
+execution:
+  prompt: "Inspect all version manifests and tell me whether they agree before we cut a release."
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 3
+graders:
+  - type: tool_used
+    name: selected-bumping-version
+    tool: Skill
+    input_match: "bumping-version"
+    min: 1
+  - type: llm
+    name: workflow-outcome
+    criteria: "Pass only if the response follows the release preparation contract: detect and reconcile manifests, update the changelog, use the release executor, and preserve the explicit approval gate before publishing."
+    focus: last_message

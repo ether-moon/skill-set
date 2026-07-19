@@ -1,0 +1,23 @@
+schema_version: "1.1"
+name: grilling-plans-trigger-positive-06
+description: Should select grilling-plans for a representative request
+tags:
+  - grilling-plans
+  - trigger-positive
+execution:
+  prompt: "Walk the decision tree for this ADR draft with a recommendation on each question."
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 3
+graders:
+  - type: tool_used
+    name: selected-grilling-plans
+    tool: Skill
+    input_match: "grilling-plans"
+    min: 1
+  - type: llm
+    name: workflow-outcome
+    criteria: "Pass only if the response begins a bounded adversarial plan review with exactly one decision question, maintains confirmed, rejected, and unresolved decisions, and does not design or implement the solution."
+    focus: last_message

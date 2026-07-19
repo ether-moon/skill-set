@@ -1,5 +1,15 @@
 # Evaluation and Iteration
 
+## Table of Contents
+
+- [Core Loop](#core-loop)
+- [Official Eval Layout](#official-eval-layout)
+- [Trigger Cases](#trigger-cases)
+- [Functional Cases](#functional-cases)
+- [Baselines and Ablation](#baselines-and-ablation)
+- [Benchmark and Acceptance](#benchmark-and-acceptance)
+- [Failure Classification and Iteration](#failure-classification-and-iteration)
+
 ## Core Loop
 
 Evaluate behavior before adding extensive instructions:

@@ -10,9 +10,17 @@ on:
         required: false
         default: '3'
       max_cost_usd:
-        description: Hard evaluation cost ceiling
+        description: Total target split into two CLI ceilings; each may overrun one agent run
         required: false
         default: '40'
+      model:
+        description: Model identifier evaluated by the agent runs
+        required: false
+        default: 'haiku'
+      judge_model:
+        description: Independent model identifier used by LLM graders
+        required: false
+        default: 'sonnet'
 
 permissions:
   contents: read
@@ -23,13 +31,11 @@ concurrency:
 
 jobs:
   model-evaluation:
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: main
 
       - uses: actions/setup-node@v4
         with:
@@ -42,8 +48,10 @@ jobs:
         id: eval
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          REQUESTED_RUNS: ${{ github.event.inputs.runs || '1' }}
-          MAX_COST_USD: ${{ github.event.inputs.max_cost_usd || '25' }}
+          REQUESTED_RUNS: ${{ github.event.inputs.runs || '3' }}
+          MAX_COST_USD: ${{ github.event.inputs.max_cost_usd || '40' }}
+          EVAL_MODEL: ${{ github.event.inputs.model || 'haiku' }}
+          JUDGE_MODEL: ${{ github.event.inputs.judge_model || 'sonnet' }}
         run: |
           mkdir -p eval-results
           if [ -z "$ANTHROPIC_API_KEY" ]; then
@@ -57,6 +65,8 @@ jobs:
             --output-dir eval-results \
             --runs "$REQUESTED_RUNS" \
             --max-cost-usd "$MAX_COST_USD" \
+            --model "$EVAL_MODEL" \
+            --judge-model "$JUDGE_MODEL" \
             > eval-results/run.log 2>&1
           eval_status=$?
           set -e
@@ -85,6 +95,13 @@ jobs:
               exit 1
               ;;
           esac
+
+      - name: Surface acceptance metrics for human review
+        if: steps.eval.outputs.status == 'finished-needs-human-review'
+        run: |
+          jq '{status, trigger, safety, baseline, resources, acceptance}' \
+            eval-results/acceptance-summary.json
+          echo '::notice::Model metrics are advisory and require human review before release.'
 
       - name: Upload evaluation artifacts
         if: always()

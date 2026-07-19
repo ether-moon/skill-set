@@ -1,5 +1,15 @@
 # Testing Skills
 
+## Table of Contents
+
+- [Test in Layers](#test-in-layers)
+- [Structural Validation](#structural-validation)
+- [Trigger Testing](#trigger-testing)
+- [Functional and Safety Testing](#functional-and-safety-testing)
+- [Cross-Model Testing](#cross-model-testing)
+- [Observe Navigation](#observe-navigation)
+- [Acceptance Evidence](#acceptance-evidence)
+
 ## Test in Layers
 
 Use the cheapest layer that can disprove the claim, then expand:
