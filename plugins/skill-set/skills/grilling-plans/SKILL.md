@@ -27,7 +27,7 @@ This is a discipline skill. Each rule below corresponds to a specific way grilli
 - Locked specs that just need decomposition → `superpowers:writing-plans`
 - Bug investigation → `superpowers:systematic-debugging`
 - Reviewing already-written code → `simplify`
-- External library API questions → `understanding-code-context`
+- External library API questions → use the environment's configured documentation or research tools
 
 Thinking "the plan looks good enough, skip grilling"? That is exactly when grilling matters most.
 
@@ -35,7 +35,7 @@ Thinking "the plan looks good enough, skip grilling"? That is exactly when grill
 
 Before the first question, absorb whatever domain context already exists:
 
-- If `CONTEXT.md` and `docs/adr/` exist (per `building-shared-vocabulary`), read them first — `CONTEXT.md` carries canonical vocabulary, ADRs in the area being grilled record decisions you should not re-litigate. If absent, infer domain vocabulary from package/module names, test descriptions, and recent commit messages.
+- If `CONTEXT.md` and `docs/adr/` exist, read them first — `CONTEXT.md` carries canonical vocabulary, ADRs in the area being grilled record decisions you should not re-litigate. If absent, infer domain vocabulary from package/module names, test descriptions, and recent commit messages.
 - Walk relevant code with Grep / Glob / Read or an `Explore` subagent — see `superpowers:dispatching-parallel-agents` if multiple independent areas need pre-grilling sweeps.
 
 This costs a few minutes and saves a session of mis-aimed questions. It also lets Rule 5 (term sharpening) work against an actual baseline rather than guesses.
@@ -126,7 +126,7 @@ receive plan
       → fuzzy term?  yes → sharpen (canonical name), then continue
       → tree complete?  no → next branch
                         yes → plan validated
-                              (optional: update CONTEXT.md / ADR)
+                              (optional: note documentation follow-ups)
 ```
 
 ## Outputs
@@ -137,8 +137,8 @@ receive plan
 
 | Trigger | Action |
 |---|---|
-| A fuzzy term was sharpened during grilling | Hand off to `building-shared-vocabulary` to update `CONTEXT.md` |
-| A decision is **hard-to-reverse** AND **surprising-without-context** AND **the result of a real trade-off** | Offer to record an ADR via `building-shared-vocabulary` |
+| A fuzzy term was sharpened during grilling | Note a `CONTEXT.md` update as a documentation follow-up; modify it only on explicit request |
+| A decision is **hard-to-reverse** AND **surprising-without-context** AND **the result of a real trade-off** | Offer to record an ADR in the project's established documentation location; write it only on explicit request |
 | The plan reveals an architectural friction worth a separate refactor | Hand off to `improving-architecture` |
 
 Do not produce these artifacts speculatively. Only when the bar is met.

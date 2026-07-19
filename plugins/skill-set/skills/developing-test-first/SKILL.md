@@ -29,7 +29,6 @@ This is a discipline skill — absolute rules, no exceptions. Violating the lett
 **Do NOT use for:**
 - Test strategy and layer design → `driving-with-tests`
 - Classifying CI failure output → `autofixing-and-escalating`
-- Test framework API docs → `understanding-code-context`
 
 Thinking "skip TDD just this once"? Stop. That's rationalization.
 
@@ -208,7 +207,6 @@ Detect your human partner's language from conversation context, project docs, an
 
 - **Standalone**: Use for any coding task — no other skill required
 - **With `driving-with-tests`**: Pair for full test strategy (Orient → TDD → Probe → Guard)
-- **Within `ralph` iterations**: Apply TDD discipline inside each iteration
 
 ## Reference
 

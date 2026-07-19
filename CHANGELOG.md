@@ -5,6 +5,15 @@ All notable changes to the skill-set plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Removed
+
+- Removed the `applying-coding-baseline`, `building-shared-vocabulary`, `consulting-peer-llms`, `ralph`, `understanding-code-context`, and `using-skill-set` skills.
+- Removed the peer-review and Ralph slash commands that depended on the deleted skills.
+- Removed the broken `using-skill-set` SessionStart hook and its static skill registry.
+- Removed the Context7 MCP server because no remaining skill consumes it.
+
 ## [1.13.2] - 2026-05-20
 
 ### Fixed

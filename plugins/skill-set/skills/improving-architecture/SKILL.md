@@ -47,7 +47,7 @@ Full elaboration in `reference/deep-modules.md`. The deletion test (the most use
 
 ### 1. Orient
 
-If `CONTEXT.md` and `docs/adr/` exist (per `building-shared-vocabulary`), read them first — `CONTEXT.md` gives names to good seams, ADRs record decisions to not re-litigate. If absent, infer domain vocabulary from package/module names, test descriptions, and recent commit messages, and proceed.
+If `CONTEXT.md` and `docs/adr/` exist, read them first — `CONTEXT.md` gives names to good seams, ADRs record decisions to not re-litigate. If absent, infer domain vocabulary from package/module names, test descriptions, and recent commit messages, and proceed.
 
 ### 2. Explore
 
@@ -130,7 +130,7 @@ Skip this step when the right interface is already obvious. Use it when the user
 
 Hand off to `grilling-plans` to interrogate the chosen design. Do not jump to writing implementation plans directly — the candidate is still under-specified, and grilling will surface what is unclear.
 
-After grilling, ADRs and `CONTEXT.md` updates are owned by `building-shared-vocabulary` — this skill does not write them.
+After grilling, note any ADR or `CONTEXT.md` update as a documentation follow-up — this skill does not write those artifacts.
 
 ## Process Flow
 

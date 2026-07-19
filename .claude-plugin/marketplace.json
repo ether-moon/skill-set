@@ -1,5 +1,6 @@
 {
   "name": "skill-set",
+  "description": "A marketplace for the unified skill-set development workflow plugin.",
   "owner": {
     "name": "ether-moon"
   },
@@ -7,7 +8,7 @@
     {
       "name": "skill-set",
       "source": "./plugins/skill-set",
-      "description": "Comprehensive productivity skills and development tools for Claude Code, including git workflow automation, code context understanding, peer LLM consulting, and PR review feedback processing."
+      "description": "Development workflow toolkit for Claude Code with git and PR automation, test strategy, skill authoring, architecture review, and technical writing."
     }
   ]
 }

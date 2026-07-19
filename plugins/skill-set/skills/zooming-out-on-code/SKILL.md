@@ -20,14 +20,14 @@ When dropped into unfamiliar code, the agent's first instinct is often to read t
 
 ## Do NOT use for
 
-- External library / framework documentation → `understanding-code-context`
+- External library / framework documentation → use the environment's configured documentation or research tools
 - Reviewing changed code for quality → `simplify`
 - Finding refactor opportunities → `improving-architecture`
 - Debugging a specific bug → `superpowers:systematic-debugging`
 
 ## Process
 
-1. **Read project context first.** If `CONTEXT.md` and `docs/adr/` exist (per `building-shared-vocabulary`), read them first. If absent, infer domain vocabulary from package/module names, public type/class names that mention business nouns, test descriptions, and recent commit messages.
+1. **Read project context first.** If `CONTEXT.md` and `docs/adr/` exist, read them first. If absent, infer domain vocabulary from package/module names, public type/class names that mention business nouns, test descriptions, and recent commit messages.
 
 2. **Go up one level.**
    - If the user asks about a function, describe its containing module

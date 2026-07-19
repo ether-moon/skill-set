@@ -1,166 +1,105 @@
 # skill-set
 
-Unified productivity plugin for Claude Code providing comprehensive development tools and automated workflows.
+A unified Claude Code plugin for git and PR automation, testing discipline, skill authoring, architecture review, and technical writing.
 
 ## Installation
 
-Add this plugin to Claude Code:
+Add the plugin to Claude Code:
 
 ```bash
 /plugin install skill-set
 ```
 
-That's it! All features are now available in a single unified plugin.
+## Skills
 
-## Features
+### Delivery workflows
 
-### Git Workflow Automation
-**Commands**:
-- `/skill-set:git:commit` - Create context-aware git commits
-- `/skill-set:git:push` - Push changes to remote (auto-commits if needed)
-- `/skill-set:git:pr` - Create pull requests (auto-push and commit if needed)
+- **managing-git-workflow** — Creates context-aware commits, pushes branches, and opens pull requests.
+- **autofixing-and-escalating** — Classifies external findings, fixes unambiguous issues, and escalates decisions that require user judgment.
+- **shipping-pr** — Polls CI and review status, dispatches blocker resolvers, and repeats until a pull request is verified clean or convergence stops.
+- **bumping-version** — Detects project version files, updates release metadata, and prepares the version bump for publication.
 
-**Capabilities**:
-- Language-aware commit messages (adapts to your project's language)
-- Automatic ticket number extraction from branch names
-- Context-aware PR descriptions with full change summaries
-- Git history analysis for consistent messaging
+### Testing
 
-### Code Context Understanding
-Find and read official documentation for external libraries and frameworks using Context7.
+- **developing-test-first** — Applies the Red/Green/Refactor cycle when implementing behavior changes.
+- **driving-with-tests** — Establishes the test baseline, selects appropriate test layers, probes behavior, and protects tests as specifications.
 
-**Use when**: Understanding external libraries, frameworks, or dependencies.
+### Planning and architecture
 
-**Features**:
-- Official documentation lookup via Context7
-- Multiple search term strategies for finding library docs
-- Version-specific authoritative documentation
-- Best practices and patterns from official sources
+- **grilling-plans** — Stress-tests an existing plan one decision at a time before implementation.
+- **improving-architecture** — Finds high-leverage module boundaries and refactor candidates across a codebase.
+- **zooming-out-on-code** — Maps the responsibility, callers, dependencies, and siblings around unfamiliar code.
 
-### Peer LLM Consulting
-Execute peer reviews from other LLM tools (Gemini, Codex, Claude) in parallel and synthesize actionable insights.
+### Authoring and project guidance
 
-**Command**:
-```bash
-/skill-set:consulting:review
-```
+- **creating-skills** — Guides skill design, structure, testing, evaluation, and iteration using repository conventions.
+- **writing-clear-prose** — Improves explanatory, persuasive, and technical writing through structured drafting and revision.
+- **guarding-agent-directives** — Reviews proposed agent directives for duplication, overreach, poor placement, and context bloat.
 
-**Features**:
-- Dynamic CLI selection with auto-detection
-- Parallel LLM execution for faster feedback
-- Synthesized reports with actionable insights
+## Slash Commands
 
-### Ralph Loop
-Plan and execute implementation work with fresh context per iteration via Task subagents.
-
-**Commands**:
-```bash
-/skill-set:ralph:plan
-/skill-set:ralph:plan docs/plans/feature-design.md
-/skill-set:ralph:execute
-/skill-set:ralph:execute tmp/ralph/2026-03-06-1430/plan.md
-```
-
-**Features**:
-- Two modes: PLANNING (generate plans) and BUILDING (implement from plans)
-- Fresh subagent per iteration (no context rot)
-- Plan file on disk as single source of truth
-- Git commit-based progress tracking
-- Auto-planning fallback (execute without a plan → auto-creates one)
-- DONE condition negotiation before loop starts
-
-### PR Review Feedback Processing
-Interactive PR review processing from any source (human, CodeRabbit, Codex, Claude, other bots) with severity classification and verified completion workflow.
-
-**Command**:
-```bash
-/skill-set:pr-review:fix
-```
-
-**Features**:
-- Processes review comments from any source (human reviewers, AI tools, bots)
-- Automatic severity-based classification (CRITICAL, MAJOR, MINOR)
-- Interactive issue discussion before applying changes
-- Verified completion workflow with mandatory steps
-
-### Skill Creation Guide
-Comprehensive guide for creating effective Claude skills with structured workflow and testing methodology.
-
-### Writing Clear Prose
-Guides writing and revision of explanatory text, persuasive proposals, and technical documents with 4 core principles.
-
-### Guarding Agent Directives
-Guards agent directive files (CLAUDE.md, AGENTS.md) against bloat by verifying additions through strict criteria.
-
-### Session Initialization
-Automatically establishes workflows at session start to ensure proper skill usage.
-
-## Usage
-
-Skills are automatically available after installing the plugin. Claude will use them when relevant to your task.
-
-### Slash Commands
-
-```bash
+```text
 /skill-set:git:commit
 /skill-set:git:push
 /skill-set:git:pr
-/skill-set:ralph:plan
-/skill-set:ralph:execute
-/skill-set:pr-review:fix
-/skill-set:consulting:review
+/skill-set:pr:fix
+/skill-set:pr:ship
 /skill-set:plan:grill
 /skill-set:code:zoom-out
 ```
 
+Skills are also model-invocable and load automatically when their descriptions match the current task.
+
 ## Project Structure
 
-```
+```text
 plugins/
 └── skill-set/
     ├── .claude-plugin/
     │   └── plugin.json
     ├── .mcp.json
     ├── commands/
-    │   ├── git/                    # commit, push, pr
-    │   ├── ralph/                  # plan, execute
-    │   ├── pr-review/              # fix
-    │   └── consulting/             # review
+    │   ├── code/                  # zoom-out
+    │   ├── git/                   # commit, push, pr
+    │   ├── plan/                  # grill
+    │   └── pr/                    # fix, ship
     ├── skills/
-    │   ├── managing-git-workflow/
-    │   ├── understanding-code-context/
-    │   ├── consulting-peer-llms/
-    │   ├── ralph/
+    │   ├── autofixing-and-escalating/
+    │   ├── bumping-version/
     │   ├── creating-skills/
-    │   ├── writing-clear-prose/
+    │   ├── developing-test-first/
+    │   ├── driving-with-tests/
+    │   ├── grilling-plans/
     │   ├── guarding-agent-directives/
-    │   └── using-skill-set/
-    ├── agents/
-    │   └── pr-review-feedback.md
-    └── hooks/
-        └── hooks.json
+    │   ├── improving-architecture/
+    │   ├── managing-git-workflow/
+    │   ├── shipping-pr/
+    │   ├── writing-clear-prose/
+    │   └── zooming-out-on-code/
+    └── agents/
+        ├── resolving-pr-blockers.md
+        ├── merge-conflict-resolver.md
+        ├── ci-failure-resolver.md
+        └── pr-review-feedback.md
 ```
 
-## Design Philosophy
+## Design Principles
 
-- **Progressive disclosure**: Core functionality in SKILL.md, details in reference files
-- **Context-aware**: Adapts to your project's language and conventions
-- **Token efficient**: Reads only necessary code using symbolic tools
-- **Namespaced**: Commands organized to prevent collisions
-- **Unified**: Single installation, consistent experience
+- **Progressive disclosure** — Keep core workflows in `SKILL.md` and load references only when needed.
+- **Context awareness** — Adapt workflow output to project language and conventions.
+- **Token efficiency** — Keep skill metadata and instructions focused on behavior the model cannot reliably infer.
+- **Namespacing** — Organize commands to prevent collisions.
+- **Verification** — Test runtime integrations in addition to validating static plugin structure.
 
 ## Requirements
 
-- Claude Code (latest version recommended)
-- Git (for git workflow features)
-- Peer LLM CLIs (for consulting features, optional):
-  - `gemini-cli` for Gemini
-  - `codex` for Codex
-  - Additional CLIs detected automatically
+- Claude Code
+- Git for repository workflows
+- GitHub CLI for pull request workflows
 
 ## Contributing
 
-Contributions welcome! Please see [AGENTS.md](AGENTS.md) for development guidelines and best practices.
+See [AGENTS.md](AGENTS.md) for repository conventions and skill development guidance.
 
 ## License
 
@@ -171,11 +110,10 @@ MIT
 The following skills were inspired by [mattpocock/skills](https://github.com/mattpocock/skills) (MIT license):
 
 - `grilling-plans` ← `grill-me` / `grill-with-docs`
-- `building-shared-vocabulary` ← `grill-with-docs` (CONTEXT.md / ADR pattern)
 - `zooming-out-on-code` ← `zoom-out`
 - `improving-architecture` ← `improve-codebase-architecture`
 - `developing-test-first` (Horizontal Slicing section) ← `tdd`
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for version history and migration guides.
+See [CHANGELOG.md](CHANGELOG.md) for version history and migration notes.

@@ -30,8 +30,6 @@ This skill covers the strategic layer **around** the TDD cycle:
 **Do NOT use for:**
 - The TDD cycle itself (Red/Green/Refactor) → `developing-test-first`
 - Classifying CI failure output → `autofixing-and-escalating`
-- Iterative implementation loop → `ralph`
-- Test framework API docs → `understanding-code-context`
 
 ## Orient — Before You Touch Code
 
@@ -149,7 +147,6 @@ Detect and use your human partner's preferred language for all conversational ou
 
 - **Standalone**: Use for Orient/Probe/Guard/Architecture without TDD enforcement
 - **With `developing-test-first`**: Full discipline — Orient → TDD → Probe → Guard
-- **Within `ralph` iterations**: Orient before each iteration, Probe after green
 
 ## Troubleshooting
 

@@ -12,4 +12,4 @@ Invoke the `grilling-plans` skill to stress-test the current plan, design, or pr
 
 **Outputs:**
 - A shared understanding sharp enough to feed into implementation planning
-- Optionally hands off to `building-shared-vocabulary` if a domain term is sharpened or an ADR-worthy decision crystallizes
+- Documentation follow-ups when the discussion changes canonical terminology or an architectural decision

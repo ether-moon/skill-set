@@ -61,9 +61,9 @@ Study these skill-set skills as real-world references for different patterns:
 | Skill | Pattern | Notable Technique |
 |-------|---------|-------------------|
 | `managing-git-workflow` | Sequential workflow | Self-contained reference files, Bash call optimization |
-| `understanding-code-context` | Context-aware tool selection | Anti-pattern defense, multi-variation search |
-| `consulting-peer-llms` | Multi-tool coordination | Parallel CLI execution, bundled script |
-| `ralph` | Iterative refinement | Fresh-context subagents, spec-driven loop |
+| `zooming-out-on-code` | Bounded exploration | One-level orientation with an explicit stop condition |
+| `grilling-plans` | Iterative refinement | One decision-tree question per turn |
+| `improving-architecture` | Context-aware analysis | Progressive exploration and dependency classification |
 | `writing-clear-prose` | Domain-specific intelligence | Before/After examples, 4-pass revision |
 | `guarding-agent-directives` | Verification workflow | 5-question gate, user authority override |
 

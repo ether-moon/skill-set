@@ -1,6 +1,6 @@
 {
   "name": "skill-set",
-  "description": "Comprehensive productivity skills and development tools for Claude Code, including git workflow automation, code context understanding, peer LLM consulting, and PR review feedback processing.",
+  "description": "Development workflow toolkit for Claude Code with git and PR automation, test strategy, skill authoring, architecture review, and technical writing.",
   "version": "1.13.2",
   "author": {
     "name": "ether-moon"

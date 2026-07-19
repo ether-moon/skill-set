@@ -8,18 +8,17 @@
 
 #### Skills
 1. **managing-git-workflow**: Automates git operations (commit, push, PR) with context-aware message generation in the project's language and automatic ticket extraction from branch names
-2. **understanding-code-context**: Find and read official documentation for external libraries and frameworks using Context7
-3. **consulting-peer-llms**: Execute peer reviews from other LLM tools (Gemini, Codex, Claude) in parallel and synthesize actionable insights
-4. **using-skill-set**: Establishes workflows for discovering and using skill-set features at session start
-5. **creating-skills**: Guide for creating effective Claude skills with structured workflow, testing methodology, and troubleshooting
-6. **ralph**: Plans and executes implementation work via Ralph Wiggum loop with Task subagents — two modes (PLANNING/BUILDING), fresh context per iteration, declarative spec with acceptance criteria, gap analysis per iteration
-7. **writing-clear-prose**: Guides writing and revision of explanatory text, persuasive proposals, and technical documents with 4 core principles
-8. **guarding-agent-directives**: Guards agent directive files against bloat by verifying additions through strict criteria while preserving user authority
-9. **applying-coding-baseline**: Applies a curated, pre-vetted set of baseline behavioral discipline rules (Think Before Coding, Simplicity First, Surgical Changes, Goal-Driven Execution, Fail Fast vs Graceful Handling, Documentation Priority) to coding agent directive files — replaces semantically similar existing content with canonical wording; skips guarding verification because the set is pre-vetted
-10. **autofixing-and-escalating**: Auto-fixes obvious issues and escalates ambiguous ones for user decision — classifies by clarity of correctness, applies obvious fixes automatically, presents ambiguous items with rationale and recommendations
-11. **developing-test-first**: Enforces strict test-driven development discipline — Iron Law (no production code without a failing test), Red/Green/Refactor cycle, rationalization prevention
-12. **driving-with-tests**: Guides test strategy beyond TDD — orient (run suite first), probe (manual exploration), guard (test governance), multi-layer test architecture
-13. **shipping-pr**: Drives PR end-to-end — creates the PR (delegates to managing-git-workflow), polls CI and CodeRabbit reviews, dispatches resolving-pr-blockers when blockers appear, and re-polls after each fix-push cycle until clean or convergence fails
+2. **autofixing-and-escalating**: Classifies external findings, resolves unambiguous issues, and escalates decisions that require user judgment
+3. **bumping-version**: Detects project version files, updates release metadata, and prepares version bumps for publication
+4. **creating-skills**: Guides skill design, structure, testing, evaluation, and iteration using repository conventions
+5. **developing-test-first**: Enforces a strict Red/Green/Refactor cycle for behavior changes
+6. **driving-with-tests**: Establishes test baselines, probing, governance, and multi-layer test strategy
+7. **grilling-plans**: Stress-tests an existing plan one decision at a time before implementation
+8. **guarding-agent-directives**: Reviews proposed agent directives for duplication, overreach, poor placement, and context bloat
+9. **improving-architecture**: Finds high-leverage module boundaries and refactor candidates across a codebase
+10. **shipping-pr**: Polls CI and reviews, dispatches blocker resolvers, and repeats until a pull request is verified clean or convergence stops
+11. **writing-clear-prose**: Guides drafting and revision of explanatory, persuasive, and technical documents
+12. **zooming-out-on-code**: Maps the responsibility, callers, dependencies, and siblings around unfamiliar code
 
 #### Agents
 1. **resolving-pr-blockers**: Orchestrator that scans a PR for all blockers (CI failures, merge conflicts, review comments) and dispatches specialized sub-agents to resolve them. Each sub-agent commits independently; orchestrator pushes once at the end.
@@ -31,110 +30,39 @@
 
 ```
 plugins/
-└── skill-set/                      # Unified plugin
+└── skill-set/
     ├── .claude-plugin/
-    │   ├── plugin.json            # Plugin metadata
-    │   └── marketplace.json       # Marketplace registration
-    ├── .mcp.json                  # MCP server definitions
-    ├── commands/                  # Namespaced slash commands
-    │   ├── git/
-    │   │   ├── commit.md         # /skill-set:git:commit
-    │   │   ├── push.md           # /skill-set:git:push
-    │   │   └── pr.md             # /skill-set:git:pr
-    │   ├── pr/
-    │   │   ├── fix.md            # /skill-set:pr:fix
-    │   │   └── ship.md           # /skill-set:pr:ship
-    │   ├── consulting/
-    │   │   └── review.md         # /skill-set:consulting:review
-    │   └── ralph/
-    │       ├── plan.md           # /skill-set:ralph:plan
-    │       └── execute.md        # /skill-set:ralph:execute
-    ├── skills/                    # All skills with integrated scripts
-    │   ├── managing-git-workflow/
-    │   │   ├── SKILL.md
-    │   │   └── reference/
-    │   │       ├── commit.md
-    │   │       ├── push.md
-    │   │       └── pr.md
-    │   ├── understanding-code-context/
-    │   │   ├── SKILL.md
-    │   │   └── reference/
-    │   │       ├── tools.md
-    │   │       ├── workflows.md
-    │   │       └── anti-patterns.md
-    │   ├── consulting-peer-llms/
-    │   │   ├── SKILL.md
-    │   │   └── reference/
-    │   │       ├── cli-commands.md
-    │   │       ├── prompt-template.md
-    │   │       └── report-format.md
-    │   ├── using-skill-set/
-    │   │   ├── SKILL.md
-    │   │   └── session-start.sh  # Session hook script
-    │   ├── creating-skills/
-    │   │   ├── SKILL.md
-    │   │   └── reference/
-    │   │       ├── structure.md
-    │   │       ├── patterns.md
-    │   │       ├── testing.md
-    │   │       ├── troubleshooting.md
-    │   │       └── checklist.md
-    │   ├── ralph/
-    │   │   ├── SKILL.md
-    │   │   ├── templates/
-    │   │   │   ├── PROMPT_plan.md  # Planning mode prompt template
-    │   │   │   ├── PROMPT_build.md # Building mode prompt template
-    │   │   │   └── loop.sh        # Bash loop reference template
-    │   │   └── reference/
-    │   │       └── spec-quality.md # Ralph-ready spec criteria
+    │   └── plugin.json
+    ├── .mcp.json
+    ├── commands/
+    │   ├── code/                  # zoom-out
+    │   ├── git/                   # commit, push, pr
+    │   ├── plan/                  # grill
+    │   └── pr/                    # fix, ship
+    ├── skills/
     │   ├── autofixing-and-escalating/
-    │   │   ├── SKILL.md
-    │   │   └── reference/
-    │   │       ├── classification.md
-    │   │       └── resolution.md
-    │   ├── writing-clear-prose/
-    │   │   ├── SKILL.md
-    │   │   └── reference/
-    │   │       ├── principles.md
-    │   │       ├── anti-patterns.md
-    │   │       ├── drafting.md
-    │   │       └── revising.md
-    │   ├── guarding-agent-directives/
-    │   │   ├── SKILL.md
-    │   │   └── reference/
-    │   │       └── verification.md
-    │   ├── applying-coding-baseline/
-    │   │   ├── SKILL.md
-    │   │   └── reference/
-    │   │       └── baseline-rules.md
+    │   ├── bumping-version/
+    │   ├── creating-skills/
     │   ├── developing-test-first/
-    │   │   ├── SKILL.md
-    │   │   └── reference/
-    │   │       └── anti-patterns.md
     │   ├── driving-with-tests/
-    │   │   ├── SKILL.md
-    │   │   └── reference/
-    │   │       ├── test-design.md
-    │   │       └── probing.md
-    │   └── shipping-pr/
-    │       ├── SKILL.md           # PR end-to-end ship loop
-    │       └── reference/
-    │           ├── polling.md
-    │           ├── blocker-resolution.md
-    │           └── troubleshooting.md
-    ├── agents/                    # Isolated subagents
-    │   ├── resolving-pr-blockers.md    # Orchestrator
-    │   ├── merge-conflict-resolver.md  # Sub-agent: merge conflicts
-    │   ├── ci-failure-resolver.md      # Sub-agent: CI failures
-    │   └── pr-review-feedback.md       # Sub-agent: review comments
-    └── hooks/                     # Event handlers
-        └── hooks.json            # SessionStart hook
+    │   ├── grilling-plans/
+    │   ├── guarding-agent-directives/
+    │   ├── improving-architecture/
+    │   ├── managing-git-workflow/
+    │   ├── shipping-pr/
+    │   ├── writing-clear-prose/
+    │   └── zooming-out-on-code/
+    └── agents/
+        ├── resolving-pr-blockers.md
+        ├── merge-conflict-resolver.md
+        ├── ci-failure-resolver.md
+        └── pr-review-feedback.md
 ```
 
 ### Design Patterns Used
 
-- **Progressive disclosure**: Main SKILL.md stays under 200 lines, detailed content in reference files
-- **Gerund naming**: All skills use verb+ing format (managing, understanding, writing)
+- **Progressive disclosure**: Aim to keep main SKILL.md files under 200 lines and move details into reference files
+- **Gerund naming**: Prefer verb+ing names (managing, improving, writing)
 - **Context-aware**: Skills adapt to project language/conventions (e.g., Korean commit messages)
 - **Token efficiency**: Symbolic tools over text search, targeted reads over full file scans
 - **Language-agnostic templates**: Code examples in English with language detection for user-facing content
