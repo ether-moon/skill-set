@@ -1,0 +1,29 @@
+## Decisions Made
+- 사용자 지정 삭제 대상 6개 스킬과 해당 명령, 훅, 활성 참조를 함께 제거했습니다: 런타임에 고아 구성이 남지 않도록 하기 위함입니다.
+- `understanding-code-context`의 유일한 소비 경로였던 Context7 MCP를 제거하고, 별도 판단이 필요한 `sequential-thinking` MCP는 유지했습니다.
+- 기존 CHANGELOG 항목과 날짜 기반 설계 문서는 역사 기록으로 보존하고, 현재 README·AGENTS·플러그인 메타데이터만 갱신했습니다.
+- 통합·개선 계획 문서는 삭제 커밋과 분리하기 위해 이번 커밋에서 제외했습니다.
+
+## Problems Encountered
+- 삭제된 `using-skill-set`의 SessionStart 훅이 잘못된 경로와 치환 오류로 실패하던 문제는 스킬과 훅을 함께 제거해 해소했습니다.
+- marketplace strict 검증이 최상위 설명 누락을 지적해 marketplace 설명을 추가했습니다.
+- Claude CLI가 에이전트 파일 4개를 두고도 `Agents (0)`으로 보고하는 문제는 아직 해결되지 않았습니다.
+
+## Constraints Identified
+- 저장소 문서와 스킬 콘텐츠는 영어로 유지해야 하며, 사용자 대화만 한국어로 맞춥니다.
+- 삭제 커밋에는 삭제를 완결하는 추적 파일 변경만 포함하고 후속 개선 계획은 별도 변경으로 남겨야 합니다.
+- 과거 릴리스 기록과 설계 문서는 현재 런타임 인벤토리와 구분해 보존해야 합니다.
+
+## Open Questions
+- 플러그인 manifest에 에이전트 경로가 존재하는데도 런타임 인벤토리가 0개로 표시되는 원인은 무엇인가?
+- 소비자가 확인되지 않은 `sequential-thinking` MCP를 후속 정리에서 제거할 것인가?
+- 남은 스킬의 통합·개선 계획에서 독립적인 `creating-skills`와 `writing-clear-prose`의 경계를 어떻게 명시할 것인가?
+
+## Context
+현재 skill-set 플러그인의 필요성이 낮은 6개 스킬을 제거하고 관련 명령, SessionStart 훅, Context7 MCP, 활성 문서 참조를 정리했습니다. README, AGENTS, CHANGELOG, plugin 및 marketplace 메타데이터를 남은 12개 스킬 기준으로 갱신했으며 정적 검증과 런타임 인벤토리 검사를 통과했습니다. 후속 통합 계획은 별도 커밋을 위해 작업 트리에 남겼습니다.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
