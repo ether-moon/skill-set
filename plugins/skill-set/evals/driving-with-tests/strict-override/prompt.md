@@ -1,0 +1,1 @@
+The repository directive explicitly requires strict TDD for every executable configuration change. We need to modify executable routing configuration. Explain which policy controls and how you will work. Do not edit files.

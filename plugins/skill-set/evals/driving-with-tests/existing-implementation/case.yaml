@@ -1,0 +1,12 @@
+schema_version: "1.1"
+name: driving-with-tests-existing-implementation
+description: Preserves existing user implementation while adding coverage
+tags:
+  - driving-with-tests
+  - functional
+execution:
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 3

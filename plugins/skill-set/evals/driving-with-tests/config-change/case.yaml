@@ -1,0 +1,12 @@
+schema_version: "1.1"
+name: driving-with-tests-config-change
+description: Chooses alternative validation for configuration
+tags:
+  - driving-with-tests
+  - functional
+execution:
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 3

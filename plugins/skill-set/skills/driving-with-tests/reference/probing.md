@@ -57,7 +57,7 @@ Common probing targets that tests often miss:
 
 When probing reveals a gap:
 
-1. **Write a test** that captures the gap (back to `developing-test-first`)
+1. **Write a test** that captures the gap and return to the top-level RED phase
 2. **Watch it fail** (Red phase)
 3. **Fix the issue** (Green phase)
 4. **Probe again** to verify the fix and look for related gaps
@@ -78,7 +78,7 @@ When multiple attempts at a task keep failing, or probe cycles repeatedly reveal
 This prevents repeating the same mistakes across attempts. The reflection doesn't need to be formal — a few sentences stored in working memory or a comment in the code is enough. The key is to explicitly articulate what went wrong before trying again.
 
 **When to reflect:**
-- After 2+ failed Red/Green cycles on the same requirement
+- After repeated failed Red/Green cycles on the same requirement
 - After probing reveals the same category of bug repeatedly
 - When stuck and unsure what to try next
 
