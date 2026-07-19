@@ -1,109 +1,54 @@
 ---
 name: zooming-out-on-code
-description: Draws a higher-level system map of unfamiliar internal/project code in the project's domain vocabulary — describes the module's responsibility, callers, dependencies, and sibling modules without diving into implementation details. Use this skill proactively whenever a user expresses unfamiliarity with a project code area before changing it — phrases like "zoom out", "give me the big picture", "explain this code area", "new to this code", "where does X fit", "what calls this", "tour the module", "before I change this" — even if they don't say "zoom out" explicitly.
+description: Produces a compact, read-only system map of unfamiliar project code in domain vocabulary. Use when a user asks for the big picture, a module tour, where code fits, what calls it, what it depends on, or orientation before changing an unfamiliar area.
+allowed-tools: Read, Grep, Glob
 ---
 
-# Zooming Out On Code
+# Zooming Out on Code
 
-## Overview
+## Boundary
 
-When dropped into unfamiliar code, the agent's first instinct is often to read the file linearly. That produces local understanding without orientation. **Zooming out** does the opposite: go up one level of abstraction first, so the file in question is read with full system context.
+Orient one level above the requested symbol, file, module, or package. This is read-only analysis. Do not modify files, recommend refactors, identify architecture candidates, debug a defect, or propose next steps.
 
-**Core principle:** Understand a module by understanding its place, not its body.
-
-## When to Use
-
-- User opens a file or function they don't recognize and asks for context
-- Before proposing changes to an unfamiliar area
-- When a teammate hands off a system you have no prior context on
-- User says "zoom out", "explain this code area", "give me the big picture", "what does this do in context"
-
-## Do NOT use for
-
-- External library / framework documentation → use the environment's configured documentation or research tools
-- Reviewing changed code for quality → `simplify`
-- Finding refactor opportunities → `improving-architecture`
-- Debugging a specific bug → `superpowers:systematic-debugging`
+If `CONTEXT.md` or relevant ADRs exist, read them as vocabulary and decision evidence only. Never create or update them. When they are absent, infer terms from package names, public types, tests, and callers and record uncertainty.
 
 ## Process
 
-1. **Read project context first.** If `CONTEXT.md` and `docs/adr/` exist, read them first. If absent, infer domain vocabulary from package/module names, public type/class names that mention business nouns, test descriptions, and recent commit messages.
+1. Identify the containing unit one level above the requested target.
+2. State its single domain responsibility from observable code and tests.
+3. Find direct callers through exports, imports, references, routes, or configuration.
+4. Read direct dependencies only; do not expand transitive graphs.
+5. List siblings in the same package or layer and their distinct responsibilities.
+6. Separate unresolved or conflicting evidence into Unknowns.
+7. Stop after the five-field map.
 
-2. **Go up one level.**
-   - If the user asks about a function, describe its containing module
-   - If the user asks about a module, describe its containing package or layer
-   - If the user asks about a package, describe the system
-   - If the user asks about a top-level package or whole app, describe its role in the product/business domain — do not recurse further (recursing past the top-level package turns orientation into product strategy, which is out of scope and rarely useful for a code change)
+Prefer symbol-aware references when available, then targeted text search. Search re-exports if direct callers appear empty. Cite concrete paths; distinguish evidence from inference.
 
-3. **Map four things.** These four answer "what is it for, who needs it, what does it need, what's adjacent" — together they place the module in the dependency graph without reading its body.
-   - **Responsibility** — what is this module's single reason to exist, in domain vocabulary?
-   - **Callers** — who depends on this module? Grep on the public API name; use `LSP findReferences` if an LSP is available for the language.
-   - **Dependencies** — what does this module depend on? Read first-level imports only; transitive imports belong to a deeper zoom, not this one.
-   - **Siblings** — what other modules sit at the same level of the system? Glob the parent directory.
+## Output
 
-4. **Answer in domain language, not implementation language.** "The Order intake module validates incoming Orders against the active Promotion catalog" beats "OrderHandler calls promotionService.validate()."
+```text
+## Responsibility
+<one domain-level sentence>
 
-5. **Stop at the right level.** The goal is *orientation*, not *encyclopedia*. If the user wants to go deeper into a specific branch, they'll ask.
+## Callers
+- <path or symbol> — <why it calls this unit>
 
-## Output template
+## Dependencies
+- <path or external boundary> — <what this unit needs>
 
-```
-**<Module name in domain vocabulary>**
+## Siblings
+- <same-layer unit> — <its separate responsibility>
 
-**Responsibility:** <one sentence>
-
-**Callers:**
-- <caller 1> — <what it uses this for>
-- <caller 2> — <what it uses this for>
-
-**Dependencies:**
-- <dependency 1> — <why>
-- <dependency 2> — <why>
-
-**Siblings (same layer):**
-- <sibling 1> — <responsibility>
-- <sibling 2> — <responsibility>
-
-**Where it sits in the system:**
-<one or two sentences explaining the module's position in the larger flow,
-using CONTEXT.md vocabulary>
+## Unknowns
+- <missing, dynamic, or contradictory evidence>
 ```
 
-## Example
+Use exactly these sections: Responsibility, Callers, Dependencies, Siblings, Unknowns. If a section has no verified item, say `None found` and explain the search limit under Unknowns.
 
-User asks about `src/orders/intake/validate.ts`.
+## Stop Conditions
 
-```
-**Order Intake — Validation**
+- The target is a top-level package: describe its product role; do not expand into product strategy.
+- A dependency or caller requires unrelated-system exploration: record it under Unknowns.
+- The user asks for recommendations: finish the orientation map first and let the user make a separate request.
 
-**Responsibility:** Confirms an incoming Order satisfies promotion eligibility,
-inventory availability, and customer credit before the Order is accepted.
-
-**Callers:**
-- `src/orders/intake/route.ts` — POST /orders endpoint, calls validation before persisting
-- `src/admin/manual-orders.ts` — admin tool that creates Orders on behalf of a Customer
-
-**Dependencies:**
-- `src/promotions/catalog.ts` — looks up active promotions for the Customer
-- `src/inventory/availability.ts` — confirms each Line Item is stocked
-- `src/billing/credit.ts` — reads Customer credit limit
-
-**Siblings (same layer — `src/orders/intake/`):**
-- `route.ts` — HTTP boundary
-- `persist.ts` — writes accepted Orders to the write model
-- `events.ts` — emits `OrderPlaced` events on success
-
-**Where it sits in the system:**
-Validation is the gate between an HTTP request and a confirmed Order in the write
-model. After it passes, persist + event emission are mechanical; before it passes,
-nothing about the Order is durable.
-```
-
-## Troubleshooting
-
-| Symptom | Cause | Fix |
-|---|---|---|
-| Output sounds like the file's docstring | Did not actually go up a level | Re-do step 2 — describe the *containing* unit, not the unit itself |
-| Output uses class/function names instead of domain terms | Skipped step 1 (didn't read CONTEXT.md) or no glossary exists | Read CONTEXT.md if present; otherwise note its absence and use the domain terms inferable from the code |
-| Caller list is empty but module clearly is in use | API is exported through a barrel/index file | Search for re-exports, then trace from there |
-| Output is huge | Stopped at the wrong level | Cut to the four-item template strictly; deeper detail belongs to follow-up questions |
+Use the user's language for explanations. Keep identifiers and paths exact.

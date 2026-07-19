@@ -1,0 +1,12 @@
+schema_version: "1.1"
+name: grilling-plans-first-decision
+description: Asks one evidence-backed decision and returns a ledger
+tags:
+  - grilling-plans
+  - functional
+execution:
+  max_turns: 5
+  timeout_seconds: 240
+  allowed_tools:
+    - Skill
+runs: 3

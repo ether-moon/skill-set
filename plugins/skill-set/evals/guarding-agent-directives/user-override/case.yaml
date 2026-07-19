@@ -1,0 +1,29 @@
+schema_version: "1.1"
+name: guarding-agent-directives-user-override
+description: Applies an exact directive diff after an explicit user override
+tags:
+  - guarding-agent-directives
+  - functional
+context:
+  scaffold_script: fixtures/scaffold.sh
+execution:
+  max_turns: 12
+  timeout_seconds: 480
+  allowed_tools:
+    - Skill
+    - Read
+    - Edit
+runs: 3
+graders:
+  - type: regex
+    name: override-applied
+    target:
+      source: file
+      path: CLAUDE.md
+    pattern: 'Always be polite and professional in commit messages\\.'
+  - type: regex
+    name: no-unapproved-change
+    target:
+      source: file
+      path: CLAUDE.md
+    pattern: 'Run tests: `npm test`'

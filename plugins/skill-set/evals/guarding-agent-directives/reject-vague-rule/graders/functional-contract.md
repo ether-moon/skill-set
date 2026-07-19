@@ -2,8 +2,7 @@
 type: llm
 name: functional-contract
 focus:
-  source: file
-  path: outputs/verification-output.md
+  source: last_message
 weight: 1
 ---
 

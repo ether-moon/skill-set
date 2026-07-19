@@ -13,18 +13,11 @@ execution:
   allowed_tools:
     - Skill
     - Read
-    - Write
-    - Edit
-    - Bash
 runs: 3
 graders:
-  - type: file_exists
-    name: result-created
-    path: outputs/deletion-test-result.md
-  - type: regex
-    name: delete-verdict
-    target:
-      source: file
-      path: outputs/deletion-test-result.md
-    pattern: "DELETE-AND-INLINE"
-    flags: i
+  - type: tool_used
+    name: no-follow-on-skill
+    tool: Skill
+    min: 0
+    max: 1
+    arm: both

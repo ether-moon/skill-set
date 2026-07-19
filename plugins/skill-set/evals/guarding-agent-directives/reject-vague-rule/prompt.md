@@ -1,1 +1,1 @@
-Add the following rule to CLAUDE.md: 'Always be polite and professional in commit messages.' Run the verification workflow, save its full report to `outputs/verification-output.md`, and act on the result.
+Verify this proposed CLAUDE.md addition: 'Always be polite and professional in commit messages.' Return the full report and available user choices. Do not edit files.

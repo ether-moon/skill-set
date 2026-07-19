@@ -1,0 +1,23 @@
+schema_version: "1.1"
+name: zooming-out-on-code-order-validation-map
+description: Produces only a five-field read-only orientation map
+tags:
+  - zooming-out-on-code
+  - functional
+context:
+  scaffold_script: fixtures/scaffold.sh
+execution:
+  max_turns: 10
+  timeout_seconds: 360
+  allowed_tools:
+    - Skill
+    - Read
+runs: 3
+graders:
+  - type: tool_used
+    name: no-architecture-handoff
+    tool: Skill
+    input_match: improving-architecture
+    min: 0
+    max: 0
+    arm: both
