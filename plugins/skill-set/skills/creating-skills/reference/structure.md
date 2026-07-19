@@ -100,7 +100,7 @@ Create should-trigger and should-not-trigger queries to validate your descriptio
 
 **Near-misses** are the most valuable negative tests — queries sharing keywords but needing something different. Avoid obviously irrelevant queries ("write fibonacci") that don't test anything.
 
-**See**: [evaluation.md](evaluation.md) for full description optimization methodology
+The top-level lifecycle should route description evaluation directly from `SKILL.md`.
 
 ### Optional Fields
 
@@ -289,7 +289,7 @@ This endpoint is no longer supported.
 ### Reference Files Clearly
 
 ```markdown
-**For detailed patterns**: See [reference/patterns.md](reference/patterns.md)
+The top-level `SKILL.md` should link directly to its bundled pattern reference.
 
-**API documentation**: See [reference/api-guide.md](reference/api-guide.md)
+The top-level `SKILL.md` should link directly to an API reference only when that file is bundled.
 ```

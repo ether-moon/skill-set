@@ -323,7 +323,7 @@ ELSE:
 name: deep-research
 context: fork
 agent: Explore
-allowed-tools: Bash(gh *)
+allowed-tools: Bash(gh:*)
 ---
 
 Research $ARGUMENTS thoroughly:

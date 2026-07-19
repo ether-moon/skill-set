@@ -1,0 +1,35 @@
+schema_version: "1.1"
+name: writing-clear-prose-technical-document
+description: Revises a technical proposal without losing supplied facts
+tags:
+  - writing-clear-prose
+  - functional
+context:
+  scaffold_script: fixtures/scaffold.sh
+execution:
+  max_turns: 12
+  timeout_seconds: 480
+  allowed_tools:
+    - Skill
+    - Read
+    - Write
+    - Edit
+runs: 3
+graders:
+  - type: file_exists
+    name: revision-created
+    path: outputs/revised.md
+  - type: regex
+    name: latency-preserved
+    target:
+      source: file
+      path: outputs/revised.md
+    pattern: '420 ?ms'
+    flags: i
+  - type: regex
+    name: retention-preserved
+    target:
+      source: file
+      path: outputs/revised.md
+    pattern: '30 days'
+    flags: i

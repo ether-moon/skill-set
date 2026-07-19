@@ -1,0 +1,51 @@
+schema_version: "1.1"
+name: creating-skills-new-with-creator
+description: Creates a new skill when the optional external creator is available
+tags:
+  - creating-skills
+  - functional
+context:
+  scaffold_script: fixtures/scaffold.sh
+execution:
+  max_turns: 12
+  timeout_seconds: 360
+  allowed_tools:
+    - Skill
+    - Read
+    - Write
+    - Edit
+    - "Bash(./validate-skill.sh:*)"
+runs: 3
+graders:
+  - type: tool_used
+    name: selected-creating-skills
+    tool: Skill
+    input_match: creating-skills
+    min: 1
+  - type: file_exists
+    name: created-skill
+    path: outputs/incident-triage/SKILL.md
+    exists: true
+  - type: file_exists
+    name: created-positive-eval
+    path: outputs/evals/incident-triage/trigger-positive-01/case.yaml
+    exists: true
+  - type: file_exists
+    name: created-negative-eval
+    path: outputs/evals/incident-triage/trigger-negative-01/case.yaml
+    exists: true
+  - type: regex
+    name: valid-trigger-description
+    target:
+      source: file
+      path: outputs/incident-triage/SKILL.md
+    pattern: "^description:.*Use when"
+    flags: m
+    match: contains
+  - type: tool_order
+    name: validates-after-writing
+    before:
+      tool: Write
+    after:
+      tool: Bash
+      input_match: validate-skill\\.sh

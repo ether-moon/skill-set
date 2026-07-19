@@ -17,14 +17,14 @@ Runtime totals: **11 skills, 7 legacy commands, 4 PR agents, 0 hooks, 0 MCP serv
 |---|---|
 | `autofixing-and-escalating` | Classifies actionable findings from linters, tests, security scans, audits, and PR reviews as obvious or ambiguous, then applies only explicitly authorized fixes. |
 | `bumping-version` | Inspects, previews, prepares, and direct-pushes approved semantic-version Git commits with consistent manifests and policy-driven changelog updates. |
-| `creating-skills` | Guides the full skill lifecycle — creating, evaluating, and optimizing Claude skills. |
+| `creating-skills` | Creates, modifies, evaluates, and optimizes Claude skills across their full lifecycle. |
 | `driving-with-tests` | Guides implementation and verification through Orient, Red/Green/Refactor, Probe, and Guard. |
 | `grilling-plans` | Adversarially interrogates an existing plan, design, or proposal before implementation — walks the decision tree one question at a time, provides a recommended answer with each question, prefers codebase exploration over questions, and surfaces contradictions between stated intent and actual code. |
 | `guarding-agent-directives` | Guards agent directive files (CLAUDE.md, AGENTS.md, referenced documents) against bloat by verifying every proposed addition through strict criteria while preserving user authority. |
 | `improving-architecture` | Surfaces deep-module refactor candidates across a codebase using domain vocabulary and Ousterhout's depth/seam framing — applies the deletion test, presents candidates with locality and leverage justifications, and hands off to the `grilling-plans` skill for the chosen candidate's design. |
 | `managing-git-workflow` | Safely inspects repository state and executes explicitly authorized commits, pushes, and pull-request creation through a constrained runner. |
 | `shipping-pr` | Drives an existing or newly requested pull request through deterministic CI, review, and blocker-resolution cycles until it is verified clean or reaches a terminal stop. |
-| `writing-clear-prose` | Guides drafting and revising non-fiction prose — reports, proposals, technical documents, and explanatory text — using four core principles (concreteness, transcreation, steel man, brevity). |
+| `writing-clear-prose` | Drafts and revises substantive non-fiction such as reports, proposals, technical documents, and explanatory articles. |
 | `zooming-out-on-code` | Draws a higher-level system map of unfamiliar internal/project code in the project's domain vocabulary — describes the module's responsibility, callers, dependencies, and sibling modules without diving into implementation details. |
 
 #### Legacy Commands

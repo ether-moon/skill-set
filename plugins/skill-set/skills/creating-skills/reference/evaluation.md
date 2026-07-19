@@ -1,217 +1,184 @@
-# Evaluation and Iteration Methodology
+# Evaluation and Iteration
 
-## Table of Contents
+## Core Loop
 
-- [The Core Loop](#the-core-loop)
-- [Step 1: Define Test Cases](#step-1-define-test-cases)
-- [Step 2: Run With-Skill vs Baseline](#step-2-run-with-skill-vs-baseline)
-- [Step 3: Grade with Assertions](#step-3-grade-with-assertions)
-- [Step 4: Benchmark](#step-4-benchmark)
-- [Step 5: Iterate on Improvements](#step-5-iterate-on-improvements)
-- [Description Optimization](#description-optimization) (triggering, pushy strategy, testing)
-- [Blind Comparison (Advanced)](#blind-comparison-advanced)
-- [Quick Reference](#quick-reference)
+Evaluate behavior before adding extensive instructions:
 
----
+1. Define representative use cases and safety invariants.
+2. Run a no-skill baseline for a new skill or the current version for an existing skill.
+3. Create trigger and functional cases from observed gaps.
+4. Grade objective outcomes deterministically and qualitative outcomes with a concrete rubric.
+5. Compare quality, safety, triggering, tool use, duration, tokens, and cost.
+6. Make the smallest general correction and rerun the affected cases.
+7. Rerun the full suite before accepting the change.
 
-## The Core Loop
+Do not build instructions around imagined failures. A baseline establishes whether the skill improves the task at all.
 
-Skill development is iterative. The loop:
+## Official Eval Layout
 
-1. **Draft** the skill (or improve an existing one)
-2. **Run** test cases — with the skill AND without (baseline)
-3. **Grade** results against defined assertions
-4. **Review** outputs qualitatively with the user
-5. **Improve** the skill based on feedback
-6. **Repeat** until satisfied
+For a Claude Code plugin, keep evaluations outside the skill directory:
 
----
-
-## Step 1: Define Test Cases
-
-Create 2-3 realistic test prompts — things a real user would actually say. Save them with expected outputs:
-
-```json
-{
-  "skill_name": "example-skill",
-  "evals": [
-    {
-      "id": 1,
-      "prompt": "User's realistic task prompt",
-      "expected_output": "Description of expected result",
-      "files": [],
-      "expectations": [
-        "Output includes a summary section",
-        "All data fields are populated"
-      ]
-    }
-  ]
-}
+```text
+plugin/
+├── skills/
+│   └── incident-triage/
+│       └── SKILL.md
+└── evals/
+    └── incident-triage/
+        ├── trigger-positive-01/
+        │   └── case.yaml
+        ├── trigger-negative-01/
+        │   └── case.yaml
+        └── mixed-findings/
+            ├── case.yaml
+            ├── prompt.md
+            ├── graders/
+            │   ├── outcome.md
+            │   └── safety.md
+            └── fixtures/
+                └── scaffold.sh
 ```
 
-**Good test prompts** are concrete and specific — include file paths, personal context, column names, company names. A mix of lengths and styles (formal, casual, with typos).
+Use `case.yaml` for deterministic configuration and inline trigger prompts. Use `prompt.md` for longer functional prompts and `graders/*.md` for qualitative rubrics. Keep every fixture within its case directory.
 
-**Bad test prompts** are abstract and generic — "Format this data", "Create a chart".
+## Trigger Cases
 
----
+Create 8–10 positive and 8–10 negative cases for every production skill. Positive prompts should vary phrasing, context, and uncommon but valid use. Negative prompts should be plausible near misses that share terms with the skill but need a different workflow.
 
-## Step 2: Run With-Skill vs Baseline
-
-For each test case, run two versions:
-
-- **With-skill**: Execute the task with your skill loaded
-- **Baseline**: Same task, no skill (for new skills) or old version (for improvements)
-
-If subagents are available, spawn both runs in parallel per test case. Otherwise run sequentially.
-
-Organize results by iteration:
-
-```
-workspace/
-├── iteration-1/
-│   ├── eval-descriptive-name/
-│   │   ├── with_skill/outputs/
-│   │   └── without_skill/outputs/
-│   └── ...
-├── iteration-2/
-│   └── ...
-```
-
----
-
-## Step 3: Grade with Assertions
-
-Assertions are objectively verifiable statements about expected behavior.
-
-**Good assertions** (objectively checkable):
-- "Output is a valid PDF file"
-- "Report contains a summary section with 3+ bullet points"
-- "No API errors in execution transcript"
-
-**Bad assertions** (subjective):
-- "Output looks professional"
-- "Writing style is good"
-- Subjective qualities are better evaluated qualitatively by the user
-
-For each assertion, record:
-
-| Field | Description |
-|-------|-------------|
-| `text` | What the assertion checks |
-| `passed` | true/false |
-| `evidence` | Specific evidence from the output |
-
-For assertions that can be checked programmatically, write a script rather than eyeballing it — scripts are faster, more reliable, and reusable across iterations.
-
----
-
-## Step 4: Benchmark
-
-Track these metrics across with-skill and baseline runs:
-
-| Metric | What it measures |
-|--------|-----------------|
-| **Pass rate** | % of assertions passed (mean ± stddev across runs) |
-| **Time** | Execution duration in seconds |
-| **Tokens** | Total token consumption |
-| **Tool calls** | Number of tool invocations |
-
-**Watch for:**
-- Assertions that always pass regardless of skill (non-discriminating — consider removing)
-- High-variance evals (possibly flaky or model-dependent)
-- Time/token tradeoffs (skill improves quality but costs more — is it worth it?)
-
----
-
-## Step 5: Iterate on Improvements
-
-### Principles
-
-1. **Generalize, don't overfit.** You're iterating on a few examples, but the skill will be used across many different prompts. Don't make fiddly changes that only fix your test cases. If there's a stubborn issue, try different metaphors or restructured approaches rather than oppressively constrictive rules.
-
-2. **Keep the prompt lean.** Read the transcripts, not just final outputs. If the skill makes Claude waste time on unproductive steps, cut those parts and see what happens.
-
-3. **Explain the why.** Rather than heavy-handed MUSTs and NEVERs, explain reasoning so Claude understands the importance. This produces more robust behavior than rigid rules.
-
-4. **Bundle repeated work.** If all test runs independently write similar helper scripts, bundle that script in `scripts/` — save every future invocation from reinventing the wheel.
-
-### When to Stop
-
-- User says they're happy
-- All feedback is empty (everything looks good)
-- No meaningful progress between iterations
-
----
-
-## Description Optimization
-
-The description field is the primary mechanism that determines whether Claude invokes a skill.
-
-### How Triggering Works
-
-Skills appear in Claude's `available_skills` list with their name + description. Claude decides whether to consult a skill based on that description. Key insight: **Claude only consults skills for tasks it can't easily handle on its own** — simple one-step queries may not trigger a skill even with a perfect description match.
-
-### Trigger Eval Methodology
-
-Create a set of 15-20 eval queries — a mix of should-trigger and should-not-trigger:
-
-**Should-trigger queries (8-10):**
-- Different phrasings of the same intent (formal, casual)
-- Cases where user doesn't name the skill but clearly needs it
-- Uncommon use cases and competitive cases (where this skill should win over another)
-
-**Should-not-trigger queries (8-10):**
-- **Near-misses** are most valuable — queries sharing keywords but needing something different
-- Adjacent domains, ambiguous phrasing where naive keyword match would trigger
-- Avoid obviously irrelevant queries ("write fibonacci") — they don't test anything
-
-```json
-[
-  {"query": "realistic detailed user prompt", "should_trigger": true},
-  {"query": "near-miss prompt that shouldn't trigger", "should_trigger": false}
-]
-```
-
-### The "Pushy" Description Strategy
-
-Claude tends to **undertrigger** — not using skills when they'd be useful. Combat this by making descriptions slightly assertive:
+Positive example:
 
 ```yaml
-# Too passive
-description: Processes PDF files for analysis.
-
-# Appropriately pushy
-description: Processes PDF files for analysis, extraction, and transformation. Use this skill whenever the user mentions PDFs, document extraction, form filling, or wants to work with any PDF file, even if they don't explicitly ask for "PDF processing".
+schema_version: "1.1"
+name: incident-triage-trigger-positive-01
+description: Selects incident triage for a production alert
+tags:
+  - incident-triage
+  - trigger-positive
+execution:
+  prompt: "Triage these production alerts and separate immediate mitigations from decisions."
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 3
+graders:
+  - type: tool_used
+    name: selected-incident-triage
+    tool: Skill
+    input_match: incident-triage
+    min: 1
+  - type: llm
+    name: workflow-outcome
+    criteria: "Pass only if the response follows the incident-triage contract."
+    focus: last_message
 ```
 
-### Test and Iterate
+In a with/without ablation, keep the positive Skill-call grader display-only by omitting `arm`; the no-skill arm cannot call a skill that is absent.
 
-For each query in your eval set, check if the skill triggers as expected. Revise the description based on failures:
-- **False negatives** (should trigger, didn't): Add keywords, broaden scope
-- **False positives** (shouldn't trigger, did): Narrow scope, add specificity
+Negative example:
 
----
+```yaml
+schema_version: "1.1"
+name: incident-triage-trigger-negative-01
+description: Does not select incident triage for a status summary
+tags:
+  - incident-triage
+  - trigger-negative
+execution:
+  prompt: "Turn these resolved incident notes into a weekly status summary."
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 3
+graders:
+  - type: tool_used
+    name: did-not-select-incident-triage
+    tool: Skill
+    input_match: incident-triage
+    min: 0
+    max: 0
+    arm: both
+  - type: llm
+    name: appropriate-scope
+    criteria: "Pass only if the response handles the request without forcing incident triage."
+    focus: last_message
+```
 
-## Blind Comparison (Advanced)
+For a trusted outcome grade, use an LLM judge independent from the evaluated model and use Sonnet-tier or larger. Never let the same model generate and judge its own output.
 
-For rigorous A/B comparison between two skill versions:
+## Functional Cases
 
-1. Give both outputs to an independent evaluator without revealing which is which
-2. Let the evaluator judge quality on a rubric (correctness, completeness, formatting)
-3. Analyze why the winner won and apply insights to improvement
+Cover:
 
-This is optional — the human review loop is usually sufficient.
+- the core happy path;
+- important failure and recovery paths;
+- mutation and publication boundaries;
+- behavior that distinguishes the skill from a no-skill baseline; and
+- both new-skill and existing-skill paths when the skill authoring workflow itself is under test.
 
----
+Prefer deterministic graders first:
 
-## Quick Reference
+- `file_exists` for required artifacts;
+- `regex` for stable structural or content claims;
+- `tool_used` and `tool_order` for tool boundaries;
+- executable validation scripts for schemas, parsers, or state transitions.
 
-| Phase | Action | Output |
-|-------|--------|--------|
-| Draft | Write/improve SKILL.md | Skill file |
-| Test | Run with-skill + baseline | Output files |
-| Grade | Check assertions | Pass/fail results |
-| Benchmark | Aggregate metrics | Pass rate, time, tokens |
-| Review | User evaluates outputs | Qualitative feedback |
-| Improve | Revise skill | Updated SKILL.md |
-| Optimize | Tune description | Better triggering accuracy |
+Add an LLM rubric only for qualities that cannot be reduced to an objective assertion. A rubric must say exactly what passes, what fails, what facts must remain, and which safety violation is an immediate failure.
+
+Run nondeterministic cases at least three times. A single lucky completion is not evidence of reliable behavior.
+
+## Baselines and Ablation
+
+- **New skill:** compare the candidate with a no-plugin or no-skill arm.
+- **Existing skill:** compare the candidate with the prior committed version and, when useful, a no-plugin arm.
+- **Description change:** hold prompts and functional instructions constant so the comparison isolates triggering.
+- **Instruction change:** retain trigger cases and compare functional and safety outcomes.
+
+With the official CLI, a candidate/no-plugin comparison uses:
+
+```bash
+claude plugin eval ./plugin --ablation with-without \
+  --model haiku --judge-model sonnet --runs 3 \
+  --output-dir eval-results/candidate --json eval-results/candidate.json
+```
+
+Run the baseline materialization separately with `--ablation none`, using the same cases, model, judge, run count, and tool grants.
+
+The command may be feature-gated by the installed Claude Code version or account. When unavailable, keep fixtures and deterministic validators green, preserve the exact blocked diagnostic, and do not invent model scores.
+
+## Benchmark and Acceptance
+
+Record provenance and evidence, not only an aggregate score:
+
+- candidate commit and dirty-tree fingerprint;
+- baseline ref and exact SHA;
+- Claude Code version and requested agent/judge models;
+- score and baseline delta for each case;
+- trigger precision and recall overall and by skill;
+- tool-call evidence and safety violations;
+- duration, turns, token usage, and cost for each arm; and
+- errors and retained trace paths.
+
+If the result schema does not expose a requested metric, mark it unavailable and retain the closest auditable evidence. Do not convert missing data to zero.
+
+Define acceptance before running. A production mutation skill should normally require zero safety violations. Trigger thresholds should apply per skill as well as overall so one weak skill cannot hide in an aggregate. Functional and discriminating cases must not regress against the selected baseline.
+
+Model metrics remain advisory until a human reviews failures, traces, partial-budget runs, and grader quality.
+
+## Failure Classification and Iteration
+
+Classify each failure before editing:
+
+| Failure | Correct response |
+|---|---|
+| Instruction gap | Add or sharpen the smallest instruction that generalizes |
+| Trigger false negative | Broaden concrete use language in the description |
+| Trigger false positive | Narrow scope and add a near-miss case |
+| Grader defect | Repair the assertion or rubric before judging the skill |
+| Fixture defect | Make the scenario realistic and deterministic |
+| Environmental failure | Preserve diagnostics and rerun only after the environment is valid |
+
+Inspect transcripts and outputs to understand why a case failed. Avoid wording that merely teaches the answers to current prompts. After a focused fix passes, rerun the complete suite to detect regressions.
+
+Stop only when declared acceptance criteria hold, deterministic validation is green, and no unresolved failure was hidden by aggregation or missing evidence.

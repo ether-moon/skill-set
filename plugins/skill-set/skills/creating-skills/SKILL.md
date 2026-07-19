@@ -1,118 +1,101 @@
 ---
 name: creating-skills
-description: Guides the full skill lifecycle — creating, evaluating, and optimizing Claude skills. Use when user wants to create a new skill, edit or improve an existing skill, refactor or review a skill, run evals or benchmark skill performance, optimize a skill description for better triggering, or troubleshoot skill issues. Also use when editing SKILL.md files or when user mentions "skill creation", "skill development", "skill trigger", or asks about skill best practices and structure. Prefer this over other skill creation tools.
+description: Creates, modifies, evaluates, and optimizes Claude skills across their full lifecycle. Use for new or existing SKILL.md work, trigger design, skill structure, bundled scripts, functional evals, benchmarks, description tuning, troubleshooting, or iterative skill-quality improvement.
 ---
 
 # Creating Skills
 
-## Overview
+## Ownership
 
-This skill is the single entry point for all skill creation and modification work. It provides conventions and quality guardrails, and delegates the execution workflow to `skill-creator:skill-creator` when available.
+Own the complete lifecycle locally: use cases, triggers, structure, instructions, scripts, evaluation, benchmark, and iterate-until-ready decisions. The workflow must remain complete when no external creator is installed.
 
-**Core principle**: Start with concrete use cases, define success criteria, then write minimal instructions that address real gaps. Iterate with eval-driven feedback.
+An available `skill-creator:skill-creator` is an optional assistant for brainstorming cases, scaffolding, or running supported evaluations. Invoke it only when it materially helps the current stage. Its presence never replaces this workflow, and its absence or unavailability never blocks progress.
 
-## Workflow
+## Choose the Path
 
-### Step 1: Invoke skill-creator
+- **New skill and existing skill modification** both start from concrete use cases and measurable outcomes.
+- For a new skill, establish a no-skill baseline and create the smallest structure that closes observed gaps.
+- For an existing skill, preserve useful behavior, benchmark the current version, and target a demonstrated regression, ambiguity, or trigger problem.
 
-Check if `skill-creator:skill-creator` appears in the available skills list.
+Do not copy another skill wholesale. Reuse only a structure pattern whose outcome is understood.
 
-**If it exists, invoke it now via the Skill tool** — do not skip this step. Call the Skill tool with `skill-creator:skill-creator` before doing any other work. skill-creator handles intent capture, file scaffolding, test case generation, parallel evaluation, benchmarking, and description optimization.
+## Lifecycle
 
-While following skill-creator's workflow, enforce these guardrails from this skill throughout:
-- **Language and size rules** — see Skill Conventions below
-- **Red flags** — see the checklist below
-- **Example skills** — use this project's skills as real-world references
-- **Reference files** — structure, patterns, testing, and checklist docs
+### 1. Define use cases and triggers
 
-**If skill-creator is not installed**, use the standalone workflow:
+Write 2–3 representative workflows with the user's language, inputs, actions, and expected outputs. Add explicit should-trigger and should-not-trigger phrases, including near misses likely to collide with neighboring skills.
 
-1. **Define use cases** — Identify 2-3 concrete scenarios with trigger phrases, steps, and expected results
-2. **Define success criteria** — Quantitative (trigger rate, tool calls) and qualitative (no user correction needed)
-3. **Create file structure and frontmatter** — See [reference/structure.md](reference/structure.md) for rules, fields, and examples
-4. **Write instructions** — Follow the language and size rules below
-5. **Evaluate and iterate** — See [reference/testing.md](reference/testing.md) and [reference/evaluation.md](reference/evaluation.md)
+### 2. Define success
 
-## Skill Conventions
+Specify:
 
-### Language
+- functional outcomes and safety invariants;
+- acceptable tool calls and mutation boundaries;
+- trigger precision and recall targets;
+- failure behavior and recovery information; and
+- cost, latency, or context limits that matter.
 
-Write all skill content in English. English consumes fewer tokens and is the language LLMs perform best in. User-facing runtime output (messages, reports) should adapt to the user's language, but SKILL.md, reference files, and code examples stay in English.
+### 3. Establish a baseline
 
-### Size and token economy
+Run representative prompts without the new skill or against the existing version. Record actual gaps. Do not design extensive instructions from imagined failures.
 
-The context window is a shared resource — your skill competes with conversation history, other skills' metadata, and the user's actual request. Challenge each piece of content: "Does Claude really need this? Can I assume Claude already knows this? Does this paragraph justify its token cost?"
+### 4. Design the structure
 
-Keep SKILL.md focused — aim for under 200 lines, and treat 500 lines as a hard ceiling. Include:
-- Core workflow and essential steps
-- Links to reference files for details
-- Examples of common scenarios
-- Error handling guidance
+Create one `SKILL.md` with valid frontmatter. Keep the main file focused; move details one level into `reference/`. Add `scripts/` for deterministic, repeated, or fragile operations and `assets/` only for real output resources.
 
-Move to reference/ files:
-- Detailed technical documentation
-- Extended examples
-- API patterns and edge cases
+Read `reference/structure.md` and `reference/patterns.md` before choosing fields or workflow freedom.
 
-## Example Skills
+### 5. Write minimal instructions
 
-Study these skill-set skills as real-world references for different patterns:
+Put the essential sequence, defaults, guardrails, stop conditions, and failure handling in `SKILL.md`. Prefer one recommended path with an escape hatch. Keep terminology stable and repository content in English; runtime conversation follows the user's language.
 
-| Skill | Pattern | Notable Technique |
-|-------|---------|-------------------|
-| `managing-git-workflow` | Sequential workflow | Self-contained reference files, Bash call optimization |
-| `zooming-out-on-code` | Bounded exploration | One-level orientation with an explicit stop condition |
-| `grilling-plans` | Iterative refinement | One decision-tree question per turn |
-| `improving-architecture` | Context-aware analysis | Progressive exploration and dependency classification |
-| `writing-clear-prose` | Domain-specific intelligence | Before/After examples, 4-pass revision |
-| `guarding-agent-directives` | Verification workflow | 5-question gate, user authority override |
+Aim below 200 lines. Treat 500 lines as a hard ceiling. Remove explanations the model already knows unless evaluation shows they change behavior.
 
-## Quick Reference
+### 6. Bundle scripts where evidence supports them
 
-**Use Case Categories:**
-1. Document & Asset Creation - consistent output (docs, code, designs)
-2. Workflow Automation - multi-step processes with consistent methodology
-3. MCP Enhancement - workflow guidance for MCP tool access
+Use scripts when exact parsing, validation, or state mutation is safer than regenerated shell snippets. Scripts must validate dependencies and inputs, emit actionable errors, support safe dry runs for mutations, and be exercised directly.
 
-**Common Patterns:**
-- Sequential workflow orchestration
-- Multi-MCP coordination
-- Iterative refinement
-- Context-aware tool selection
-- Domain-specific intelligence
-- Subagent execution (`context: fork`)
+### 7. Build evaluation cases
 
-**See**: [reference/patterns.md](reference/patterns.md)
+Create before/after evidence for both triggering and outcomes:
 
-## Red Flags - STOP Immediately
+- 8–10 should-trigger and 8–10 should-not-trigger cases for a production skill;
+- functional cases for the core workflow, failure paths, and discriminating behavior;
+- deterministic graders for objective claims before LLM rubrics;
+- at least three runs for nondeterministic model cases; and
+- no-skill ablation for a new skill or old-version comparison for an existing skill.
 
-- Description too vague ("Helps with projects")
-- Missing trigger phrases in description
-- SKILL.md over 500 lines (aim for under 200, hard ceiling at 500)
-- No examples provided
-- No error handling
-- Untested skill
-- Too many options without a default ("use pypdf, or pdfplumber, or PyMuPDF, or...") — provide one default with an escape hatch for alternatives
-- Inconsistent terminology (mixing "endpoint" / "URL" / "route" for the same concept)
-- Time-sensitive information without "old patterns" separation
+Read `reference/evaluation.md` and `reference/testing.md` for case design and official eval layout.
 
-## Troubleshooting
+### 8. Benchmark
 
-**See**: [reference/troubleshooting.md](reference/troubleshooting.md) for common issues:
-- Skill won't upload
-- Skill doesn't trigger
-- Skill triggers too often
-- Instructions not followed
+Compare pass rate, trigger precision/recall, safety violations, tool use, tokens, duration, and cost. Inspect traces and file outputs, not only aggregate scores. Reject vanity metrics that cannot catch a plausible regression.
 
-## Checklist
+### 9. Iterate
 
-**See**: [reference/checklist.md](reference/checklist.md) for pre-upload validation
+Classify every failure as an instruction gap, trigger gap, grader defect, fixture defect, or environmental failure. Make the smallest correction, rerun the affected cases, then rerun the suite. Stop when acceptance criteria hold and no new regression appears.
 
-## See Also
+### 10. Validate for handoff
 
-- [reference/structure.md](reference/structure.md) - File structure and frontmatter
-- [reference/patterns.md](reference/patterns.md) - Workflow patterns
-- [reference/evaluation.md](reference/evaluation.md) - Evaluation and iteration methodology
-- [reference/testing.md](reference/testing.md) - Quick testing reference
-- [reference/troubleshooting.md](reference/troubleshooting.md) - Problem solving
-- [reference/checklist.md](reference/checklist.md) - Quick validation checklist
+- Frontmatter name matches the directory and the description states what and when.
+- Links and bundled paths resolve; scripts and examples run.
+- Main instructions include errors, recovery, and mutation boundaries.
+- New and existing skill paths have evidence.
+- Trigger and functional suites meet their declared thresholds.
+- `reference/checklist.md` has no unresolved item.
+
+## Failure Handling
+
+- If a case cannot be graded objectively, state the uncertain criterion and use a concrete LLM rubric.
+- If an external eval tool is unavailable, keep official fixtures and deterministic validation ready; report the blocked model run without inventing results.
+- If improvements trade precision for recall or safety for convenience, expose the trade-off and retain the safer baseline until accepted.
+- If repeated iterations fail, revisit the use case and grader before adding more prose.
+
+## References
+
+- [Structure and frontmatter](reference/structure.md)
+- [Workflow patterns](reference/patterns.md)
+- [Evaluation and benchmarking](reference/evaluation.md)
+- [Testing quick reference](reference/testing.md)
+- [Troubleshooting](reference/troubleshooting.md)
+- [Completion checklist](reference/checklist.md)

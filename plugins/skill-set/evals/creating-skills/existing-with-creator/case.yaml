@@ -1,0 +1,55 @@
+schema_version: "1.1"
+name: creating-skills-existing-with-creator
+description: Improves an existing skill with optional creator assistance
+tags:
+  - creating-skills
+  - functional
+context:
+  scaffold_script: fixtures/scaffold.sh
+execution:
+  max_turns: 12
+  timeout_seconds: 360
+  allowed_tools:
+    - Skill
+    - Read
+    - Write
+    - Edit
+    - "Bash(./validate-skill.sh:*)"
+runs: 3
+graders:
+  - type: tool_used
+    name: selected-creating-skills
+    tool: Skill
+    input_match: creating-skills
+    min: 1
+  - type: regex
+    name: rollback-trigger-added
+    target:
+      source: file
+      path: outputs/skills/deploying-safely/SKILL.md
+    pattern: "^description:.*rollback"
+    flags: im
+    match: contains
+  - type: regex
+    name: near-miss-excluded
+    target:
+      source: file
+      path: outputs/skills/deploying-safely/SKILL.md
+    pattern: "^description:.*Do not use.*general release"
+    flags: im
+    match: contains
+  - type: file_exists
+    name: added-rollback-eval
+    path: outputs/evals/deploying-safely/trigger-positive-rollback/case.yaml
+    exists: true
+  - type: file_exists
+    name: added-near-miss-eval
+    path: outputs/evals/deploying-safely/trigger-negative-general-release/case.yaml
+    exists: true
+  - type: tool_order
+    name: validates-after-editing
+    before:
+      tool: Edit
+    after:
+      tool: Bash
+      input_match: validate-skill\\.sh
