@@ -1,103 +1,49 @@
 # Push Workflow
 
-Push changes to remote repository, automatically committing if needed. Self-contained — no delegation to other workflows.
+Publish existing commits without creating or rewriting commits.
 
-## Prerequisites
+## 1. Inspect and Confirm Authorization
 
-- Git repository with remote configured
-- Changes to push (committed or uncommitted)
-
-## Call Summary
-
-| Step | Type | Bash Calls |
-|------|------|------------|
-| 1. Gather context | read | 1 |
-| 2. Generate message (if needed) | analysis | 0 |
-| 3. Commit and/or push | write | 1 |
-| **Total** | | **2** |
-
-## Steps
-
-### 1. Gather Context (1 Bash call)
-
-Collect all needed information in a single call:
+Run:
 
 ```bash
-git status --porcelain; git log --oneline -10; git diff HEAD --stat; git branch --show-current; git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || echo "NO_UPSTREAM"
+"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git" inspect
 ```
 
-**Parse the output into 5 sections:**
-1. **Status** (`git status --porcelain`): Uncommitted changes — empty means all committed
-2. **Log** (`git log --oneline -10`): Recent commit patterns and style
-3. **Diff stat** (`git diff HEAD --stat`): Summary of uncommitted changes
-4. **Branch** (`git branch --show-current`): Current branch name for ticket extraction
-5. **Upstream** (`git rev-parse ...`): Tracking branch or `NO_UPSTREAM`
+Confirm that the user requested a push. Dirty staged, unstaged, and untracked files are reported as excluded; they do not become part of the publication.
 
-**Exit if:** Status is empty AND branch is up to date with upstream → Output appropriate message in project's language and stop.
+Record `branch.remote_sha`. Use the literal value `absent` when it is `null`.
 
-### 2. Generate Commit Message (no Bash call, only if uncommitted changes)
+## 2. Preview
 
-If status from step 1 is non-empty, generate a commit message:
-
-**Guidelines:**
-- **Language:** Match the project's language. Default to English if unclear.
-- **Style:** Follow patterns from the log output in step 1.
-- **Ticket numbers:** Extract from branch name if present (match patterns like `PROJ-123`, `TEAM-456`).
-- **Clarity:** Describe what changed and why.
-
-### 3. Commit and/or Push (1 Bash call)
-
-Choose the appropriate command based on state from step 1:
-
-**Case A: Uncommitted changes + no upstream**
 ```bash
-git add -A && git commit -m "$(cat <<'EOF'
-Generated commit message
-EOF
-)" && git push -u origin "$(git branch --show-current)" && git log --oneline -1
+"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git" push \
+  --expected-remote-sha "<sha-or-absent>" \
+  --dry-run
 ```
 
-**Case B: Uncommitted changes + upstream exists**
+Report `commits_to_push`, the destination, and `dirty_excluded`. A dry-run reads the remote twice and makes no publication.
+
+## 3. Push Existing Commits
+
+After confirming the destination:
+
 ```bash
-git add -A && git commit -m "$(cat <<'EOF'
-Generated commit message
-EOF
-)" && git push && git log --oneline -1
+"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git" push \
+  --expected-remote-sha "<sha-or-absent>"
 ```
 
-**Case C: All committed + no upstream**
-```bash
-git push -u origin "$(git branch --show-current)"
-```
+The runner reads the destination SHA again immediately before publication, rejects behind or diverged history, and verifies that the resulting remote SHA equals local HEAD. It never creates a commit or includes dirty files.
 
-**Case D: All committed + upstream exists**
-```bash
-git push
-```
+`--remote <name>` selects an explicit remote. `--remote-branch <short-name>` is reserved for an already-authorized resolver publishing an isolated worktree HEAD to a known PR branch; the runner validates that branch name and applies the same expected-SHA checks.
 
-**Output to user:**
-- Success message with branch name
-- Commit details (if committed in this step)
-- Push confirmation
+## Recovery
 
-**Example output:**
-```
-Pushed to origin/feature-branch
-  Commit: a1b2c3d PROJ-123: Improve user authentication logic
-  Branch is up to date with 'origin/feature-branch'
-```
+| Error code | Response |
+|---|---|
+| `remote_changed` | Inspect again and present the new state. |
+| `remote_ahead` | Stop and ask how to reconcile incoming commits. |
+| `diverged` | Stop and ask the user to choose a reconciliation strategy. |
+| `push_failed` | Report authentication, protection, or server rejection without changing local commits. |
 
-## Common Issues
-
-**Issue:** "No upstream tracking branch"
-**Fix:** Automatically handled with `-u` flag in Cases A and C.
-
-**Issue:** Push rejected (diverged branches)
-**Fix:**
-```bash
-git pull --rebase
-```
-Then retry the push step.
-
-**Issue:** Authentication failed
-**Fix:** User needs to configure git credentials or SSH keys. Not handled by this workflow.
+Do not perform automatic history reconciliation or retry with a widened publication policy.

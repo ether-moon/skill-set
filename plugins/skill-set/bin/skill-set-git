@@ -1,0 +1,852 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+PROGRAM=skill-set-git
+OPERATION=preflight
+MANAGED_INPUT_SENTINEL=SKILL_SET_INPUT_REPLACE_ME
+
+fallback_error() {
+  local code=$1
+  local message=$2
+  printf '{"ok":false,"operation":"%s","code":"%s","message":"%s","recoverable":true}\n' \
+    "$OPERATION" "$code" "$message" >&2
+  exit 69
+}
+
+preflight() {
+  local dependency
+  for dependency in bash git gh jq; do
+    command -v "$dependency" >/dev/null 2>&1 || fallback_error "missing_dependency" "Required command is unavailable: $dependency"
+  done
+  [[ -n ${BASH_VERSION:-} ]] || fallback_error "unsupported_shell" "Run $PROGRAM with Bash"
+  [[ ${BASH_VERSINFO[0]} -ge 3 ]] || fallback_error "unsupported_shell" "Bash 3 or newer is required"
+}
+
+json_error() {
+  local code=$1
+  local message=$2
+  local recoverable=${3:-true}
+  jq -cn \
+    --arg operation "$OPERATION" \
+    --arg code "$code" \
+    --arg message "$message" \
+    --argjson recoverable "$recoverable" \
+    '{ok:false, operation:$operation, code:$code, message:$message, recoverable:$recoverable}' >&2
+}
+
+die() {
+  local status=$1
+  local code=$2
+  local message=$3
+  local recoverable=${4:-true}
+  json_error "$code" "$message" "$recoverable"
+  exit "$status"
+}
+
+require_repository() {
+  git rev-parse --git-dir >/dev/null 2>&1 || die 66 "not_a_repository" "Run $PROGRAM inside a Git repository"
+}
+
+managed_input_root() {
+  local git_dir
+  git_dir=$(git rev-parse --absolute-git-dir) || die 66 "git_directory_unavailable" "Could not resolve the worktree Git directory"
+  printf '%s\n' "$git_dir/skill-set/inputs"
+}
+
+MANAGED_INPUT_DIR=
+
+validate_managed_input() {
+  local input_file=$1
+  local expected_kind=${2:-}
+  local root input_dir root_physical input_dir_physical allocation_name
+
+  [[ $input_file == /* ]] || die 65 "unmanaged_input_file" "Managed input paths must be absolute"
+  [[ -f $input_file && ! -L $input_file ]] || die 65 "unmanaged_input_file" "The input is not a regular managed file"
+  [[ ${input_file##*/} == content ]] || die 65 "unmanaged_input_file" "The input filename is not managed by $PROGRAM"
+
+  root=$(managed_input_root)
+  [[ -d $root && ! -L $root ]] || die 65 "managed_input_root_invalid" "The managed input root is unavailable or unsafe"
+  input_dir=${input_file%/*}
+  root_physical=$(cd -- "$root" 2>/dev/null && pwd -P) || die 65 "managed_input_root_invalid" "Could not resolve the managed input root"
+  input_dir_physical=$(cd -- "$input_dir" 2>/dev/null && pwd -P) || die 65 "unmanaged_input_file" "Could not resolve the managed input allocation"
+  allocation_name=${input_dir_physical##*/}
+
+  case $allocation_name in
+    commit-message.*|pr-body.*) ;;
+    *) die 65 "unmanaged_input_file" "The input allocation kind is not recognized" ;;
+  esac
+  [[ $input_dir_physical == "$root_physical"/* ]] || die 65 "unmanaged_input_file" "The input path escaped the managed input root"
+  if [[ -n $expected_kind && $allocation_name != "$expected_kind".* ]]; then
+    die 65 "wrong_input_kind" "The managed input file has the wrong kind for this operation"
+  fi
+  MANAGED_INPUT_DIR=$input_dir_physical
+}
+
+require_managed_input_written() {
+  local input_file=$1
+  local input_content
+  input_content=$(<"$input_file")
+  if [[ $input_content == *"$MANAGED_INPUT_SENTINEL"* ]]; then
+    die 65 "managed_input_unwritten" "Replace the managed input sentinel before continuing"
+  fi
+  [[ -n $input_content ]] || die 65 "managed_input_empty" "Managed input content must not be empty"
+}
+
+discard_managed_input() {
+  local input_file=$1
+  local expected_kind=${2:-}
+  validate_managed_input "$input_file" "$expected_kind"
+  rm -rf -- "$MANAGED_INPUT_DIR"
+}
+
+is_managed_input_candidate() {
+  local input_file=$1
+  local root
+  root=$(managed_input_root)
+  [[ $input_file == "$root"/* ]]
+}
+
+input_prepare_operation() {
+  local kind=
+  local root allocation input_file error_file
+
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --kind)
+        [[ $# -ge 2 ]] || die 64 "missing_argument" "--kind requires commit-message or pr-body"
+        kind=$2
+        shift 2
+        ;;
+      *) die 64 "unknown_argument" "Unknown input-prepare argument: $1" ;;
+    esac
+  done
+  case $kind in
+    commit-message|pr-body) ;;
+    *) die 64 "invalid_input_kind" "Managed input kind must be commit-message or pr-body" ;;
+  esac
+
+  root=$(managed_input_root)
+  error_file=$(mktemp "${TMPDIR:-/tmp}/skill-set-git-input.XXXXXX") || die 70 "temporary_file_failed" "Could not create a temporary error file"
+  if ! (umask 077 && mkdir -p -- "$root") 2>"$error_file"; then
+    rm -f -- "$error_file"
+    die 70 "managed_input_root_failed" "Could not create the managed input root"
+  fi
+  chmod 700 "$root" 2>/dev/null || { rm -f -- "$error_file"; die 70 "managed_input_permissions_failed" "Could not secure the managed input root"; }
+  if ! allocation=$(mktemp -d "$root/$kind.XXXXXX" 2>"$error_file"); then
+    rm -f -- "$error_file"
+    die 70 "managed_input_allocation_failed" "Could not allocate a managed input file"
+  fi
+  input_file=$allocation/content
+  if ! (umask 077 && printf '%s\n' "$MANAGED_INPUT_SENTINEL" >"$input_file") 2>"$error_file"; then
+    rm -rf -- "$allocation"
+    rm -f -- "$error_file"
+    die 70 "managed_input_creation_failed" "Could not create the managed input file"
+  fi
+  chmod 600 "$input_file" 2>/dev/null || { rm -rf -- "$allocation"; rm -f -- "$error_file"; die 70 "managed_input_permissions_failed" "Could not secure the managed input file"; }
+  rm -f -- "$error_file"
+
+  jq -cn --arg kind "$kind" --arg path "$input_file" --arg sentinel "$MANAGED_INPUT_SENTINEL" \
+    '{ok:true, operation:"input-prepare", kind:$kind, path:$path, sentinel:$sentinel}'
+}
+
+input_discard_operation() {
+  local input_file=
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --input-file)
+        [[ $# -ge 2 ]] || die 64 "missing_argument" "--input-file requires a managed path"
+        input_file=$2
+        shift 2
+        ;;
+      *) die 64 "unknown_argument" "Unknown input-discard argument: $1" ;;
+    esac
+  done
+  [[ -n $input_file ]] || die 64 "input_file_required" "Provide the managed path with --input-file"
+  discard_managed_input "$input_file"
+  jq -cn --arg path "$input_file" '{ok:true, operation:"input-discard", path:$path, discarded:true}'
+}
+
+nul_to_json() {
+  jq -Rs 'split("\u0000") | if length > 0 and .[-1] == "" then .[:-1] else . end'
+}
+
+staged_json() {
+  git diff --cached --name-only -z --no-ext-diff -- | nul_to_json
+}
+
+unstaged_json() {
+  git diff --name-only -z --no-ext-diff -- | nul_to_json
+}
+
+untracked_json() {
+  git ls-files --others --exclude-standard -z -- | nul_to_json
+}
+
+index_fingerprint() {
+  git write-tree
+}
+
+dirty_fingerprint() {
+  local stream_file
+  local path
+  stream_file=$(mktemp "${TMPDIR:-/tmp}/skill-set-git-state.XXXXXX") || die 70 "temporary_file_failed" "Could not create a temporary state file"
+  {
+    git diff --cached --binary --no-ext-diff --
+    git diff --binary --no-ext-diff --
+    while IFS= read -r -d '' path; do
+      printf '%s\0' "$path"
+      git hash-object -- "$path"
+    done < <(git ls-files --others --exclude-standard -z --)
+  } >"$stream_file"
+  git hash-object "$stream_file"
+  rm -f -- "$stream_file"
+}
+
+current_branch() {
+  git symbolic-ref --quiet --short HEAD 2>/dev/null || true
+}
+
+default_base() {
+  local symbolic
+  symbolic=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)
+  if [[ -n $symbolic ]]; then
+    printf '%s\n' "${symbolic#origin/}"
+  elif git show-ref --verify --quiet refs/remotes/origin/main; then
+    printf 'main\n'
+  elif git show-ref --verify --quiet refs/remotes/origin/master; then
+    printf 'master\n'
+  else
+    printf 'main\n'
+  fi
+}
+
+REMOTE_HEAD_SHA=
+
+query_remote_head() {
+  local remote=$1
+  local branch=$2
+  local error_file output
+  error_file=$(mktemp "${TMPDIR:-/tmp}/skill-set-git-remote.XXXXXX") || die 70 "temporary_file_failed" "Could not create a temporary error file"
+  if ! output=$(git ls-remote "$remote" "refs/heads/$branch" 2>"$error_file"); then
+    rm -f -- "$error_file"
+    die 69 "remote_query_failed" "Could not read the current remote branch SHA"
+  fi
+  rm -f -- "$error_file"
+  if [[ -n $output ]]; then
+    REMOTE_HEAD_SHA=${output%%$'\t'*}
+  else
+    REMOTE_HEAD_SHA=
+  fi
+}
+
+inspect_operation() {
+  local base=
+  local branch upstream remote remote_branch remote_sha
+  local staged unstaged untracked dirty index
+  local staged_diff staged_diff_stat recent_subjects
+  local ahead=null behind=null diverged=false
+  local counts left right
+  local base_ref base_exists=false pr_files='[]' commit_count=0
+  local fetch_error
+
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --base)
+        [[ $# -ge 2 ]] || die 64 "missing_argument" "--base requires a branch name"
+        base=$2
+        shift 2
+        ;;
+      *) die 64 "unknown_argument" "Unknown inspect argument: $1" ;;
+    esac
+  done
+
+  [[ -n $base ]] || base=$(default_base)
+  branch=$(current_branch)
+  [[ -n $branch ]] || die 65 "detached_head" "A named branch is required"
+  upstream=$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || true)
+  remote=$(git config --get "branch.$branch.remote" 2>/dev/null || true)
+  [[ -n $remote && $remote != . ]] || remote=origin
+  remote_branch=$(git config --get "branch.$branch.merge" 2>/dev/null || true)
+  remote_branch=${remote_branch#refs/heads/}
+  [[ -n $remote_branch ]] || remote_branch=$branch
+  remote_sha=
+  if git remote get-url "$remote" >/dev/null 2>&1; then
+    query_remote_head "$remote" "$remote_branch"
+    remote_sha=$REMOTE_HEAD_SHA
+  fi
+
+  if [[ -n $remote_sha ]]; then
+    if ! git cat-file -e "$remote_sha^{commit}" 2>/dev/null; then
+      fetch_error=$(mktemp "${TMPDIR:-/tmp}/skill-set-git-fetch.XXXXXX") || die 70 "temporary_file_failed" "Could not create a temporary error file"
+      if ! git fetch --quiet --no-tags "$remote" "refs/heads/$remote_branch" >/dev/null 2>"$fetch_error"; then
+        rm -f -- "$fetch_error"
+        die 69 "remote_fetch_failed" "Could not load the observed remote commit for branch comparison"
+      fi
+      rm -f -- "$fetch_error"
+    fi
+    counts=$(git rev-list --left-right --count "$remote_sha...HEAD")
+    left=${counts%%[[:space:]]*}
+    right=${counts##*[[:space:]]}
+    behind=$left
+    ahead=$right
+    if [[ $left -gt 0 && $right -gt 0 ]]; then
+      diverged=true
+    fi
+  fi
+
+  staged=$(staged_json)
+  unstaged=$(unstaged_json)
+  untracked=$(untracked_json)
+  dirty=$(dirty_fingerprint)
+  index=$(index_fingerprint)
+  staged_diff=$(git diff --cached --no-ext-diff --)
+  staged_diff_stat=$(git diff --cached --stat --no-ext-diff --)
+  recent_subjects=$(git log -z -10 --format=%s | nul_to_json)
+
+  base_ref=refs/remotes/origin/$base
+  if git show-ref --verify --quiet "$base_ref"; then
+    base_exists=true
+    pr_files=$(git diff --name-only -z --no-ext-diff "origin/$base...HEAD" -- | nul_to_json)
+    commit_count=$(git rev-list --count "origin/$base..HEAD")
+  fi
+
+  jq -cn \
+    --arg branch "$branch" \
+    --arg upstream "$upstream" \
+    --arg remote "$remote" \
+    --arg remote_branch "$remote_branch" \
+    --arg remote_sha "$remote_sha" \
+    --argjson ahead "$ahead" \
+    --argjson behind "$behind" \
+    --argjson diverged "$diverged" \
+    --argjson staged "$staged" \
+    --argjson unstaged "$unstaged" \
+    --argjson untracked "$untracked" \
+    --arg dirty "$dirty" \
+    --arg index "$index" \
+    --arg staged_diff "$staged_diff" \
+    --arg staged_diff_stat "$staged_diff_stat" \
+    --argjson recent_subjects "$recent_subjects" \
+    --arg base "$base" \
+    --arg range "origin/$base...HEAD" \
+    --argjson base_exists "$base_exists" \
+    --argjson files "$pr_files" \
+    --argjson commit_count "$commit_count" \
+    '{
+      ok:true,
+      operation:"inspect",
+      branch:{
+        name:$branch,
+        upstream:(if $upstream == "" then null else $upstream end),
+        remote:$remote,
+        remote_branch:$remote_branch,
+        remote_sha:(if $remote_sha == "" then null else $remote_sha end),
+        ahead:$ahead,
+        behind:$behind,
+        diverged:$diverged
+      },
+      working_tree:{
+        staged:$staged,
+        unstaged:$unstaged,
+        untracked:$untracked,
+        dirty_fingerprint:$dirty
+      },
+      index_fingerprint:$index,
+      commit_context:{staged_diff:$staged_diff, staged_diff_stat:$staged_diff_stat, recent_subjects:$recent_subjects},
+      pr_scope:{base:$base, range:$range, base_exists:$base_exists, files:$files, commit_count:$commit_count}
+    }'
+}
+
+commit_operation() {
+  local message_file=
+  local expected_index=
+  local dry_run=false
+  local commit_error stage_error
+  local before_index after_index commit_sha subject
+  local all_staged selected_staged
+  local source=index requested_paths='[]'
+  local would_commit preview_diff preview_stat preview_index preview_error
+  local paths=()
+  local include_all=false
+  local managed_message=false input_consumed=false
+
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --message-file)
+        [[ $# -ge 2 ]] || die 64 "missing_argument" "--message-file requires a path"
+        message_file=$2
+        shift 2
+        ;;
+      --expected-index)
+        [[ $# -ge 2 ]] || die 64 "missing_argument" "--expected-index requires a fingerprint"
+        expected_index=$2
+        shift 2
+        ;;
+      --path)
+        [[ $# -ge 2 ]] || die 64 "missing_argument" "--path requires a repository path"
+        paths+=("$2")
+        shift 2
+        ;;
+      --all)
+        include_all=true
+        shift
+        ;;
+      --dry-run)
+        dry_run=true
+        shift
+        ;;
+      *) die 64 "unknown_argument" "Unknown commit argument: $1" ;;
+    esac
+  done
+
+  if [[ $dry_run == false ]]; then
+    [[ -n $message_file ]] || die 64 "message_file_required" "Provide the commit message with --message-file"
+    [[ -n $expected_index ]] || die 64 "expected_index_required" "Inspect first, then pass the observed index fingerprint with --expected-index"
+    [[ -f $message_file && -r $message_file ]] || die 66 "message_file_unreadable" "The commit message file is not readable"
+    [[ -s $message_file ]] || die 65 "empty_commit_message" "The commit message file is empty"
+    if is_managed_input_candidate "$message_file"; then
+      validate_managed_input "$message_file" commit-message
+      require_managed_input_written "$message_file"
+      chmod 600 "$message_file" 2>/dev/null || die 70 "managed_input_permissions_failed" "Could not secure the managed commit message"
+      managed_message=true
+    fi
+  elif [[ -n $message_file ]]; then
+    [[ -f $message_file && -r $message_file ]] || die 66 "message_file_unreadable" "The commit message file is not readable"
+  fi
+  if [[ ${#paths[@]} -gt 0 && $include_all == true ]]; then
+    die 64 "conflicting_scope" "Choose repeatable --path arguments or explicitly requested --all, not both"
+  fi
+
+  before_index=$(index_fingerprint)
+  if [[ -n $expected_index && $before_index != "$expected_index" ]]; then
+    die 75 "index_changed" "The index changed after inspection; inspect again before committing"
+  fi
+
+  if [[ ${#paths[@]} -gt 0 ]]; then
+    all_staged=$(staged_json)
+    selected_staged=$(git diff --cached --name-only -z --no-ext-diff -- "${paths[@]}" | nul_to_json)
+    if [[ $all_staged != "$selected_staged" && $all_staged != '[]' ]]; then
+      die 65 "unrelated_staged_paths" "The index contains staged paths outside the requested commit scope"
+    fi
+    if [[ $dry_run == false ]]; then
+      stage_error=$(mktemp "${TMPDIR:-/tmp}/skill-set-git-stage.XXXXXX") || die 70 "temporary_file_failed" "Could not create a temporary error file"
+      if ! git add -- "${paths[@]}" >/dev/null 2>"$stage_error"; then
+        rm -f -- "$stage_error"
+        die 65 "path_staging_failed" "Git could not stage the requested paths"
+      fi
+      rm -f -- "$stage_error"
+    fi
+    source=paths
+    requested_paths=$(printf '%s\0' "${paths[@]}" | nul_to_json)
+  fi
+  if [[ $include_all == true ]]; then
+    if [[ $dry_run == false ]]; then
+      stage_error=$(mktemp "${TMPDIR:-/tmp}/skill-set-git-stage.XXXXXX") || die 70 "temporary_file_failed" "Could not create a temporary error file"
+      if ! git add --all >/dev/null 2>"$stage_error"; then
+        rm -f -- "$stage_error"
+        die 65 "all_staging_failed" "Git could not stage all changes"
+      fi
+      rm -f -- "$stage_error"
+    fi
+    source=all
+  fi
+
+  if [[ $dry_run == true ]]; then
+    case $source in
+      index)
+        would_commit=$(staged_json)
+        preview_diff=$(git diff --cached --no-ext-diff --)
+        preview_stat=$(git diff --cached --stat --no-ext-diff --)
+        ;;
+      paths|all)
+        preview_index=$(mktemp "${TMPDIR:-/tmp}/skill-set-git-index.XXXXXX") || die 70 "temporary_file_failed" "Could not create a temporary preview index"
+        rm -f -- "$preview_index"
+        preview_error=$(mktemp "${TMPDIR:-/tmp}/skill-set-git-preview.XXXXXX") || die 70 "temporary_file_failed" "Could not create a temporary error file"
+        if ! GIT_INDEX_FILE=$preview_index git read-tree HEAD >/dev/null 2>"$preview_error"; then
+          rm -f -- "$preview_index" "$preview_error"
+          die 70 "preview_index_failed" "Could not initialize the commit preview index"
+        fi
+        if [[ $source == paths ]]; then
+          if ! GIT_INDEX_FILE=$preview_index git add -- "${paths[@]}" >/dev/null 2>"$preview_error"; then
+            rm -f -- "$preview_index" "$preview_error"
+            die 65 "path_preview_failed" "Could not preview the requested commit paths"
+          fi
+        elif ! GIT_INDEX_FILE=$preview_index git add --all >/dev/null 2>"$preview_error"; then
+          rm -f -- "$preview_index" "$preview_error"
+          die 65 "all_preview_failed" "Could not preview all working-tree changes"
+        fi
+        would_commit=$(GIT_INDEX_FILE=$preview_index git diff --cached --name-only -z --no-ext-diff -- | nul_to_json)
+        preview_diff=$(GIT_INDEX_FILE=$preview_index git diff --cached --no-ext-diff --)
+        preview_stat=$(GIT_INDEX_FILE=$preview_index git diff --cached --stat --no-ext-diff --)
+        rm -f -- "$preview_index" "$preview_error"
+        ;;
+    esac
+    [[ $would_commit != '[]' ]] || die 65 "nothing_to_commit" "The requested scope contains no changes"
+    jq -cn \
+      --arg source "$source" \
+      --argjson requested_paths "$requested_paths" \
+      --argjson would_commit "$would_commit" \
+      --arg index "$before_index" \
+      --arg preview_diff "$preview_diff" \
+      --arg preview_stat "$preview_stat" \
+      '{ok:true, operation:"commit", dry_run:true, source:$source, requested_paths:$requested_paths, would_commit:$would_commit, staged_preview:{diff:$preview_diff, stat:$preview_stat}, index:$index, pushed:false}'
+    return
+  fi
+
+  git diff --cached --quiet -- && die 65 "nothing_staged" "No staged changes are available to commit"
+
+  commit_error=$(mktemp "${TMPDIR:-/tmp}/skill-set-git-commit.XXXXXX") || die 70 "temporary_file_failed" "Could not create a temporary error file"
+  if ! git commit --quiet --file="$message_file" >/dev/null 2>"$commit_error"; then
+    rm -f -- "$commit_error"
+    die 70 "commit_failed" "Git could not create the commit; the index was preserved"
+  fi
+  rm -f -- "$commit_error"
+
+  commit_sha=$(git rev-parse HEAD)
+  subject=$(git log -1 --format=%s)
+  after_index=$(index_fingerprint)
+  if [[ $managed_message == true ]]; then
+    discard_managed_input "$message_file" commit-message
+    input_consumed=true
+  fi
+  jq -cn \
+    --arg source "$source" \
+    --argjson requested_paths "$requested_paths" \
+    --arg before_index "$before_index" \
+    --arg after_index "$after_index" \
+    --arg sha "$commit_sha" \
+    --arg subject "$subject" \
+    --argjson input_consumed "$input_consumed" \
+    '{ok:true, operation:"commit", source:$source, requested_paths:$requested_paths, index_before:$before_index, index_after:$after_index, commit:{sha:$sha, subject:$subject}, input_consumed:$input_consumed, pushed:false}'
+}
+
+push_operation() {
+  local expected_remote_sha=
+  local requested_remote=
+  local requested_remote_branch=
+  local dry_run=false
+  local branch remote remote_branch actual canonical_actual rechecked head_sha relation ahead_count
+  local staged unstaged untracked
+  local fetch_error push_error
+
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --expected-remote-sha)
+        [[ $# -ge 2 ]] || die 64 "missing_argument" "--expected-remote-sha requires a SHA or absent"
+        expected_remote_sha=$2
+        shift 2
+        ;;
+      --remote)
+        [[ $# -ge 2 ]] || die 64 "missing_argument" "--remote requires a remote name"
+        requested_remote=$2
+        shift 2
+        ;;
+      --remote-branch)
+        [[ $# -ge 2 ]] || die 64 "missing_argument" "--remote-branch requires a short branch name"
+        requested_remote_branch=$2
+        shift 2
+        ;;
+      --dry-run)
+        dry_run=true
+        shift
+        ;;
+      *) die 64 "unknown_argument" "Unknown push argument: $1" ;;
+    esac
+  done
+
+  [[ -n $expected_remote_sha ]] || die 64 "expected_remote_sha_required" "Inspect first, then pass --expected-remote-sha with the observed SHA or absent"
+  [[ $expected_remote_sha == absent || $expected_remote_sha =~ ^[0-9a-f]{40}$ || $expected_remote_sha =~ ^[0-9a-f]{64}$ ]] || die 64 "invalid_expected_remote_sha" "Expected remote SHA must be a hexadecimal object ID or absent"
+  if [[ -n $requested_remote_branch ]]; then
+    [[ $requested_remote_branch != refs/* ]] || die 64 "invalid_remote_branch" "Use a short remote branch name, not a full ref"
+    git check-ref-format --branch "$requested_remote_branch" >/dev/null 2>&1 || die 64 "invalid_remote_branch" "The remote branch override is not a valid branch name"
+  fi
+
+  branch=$(current_branch)
+  [[ -n $branch ]] || die 65 "detached_head" "A named branch is required"
+  remote=$requested_remote
+  [[ -n $remote ]] || remote=$(git config --get "branch.$branch.remote" 2>/dev/null || true)
+  [[ -n $remote && $remote != . ]] || remote=origin
+  git remote get-url "$remote" >/dev/null 2>&1 || die 66 "remote_not_found" "The requested Git remote does not exist"
+  remote_branch=$requested_remote_branch
+  if [[ -z $remote_branch ]]; then
+    remote_branch=$(git config --get "branch.$branch.merge" 2>/dev/null || true)
+    remote_branch=${remote_branch#refs/heads/}
+    [[ -n $remote_branch ]] || remote_branch=$branch
+  fi
+  head_sha=$(git rev-parse HEAD)
+
+  query_remote_head "$remote" "$remote_branch"
+  actual=$REMOTE_HEAD_SHA
+  canonical_actual=${actual:-absent}
+  if [[ $canonical_actual != "$expected_remote_sha" ]]; then
+    die 75 "remote_changed" "The remote branch changed after inspection; inspect again before pushing"
+  fi
+
+  relation=new
+  ahead_count=$(git rev-list --count HEAD)
+  if [[ -n $actual ]]; then
+    if ! git cat-file -e "$actual^{commit}" 2>/dev/null; then
+      fetch_error=$(mktemp "${TMPDIR:-/tmp}/skill-set-git-fetch.XXXXXX") || die 70 "temporary_file_failed" "Could not create a temporary error file"
+      if ! git fetch --quiet --no-tags "$remote" "refs/heads/$remote_branch" >/dev/null 2>"$fetch_error"; then
+        rm -f -- "$fetch_error"
+        die 69 "remote_fetch_failed" "Could not load the observed remote commit for ancestry verification"
+      fi
+      rm -f -- "$fetch_error"
+    fi
+
+    if [[ $actual == "$head_sha" ]]; then
+      relation=up_to_date
+      ahead_count=0
+    elif git merge-base --is-ancestor "$actual" HEAD; then
+      relation=ahead
+      ahead_count=$(git rev-list --count "$actual..HEAD")
+    elif git merge-base --is-ancestor HEAD "$actual"; then
+      die 65 "remote_ahead" "The remote branch contains commits that are not in the local branch"
+    else
+      die 65 "diverged" "The local and remote branches have diverged"
+    fi
+  fi
+
+  staged=$(staged_json)
+  unstaged=$(unstaged_json)
+  untracked=$(untracked_json)
+  if [[ $dry_run == true ]]; then
+    query_remote_head "$remote" "$remote_branch"
+    rechecked=${REMOTE_HEAD_SHA:-absent}
+    if [[ $rechecked != "$expected_remote_sha" ]]; then
+      die 75 "remote_changed" "The remote branch changed during dry-run verification; inspect again"
+    fi
+    jq -cn \
+      --arg branch "$branch" --arg remote "$remote" --arg remote_branch "$remote_branch" \
+      --arg head_sha "$head_sha" --arg observed_remote_sha "$rechecked" --arg relation "$relation" \
+      --argjson would_push "$([[ $relation == up_to_date ]] && printf false || printf true)" \
+      --argjson ahead_count "$ahead_count" --argjson staged "$staged" --argjson unstaged "$unstaged" --argjson untracked "$untracked" \
+      '{ok:true, operation:"push", dry_run:true, would_push:$would_push, branch:$branch, remote:$remote, remote_branch:$remote_branch, head_sha:$head_sha, observed_remote_sha:$observed_remote_sha, relation:$relation, commits_to_push:$ahead_count, dirty_excluded:{staged:$staged, unstaged:$unstaged, untracked:$untracked}}'
+    return
+  fi
+  if [[ $relation == up_to_date ]]; then
+    jq -cn \
+      --arg branch "$branch" --arg remote "$remote" --arg remote_branch "$remote_branch" \
+      --arg head_sha "$head_sha" --argjson staged "$staged" --argjson unstaged "$unstaged" --argjson untracked "$untracked" \
+      '{ok:true, operation:"push", pushed:false, reason:"up_to_date", branch:$branch, remote:$remote, remote_branch:$remote_branch, head_sha:$head_sha, remote_sha:$head_sha, dirty_excluded:{staged:$staged, unstaged:$unstaged, untracked:$untracked}}'
+    return
+  fi
+
+  query_remote_head "$remote" "$remote_branch"
+  rechecked=${REMOTE_HEAD_SHA:-absent}
+  if [[ $rechecked != "$expected_remote_sha" ]]; then
+    die 75 "remote_changed" "The remote branch changed immediately before push; inspect again"
+  fi
+
+  push_error=$(mktemp "${TMPDIR:-/tmp}/skill-set-git-push.XXXXXX") || die 70 "temporary_file_failed" "Could not create a temporary error file"
+  if ! git push --quiet --set-upstream "$remote" "HEAD:refs/heads/$remote_branch" >/dev/null 2>"$push_error"; then
+    rm -f -- "$push_error"
+    die 69 "push_failed" "The remote rejected the push; no local commit was created"
+  fi
+  rm -f -- "$push_error"
+
+  query_remote_head "$remote" "$remote_branch"
+  [[ $REMOTE_HEAD_SHA == "$head_sha" ]] || die 75 "push_verification_failed" "The remote SHA does not match the pushed local HEAD"
+  jq -cn \
+    --arg branch "$branch" --arg remote "$remote" --arg remote_branch "$remote_branch" \
+    --arg head_sha "$head_sha" --arg remote_sha "$REMOTE_HEAD_SHA" --arg relation "$relation" \
+    --argjson ahead_count "$ahead_count" --argjson staged "$staged" --argjson unstaged "$unstaged" --argjson untracked "$untracked" \
+    '{ok:true, operation:"push", pushed:true, branch:$branch, remote:$remote, remote_branch:$remote_branch, head_sha:$head_sha, remote_sha:$remote_sha, previous_relation:$relation, commits_pushed:$ahead_count, dirty_excluded:{staged:$staged, unstaged:$unstaged, untracked:$untracked}}'
+}
+
+pr_create_operation() {
+  local base=
+  local title=
+  local body_file=
+  local confirm_dirty=false
+  local dry_run=false
+  local branch existing_url gh_error
+  local staged unstaged untracked pr_files commit_count
+  local dirty_count remote remote_branch head_sha observed_remote actual relation ahead_count rechecked
+  local fetch_error push_error created_url pushed=false
+  local managed_body=false input_consumed=false
+
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --base)
+        [[ $# -ge 2 ]] || die 64 "missing_argument" "--base requires a branch name"
+        base=$2
+        shift 2
+        ;;
+      --title)
+        [[ $# -ge 2 ]] || die 64 "missing_argument" "--title requires text"
+        title=$2
+        shift 2
+        ;;
+      --body-file)
+        [[ $# -ge 2 ]] || die 64 "missing_argument" "--body-file requires a path"
+        body_file=$2
+        shift 2
+        ;;
+      --confirm-dirty-excluded)
+        confirm_dirty=true
+        shift
+        ;;
+      --dry-run)
+        dry_run=true
+        shift
+        ;;
+      *) die 64 "unknown_argument" "Unknown pr-create argument: $1" ;;
+    esac
+  done
+
+  [[ -n $base ]] || base=$(default_base)
+  branch=$(current_branch)
+  [[ -n $branch ]] || die 65 "detached_head" "A named branch is required"
+  [[ $branch != "$base" ]] || die 65 "base_branch_checked_out" "Create a pull request from a branch other than the base branch"
+  git show-ref --verify --quiet "refs/remotes/origin/$base" || die 66 "base_not_found" "The remote-tracking base branch is unavailable"
+  if [[ -n $body_file ]] && is_managed_input_candidate "$body_file"; then
+    validate_managed_input "$body_file" pr-body
+    require_managed_input_written "$body_file"
+    chmod 600 "$body_file" 2>/dev/null || die 70 "managed_input_permissions_failed" "Could not secure the managed pull request body"
+    managed_body=true
+  fi
+
+  staged=$(staged_json)
+  unstaged=$(unstaged_json)
+  untracked=$(untracked_json)
+  pr_files=$(git diff --name-only -z --no-ext-diff "origin/$base...HEAD" -- | nul_to_json)
+  commit_count=$(git rev-list --count "origin/$base..HEAD")
+
+  gh_error=$(mktemp "${TMPDIR:-/tmp}/skill-set-git-gh.XXXXXX") || die 70 "temporary_file_failed" "Could not create a temporary error file"
+  if ! existing_url=$(gh pr list --head "$branch" --state open --json url --jq '.[0].url // empty' 2>"$gh_error"); then
+    rm -f -- "$gh_error"
+    die 69 "pr_lookup_failed" "GitHub CLI could not check for an existing pull request"
+  fi
+  rm -f -- "$gh_error"
+
+  if [[ -n $existing_url ]]; then
+    if [[ $managed_body == true ]]; then
+      discard_managed_input "$body_file" pr-body
+      input_consumed=true
+    fi
+    jq -cn \
+      --arg url "$existing_url" --arg branch "$branch" --arg base "$base" --arg range "origin/$base...HEAD" \
+      --argjson files "$pr_files" --argjson commit_count "$commit_count" \
+      --argjson staged "$staged" --argjson unstaged "$unstaged" --argjson untracked "$untracked" \
+      --argjson input_consumed "$input_consumed" \
+      '{ok:true, operation:"pr-create", existing:true, created:false, url:$url, branch:$branch, base:$base, input_consumed:$input_consumed, committed_scope:{range:$range, files:$files, commit_count:$commit_count}, dirty_excluded:{staged:$staged, unstaged:$unstaged, untracked:$untracked}}'
+    return
+  fi
+
+  [[ -n $title ]] || die 64 "title_required" "Provide a pull request title with --title"
+  [[ -n $body_file && -f $body_file && -r $body_file ]] || die 66 "body_file_unreadable" "Provide a readable pull request body with --body-file"
+  [[ -s $body_file ]] || die 65 "empty_pr_body" "The pull request body file is empty"
+  [[ $commit_count -gt 0 ]] || die 65 "no_pr_commits" "There are no committed changes in the pull request range"
+  dirty_count=$(jq -n --argjson staged "$staged" --argjson unstaged "$unstaged" --argjson untracked "$untracked" '$staged + $unstaged + $untracked | length')
+  if [[ $dirty_count -gt 0 && $confirm_dirty == false ]]; then
+    die 65 "dirty_exclusion_unconfirmed" "Dirty files are excluded from the pull request; confirm that exclusion explicitly"
+  fi
+
+  remote=$(git config --get "branch.$branch.remote" 2>/dev/null || true)
+  [[ -n $remote && $remote != . ]] || remote=origin
+  git remote get-url "$remote" >/dev/null 2>&1 || die 66 "remote_not_found" "The branch remote does not exist"
+  remote_branch=$(git config --get "branch.$branch.merge" 2>/dev/null || true)
+  remote_branch=${remote_branch#refs/heads/}
+  [[ -n $remote_branch ]] || remote_branch=$branch
+  head_sha=$(git rev-parse HEAD)
+  query_remote_head "$remote" "$remote_branch"
+  actual=$REMOTE_HEAD_SHA
+  observed_remote=${actual:-absent}
+  relation=new
+  ahead_count=$(git rev-list --count HEAD)
+  if [[ -n $actual ]]; then
+    if ! git cat-file -e "$actual^{commit}" 2>/dev/null; then
+      fetch_error=$(mktemp "${TMPDIR:-/tmp}/skill-set-git-fetch.XXXXXX") || die 70 "temporary_file_failed" "Could not create a temporary error file"
+      if ! git fetch --quiet --no-tags "$remote" "refs/heads/$remote_branch" >/dev/null 2>"$fetch_error"; then
+        rm -f -- "$fetch_error"
+        die 69 "remote_fetch_failed" "Could not load the observed remote commit for ancestry verification"
+      fi
+      rm -f -- "$fetch_error"
+    fi
+    if [[ $actual == "$head_sha" ]]; then
+      relation=up_to_date
+      ahead_count=0
+    elif git merge-base --is-ancestor "$actual" HEAD; then
+      relation=ahead
+      ahead_count=$(git rev-list --count "$actual..HEAD")
+    elif git merge-base --is-ancestor HEAD "$actual"; then
+      die 65 "remote_ahead" "The remote branch contains commits that are not in local HEAD"
+    else
+      die 65 "diverged" "The local and remote branches have diverged"
+    fi
+  fi
+
+  if [[ $dry_run == true ]]; then
+    query_remote_head "$remote" "$remote_branch"
+    rechecked=${REMOTE_HEAD_SHA:-absent}
+    [[ $rechecked == "$observed_remote" ]] || die 75 "remote_changed" "The remote branch changed during pull request dry-run verification"
+    jq -cn \
+      --arg branch "$branch" --arg base "$base" --arg range "origin/$base...HEAD" \
+      --arg remote "$remote" --arg remote_branch "$remote_branch" --arg head_sha "$head_sha" --arg observed_remote_sha "$observed_remote" \
+      --argjson would_push "$([[ $relation == up_to_date ]] && printf false || printf true)" \
+      --argjson files "$pr_files" --argjson commit_count "$commit_count" \
+      --argjson staged "$staged" --argjson unstaged "$unstaged" --argjson untracked "$untracked" \
+      '{ok:true, operation:"pr-create", dry_run:true, existing:false, would_create:true, would_push:$would_push, branch:$branch, base:$base, remote:$remote, remote_branch:$remote_branch, head_sha:$head_sha, observed_remote_sha:$observed_remote_sha, input_consumed:false, committed_scope:{range:$range, files:$files, commit_count:$commit_count}, dirty_excluded:{staged:$staged, unstaged:$unstaged, untracked:$untracked}}'
+    return
+  fi
+
+  if [[ $relation != up_to_date ]]; then
+    query_remote_head "$remote" "$remote_branch"
+    rechecked=${REMOTE_HEAD_SHA:-absent}
+    [[ $rechecked == "$observed_remote" ]] || die 75 "remote_changed" "The remote branch changed immediately before the pull request push"
+    push_error=$(mktemp "${TMPDIR:-/tmp}/skill-set-git-push.XXXXXX") || die 70 "temporary_file_failed" "Could not create a temporary error file"
+    if ! git push --quiet --set-upstream "$remote" "HEAD:refs/heads/$remote_branch" >/dev/null 2>"$push_error"; then
+      rm -f -- "$push_error"
+      die 69 "pr_push_failed" "The committed pull request branch could not be pushed"
+    fi
+    rm -f -- "$push_error"
+    query_remote_head "$remote" "$remote_branch"
+    [[ $REMOTE_HEAD_SHA == "$head_sha" ]] || die 75 "push_verification_failed" "The remote branch does not match the committed pull request HEAD"
+    pushed=true
+  fi
+
+  gh_error=$(mktemp "${TMPDIR:-/tmp}/skill-set-git-gh.XXXXXX") || die 70 "temporary_file_failed" "Could not create a temporary error file"
+  if ! created_url=$(gh pr create --title "$title" --body-file "$body_file" --base "$base" --head "$branch" 2>"$gh_error"); then
+    rm -f -- "$gh_error"
+    die 69 "pr_create_failed" "GitHub CLI could not create the pull request; any reported branch push remains available"
+  fi
+  rm -f -- "$gh_error"
+  [[ -n $created_url ]] || die 70 "missing_pr_url" "GitHub CLI created no discoverable pull request URL"
+  if [[ $managed_body == true ]]; then
+    discard_managed_input "$body_file" pr-body
+    input_consumed=true
+  fi
+
+  jq -cn \
+    --arg url "$created_url" --arg branch "$branch" --arg base "$base" --arg range "origin/$base...HEAD" \
+    --arg remote "$remote" --arg remote_branch "$remote_branch" --arg head_sha "$head_sha" --arg remote_sha "$head_sha" \
+    --argjson pushed "$pushed" --argjson files "$pr_files" --argjson commit_count "$commit_count" \
+    --argjson staged "$staged" --argjson unstaged "$unstaged" --argjson untracked "$untracked" \
+    --argjson input_consumed "$input_consumed" \
+    '{ok:true, operation:"pr-create", existing:false, created:true, pushed:$pushed, url:$url, branch:$branch, base:$base, remote:$remote, remote_branch:$remote_branch, head_sha:$head_sha, remote_sha:$remote_sha, input_consumed:$input_consumed, committed_scope:{range:$range, files:$files, commit_count:$commit_count}, dirty_excluded:{staged:$staged, unstaged:$unstaged, untracked:$untracked}}'
+}
+
+usage() {
+  printf 'Usage: %s input-prepare|input-discard|inspect|commit|push|pr-create [options]\n' "$PROGRAM" >&2
+}
+
+main() {
+  preflight
+  [[ $# -gt 0 ]] || { usage; die 64 "missing_operation" "Choose input-prepare, input-discard, inspect, commit, push, or pr-create"; }
+  OPERATION=$1
+  shift
+  require_repository
+  case $OPERATION in
+    input-prepare) input_prepare_operation "$@" ;;
+    input-discard) input_discard_operation "$@" ;;
+    inspect) inspect_operation "$@" ;;
+    commit) commit_operation "$@" ;;
+    push) push_operation "$@" ;;
+    pr-create) pr_create_operation "$@" ;;
+    *) usage; die 64 "unknown_operation" "Unknown operation: $OPERATION" ;;
+  esac
+}
+
+main "$@"

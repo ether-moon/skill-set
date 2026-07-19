@@ -21,7 +21,7 @@ Runtime totals: **12 skills, 7 legacy commands, 4 PR agents, 0 hooks, 0 MCP serv
 
 | Skill | Description |
 |---|---|
-| `autofixing-and-escalating` | Classifies issues from external sources by clarity of correctness, auto-fixes obvious ones, and escalates ambiguous ones with rationale and recommendations. |
+| `autofixing-and-escalating` | Classifies actionable findings from linters, tests, security scans, audits, and PR reviews as obvious or ambiguous, then applies only explicitly authorized fixes. |
 | `bumping-version` | Bump a project's version with changelog update — auto-detects version files (plugin.json, package.json, pyproject.toml, Cargo.toml, gemspec, VERSION, ...). |
 | `creating-skills` | Guides the full skill lifecycle — creating, evaluating, and optimizing Claude skills. |
 | `developing-test-first` | Enforces strict Red/Green/Refactor TDD discipline before writing production code. |
@@ -29,7 +29,7 @@ Runtime totals: **12 skills, 7 legacy commands, 4 PR agents, 0 hooks, 0 MCP serv
 | `grilling-plans` | Adversarially interrogates an existing plan, design, or proposal before implementation — walks the decision tree one question at a time, provides a recommended answer with each question, prefers codebase exploration over questions, and surfaces contradictions between stated intent and actual code. |
 | `guarding-agent-directives` | Guards agent directive files (CLAUDE.md, AGENTS.md, referenced documents) against bloat by verifying every proposed addition through strict criteria while preserving user authority. |
 | `improving-architecture` | Surfaces deep-module refactor candidates across a codebase using domain vocabulary and Ousterhout's depth/seam framing — applies the deletion test, presents candidates with locality and leverage justifications, and hands off to the `grilling-plans` skill for the chosen candidate's design. |
-| `managing-git-workflow` | Automates git commits, push, and PR creation with context-aware messages that match the project's language and conventions, plus automatic ticket extraction from branch names. |
+| `managing-git-workflow` | Safely inspects repository state and executes explicitly authorized commits, pushes, and pull-request creation through a constrained runner. |
 | `shipping-pr` | Ships a PR end-to-end — creates the PR if missing, polls CI checks and CodeRabbit reviews until they stabilize, then auto-invokes the resolving-pr-blockers agent to fix blockers, and loops on push-triggered re-runs until the PR is clean or max-cycles reached. |
 | `writing-clear-prose` | Guides drafting and revising non-fiction prose — reports, proposals, technical documents, and explanatory text — using four core principles (concreteness, transcreation, steel man, brevity). |
 | `zooming-out-on-code` | Draws a higher-level system map of unfamiliar internal/project code in the project's domain vocabulary — describes the module's responsibility, callers, dependencies, and sibling modules without diving into implementation details. |
@@ -39,9 +39,9 @@ Runtime totals: **12 skills, 7 legacy commands, 4 PR agents, 0 hooks, 0 MCP serv
 | Invocation | Description |
 |---|---|
 | `/skill-set:code:zoom-out` | Draw a higher-level system map of unfamiliar code in the project's domain vocabulary. |
-| `/skill-set:git:commit` | Create a git commit using the managing-git-workflow skill |
-| `/skill-set:git:pr` | Create a pull request using the managing-git-workflow skill |
-| `/skill-set:git:push` | Push changes to remote using the managing-git-workflow skill |
+| `/skill-set:git:commit` | Create a scoped commit without pushing |
+| `/skill-set:git:pr` | Create or find a pull request from committed changes |
+| `/skill-set:git:push` | Push existing commits with remote SHA protection |
 | `/skill-set:plan:grill` | Adversarially interrogate an existing plan or design before implementation. |
 | `/skill-set:pr:fix` | Resolve all PR blockers — CI failures, merge conflicts, and review feedback |
 | `/skill-set:pr:ship` | Ship a PR end-to-end — create (if needed), poll CI and CodeRabbit, auto-fix blockers, repeat until clean |
@@ -61,6 +61,7 @@ Runtime totals: **12 skills, 7 legacy commands, 4 PR agents, 0 hooks, 0 MCP serv
 plugins/skill-set/
 ├── .claude-plugin/plugin.json
 ├── agents/                     # generated table above
+├── bin/                        # deterministic mutation executors
 ├── commands/                   # nested legacy command names
 ├── evals/                      # official plugin eval cases
 ├── scripts/                    # inventory and eval tooling

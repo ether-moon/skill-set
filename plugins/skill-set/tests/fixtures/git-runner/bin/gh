@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+[[ $# -ge 2 && $1 == pr ]] || { printf 'unsupported mock gh command\n' >&2; exit 2; }
+
+case $2 in
+  list)
+    if [[ -n ${MOCK_GH_EXISTING_URL:-} ]]; then
+      printf '%s\n' "$MOCK_GH_EXISTING_URL"
+    fi
+    ;;
+  create)
+    shift 2
+    title=
+    body_file=
+    base=
+    head=
+    while [[ $# -gt 0 ]]; do
+      case $1 in
+        --title) title=$2; shift 2 ;;
+        --body-file) body_file=$2; shift 2 ;;
+        --base) base=$2; shift 2 ;;
+        --head) head=$2; shift 2 ;;
+        *) printf 'unsupported mock gh argument: %s\n' "$1" >&2; exit 2 ;;
+      esac
+    done
+    [[ -n ${MOCK_GH_LOG:-} ]] || { printf 'MOCK_GH_LOG is required\n' >&2; exit 2; }
+    jq -cn \
+      --arg title "$title" \
+      --arg body "$(<"$body_file")" \
+      --arg body_file "$body_file" \
+      --arg base "$base" \
+      --arg head "$head" \
+      '{command:"pr-create", title:$title, body:$body, body_file:$body_file, base:$base, head:$head}' >>"$MOCK_GH_LOG"
+    printf '%s\n' "${MOCK_GH_CREATED_URL:-https://example.invalid/pull/1}"
+    ;;
+  *) printf 'unsupported mock gh pr command: %s\n' "$2" >&2; exit 2 ;;
+esac
