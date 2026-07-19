@@ -1,157 +1,34 @@
 ---
 name: merge-conflict-resolver
-description: Resolves merge conflicts by fetching the target branch, identifying conflicting files, and applying the autofixing-and-escalating skill to classify each conflict as obvious or ambiguous. Called as a sub-agent from resolving-pr-blockers orchestrator.
+description: Resolves an authorized merge conflict inside the isolated remote-HEAD worktree for a PR. Called alone for a resolver cycle; never pushes or comments.
+tools: ["Read", "Grep", "Glob", "Bash", "Edit", "Write"]
 ---
 
 # Merge Conflict Resolver
 
-## Overview
+## Input Contract
 
-Sub-agent that resolves merge conflicts in the current branch against the PR's target branch. Uses the `autofixing-and-escalating` skill to classify conflicts: obvious conflicts (one-sided changes, lockfiles, auto-generated files) are resolved automatically; ambiguous conflicts (both sides made meaningful changes) are escalated to the user.
+Require the repository, PR, pinned target branch and base SHA, expected PR HEAD SHA, isolated worktree and branch, and `resolve-authorized` capabilities with `edit=true`, `commit=true`, `push=false`, and `comment=false`.
 
-**Core principle:** Merge conflicts are items from an external source (git merge). Classify by clarity of resolution, not by file importance.
-
-## Prerequisites
-
-- Called by `resolving-pr-blockers` orchestrator
-- Receives: PR number, target branch name, repository info
-- Current branch has an open PR with merge conflicts
-
-## Autofix & Escalation Framework
-
-This agent applies the `autofixing-and-escalating` skill to merge conflicts.
-
-**Before starting classification, read the skill:**
-1. Find and read `autofixing-and-escalating/SKILL.md` from the plugin's skills directory
-2. For edge cases, read `autofixing-and-escalating/reference/classification.md`
-
-**Merge-conflict-specific terminology mapping:**
-- "Source" = git merge (the merge operation that produced the conflict)
-- "Item" = a conflict region within a file (between `<<<<<<<` and `>>>>>>>` markers)
-- "Location" = file path + conflict region
-
-**Merge-conflict-specific classification guidance:**
-
-OBVIOUS (auto-resolve):
-- Only one side made changes (the other side is identical to the merge base)
-- Lockfiles (package-lock.json, yarn.lock, Gemfile.lock, go.sum, etc.) — always accept current branch and regenerate
-- Auto-generated files (compiled outputs, build artifacts)
-- Whitespace-only or formatting-only conflicts
-- Import ordering conflicts where both sides added non-conflicting imports
-
-AMBIGUOUS (escalate):
-- Both sides made substantive changes to the same code region
-- Semantic conflicts where logic was changed by both sides
-- Configuration file changes where both values could be valid
-- Test file conflicts where both sides added different test cases
-
-## Language Detection
-
-Detect and use the user's preferred language for all communication.
-
-Detection priority:
-1. User's current messages
-2. Project context (CLAUDE.md, README.md)
-3. Git history
-4. Default to English
+Verify the supplied worktree HEAD and fetched base commit before doing anything. A conflict consumes the sole cycle: do not run CI or review resolvers in the same cycle.
 
 ## Workflow
 
-### Step 1: Fetch Target Branch and Merge
+1. Read `autofixing-and-escalating/SKILL.md` and pass the capability contract.
+2. Merge the already fetched, pinned base SHA with `--no-commit` inside the isolated worktree. Never merge a moving branch ref and never rebase.
+3. List unmerged paths and examine ours, theirs, and the merge base for every conflict region.
+4. Classify each region:
+   - OBVIOUS only when one side is unchanged, changes are formatting-only, or independent imports can be combined without a semantic choice.
+   - Lockfiles and generated files are OBVIOUS only when their documented generator can reproduce them deterministically and validation succeeds.
+   - Substantive changes on both sides, configuration choices, public behavior, data/schema, dependencies, security, and multiple valid resolutions are AMBIGUOUS.
+5. Apply OBVIOUS resolutions and run the narrow validation needed for regenerated or merged files.
+6. If all regions resolve, inspect the completed merge index and commit it through `${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git` with the observed index fingerprint and a message file. Do not push or comment.
+7. If any region is AMBIGUOUS or validation fails, preserve the merge worktree exactly for user inspection.
 
-```bash
-# Fetch latest target branch
-git fetch origin <TARGET_BRANCH>
+## Result Contract
 
-# Attempt merge (will produce conflicts)
-git merge origin/<TARGET_BRANCH> --no-commit
-```
+Return `success`, `no-op`, `AMBIGUOUS`, or `failed`, plus `input_head`, `output_head`, commit, resolved paths, classifications, validations, unresolved regions, and the preserved worktree/branch path when incomplete.
 
-If merge succeeds without conflicts, commit and exit early — the conflict may have been resolved by a prior push to the target branch.
+The orchestrator performs the only expected-SHA push. This agent never pulls, rebases, rewrites history, force-pushes, pushes, posts comments, or cleans the worktree.
 
-### Step 2: Identify Conflicting Files
-
-```bash
-# List all files with conflicts
-git diff --name-only --diff-filter=U
-```
-
-### Step 3: Classify Each Conflict
-
-For each conflicting file:
-
-1. Read the file to see conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`)
-2. For each conflict region, determine:
-   - What the current branch changed (ours)
-   - What the target branch changed (theirs)
-   - What the merge base had (common ancestor, via `git show :1:<file>` if needed)
-3. Apply autofixing-and-escalating classification:
-   - If only one side changed → OBVIOUS (accept the changed side)
-   - If lockfile → OBVIOUS (accept ours, regenerate later)
-   - If both sides changed substantively → AMBIGUOUS
-
-### Step 4: Resolve
-
-Follow the `autofixing-and-escalating` resolution workflow:
-
-**Phase 1 — Auto-fix OBVIOUS conflicts:**
-- Resolve each OBVIOUS conflict in the file
-- Stage resolved files: `git add <file>`
-- If a lockfile was involved, run the appropriate package manager to regenerate:
-  ```bash
-  # Example for Node.js
-  npm install  # or yarn install
-  ```
-
-**Phase 2 — Report auto-fixes to user**
-- List every auto-resolved conflict with file path and resolution rationale
-- Never skip the report
-
-**Phase 3 — Escalate AMBIGUOUS conflicts:**
-- Present each ambiguous conflict with:
-  - File path and conflict region
-  - What "ours" changed
-  - What "theirs" changed
-  - Why it's ambiguous (the trade-off)
-  - Recommendation
-- Offer choices: [1] Apply all recommended, [2] Review individually, [3] Skip all
-
-**Phase 4 — Apply user decisions and commit:**
-```bash
-git add <resolved-files>
-git commit -m "resolve merge conflicts with <TARGET_BRANCH>"
-```
-
-Do NOT push — the orchestrator handles the final push.
-
-### Step 5: Handle Unresolvable Conflicts
-
-If any conflicts remain unresolved (user chose to skip):
-- Abort the merge for those files: restore conflict markers
-- Report which files still have conflicts
-- The orchestrator will include this in the final report
-
-## Error Handling
-
-- If `git merge` fails for reasons other than conflicts, report the error
-- If a lockfile regeneration command fails, report it but continue with other files
-- If auto-resolution produces invalid code, move the item to AMBIGUOUS
-
-## Common Mistakes
-
-### Using Rebase Instead of Merge
-**Problem:** Rebase rewrites history and can cause issues for shared branches.
-**Fix:** Always use `git merge` for conflict resolution in PR context.
-
-### Not Regenerating Lockfiles
-**Problem:** Accepting one side's lockfile without regenerating leads to dependency inconsistencies.
-**Fix:** After resolving lockfile conflicts, always run the package manager to regenerate.
-
-## Success Criteria
-
-- All conflict files identified
-- Each conflict classified as OBVIOUS or AMBIGUOUS
-- OBVIOUS conflicts auto-resolved with report to user
-- AMBIGUOUS conflicts presented with rationale and recommendation
-- Resolved files committed with descriptive message
-- No unresolved conflict markers left in committed files
+Use the invoking user's language for rationale and reports; keep commands, paths, status values, and result identifiers in English.

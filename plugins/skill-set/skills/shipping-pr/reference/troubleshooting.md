@@ -1,25 +1,41 @@
-# Troubleshooting — Common Mistakes
+# Troubleshooting
 
-## Skipping the new-SHA check-runs wait
-**Problem:** `gh pr checks --watch` runs immediately after push and reports the previous SHA's completed checks as final, declaring the cycle clean prematurely.
-**Fix:** Always poll `repos/{o}/{r}/commits/{NEW_SHA}/check-runs` for `total_count > 0` (with 60 s budget) before entering `--watch`.
+## Active run or lock
 
-## Treating a CodeRabbit review timeout as "clean"
-**Problem:** Step 4 waits a fixed time for CodeRabbit, but CodeRabbit's review can take longer (~15 min observed). On timeout the loop sees no review comments, and Step 7 declares the PR clean — when in fact CodeRabbit simply had not finished. The fix ping-pong silently ends one review short.
-**Fix:** Poll the `CodeRabbit` commit status (`context == "CodeRabbit"`) on `TARGET_SHA` until it leaves `pending`; that terminal state is the real completion signal. If the 30-min cap is hit while still pending, carry `REVIEW_VERIFIED=false` so Step 7 exits "not verified" instead of "clean".
+Use `init --resume` when state reports an active run. A lock-directory error means another operation is updating the same PR state. Wait for it to finish. Remove a stale lock only after confirming no runner process is active.
 
-## Watching advisory checks
-**Problem:** `gh pr checks --watch` blocks on never-completing advisory checks (codecov pending, preview deploys).
-**Fix:** Use `--required` (default) unless user explicitly opts out.
+## Compare-and-swap rejection
 
-## Treating `mergeable == UNKNOWN` as clean
-**Problem:** GitHub computes mergeability lazily; a cold cache returns UNKNOWN and the loop misclassifies as clean.
-**Fix:** Sleep 3 s and re-query once when UNKNOWN, matching the existing `resolving-pr-blockers` convention.
+Another snapshot or transition won the race. Reload the state and continue from its `run_id` and `status`; never overwrite the file manually.
 
-## Trying to compare blocker sets across cycles
-**Problem:** Hard to distinguish "same blocker, different test" from "exact same failure". Easy to false-positive (premature exit) or false-negative (infinite loop).
-**Fix:** Use the simple "did the resolver produce a new commit?" signal. If yes, run another cycle; if no, stop.
+## HEAD changed during a snapshot
 
-## Using a fixed sleep after push
-**Problem:** GitHub registration latency varies; any fixed value is wrong somewhere.
-**Fix:** Poll `check-runs` count instead of sleeping.
+The returned results were discarded intentionally. Call `snapshot` again. The check deadline, review deadline, and check-registration grace were reset for the new HEAD.
+
+## Interrupted resolver run
+
+A resumed `resolving` state must use `.resolution.worktree`, `.resolution.branch`, pinned SHAs, expected agents, and `.resolution.publication`; never launch a second resolver. For `prepared`, `gate_passed`, or `commenting`, call `publish` with the same recorded files and expected local HEAD. It reconciles an already-pushed HEAD and searches the stable hidden marker before commenting. For `pending`, the resolver was interrupted before a safe result set was journaled: report the paths and transition with `--resolver-attempt --resolver-result partial-failure` to `awaiting_user`. Use `failed` only when recovery is impossible. A resumed `awaiting_user` state stays paused until the user explicitly chooses how to continue.
+
+## Pending or unknown checks
+
+Pending, cancelled, unknown, and timed-out checks are never clean. Report their buckets and deadline. Do not dispatch a code resolver for a merely pending check.
+
+## CodeRabbit absent
+
+When CodeRabbit is required, an absent current-HEAD status is treated as not yet registered until the review deadline. If auto-detection was wrong, start a new run with an explicit `--coderabbit-required false`; do not mutate active state.
+
+## Resolver failure
+
+Do not push partial commits. Preserve the isolated worktree and branch, report their paths and the expected remote SHA, and transition to `awaiting_user` or `failed`.
+
+## PR head or remote binding changed
+
+The recorded PR head repository, branch, and host are compare-and-swap inputs, not hints. For a fork, configure the selected remote's push URL for the fork repository. On `head_branch_mismatch`, `remote_binding_mismatch`, or `pr_head_binding_changed`, do not push or comment: take a fresh snapshot, verify the live head repository/ref, and begin a new resolver attempt with the correctly bound remote.
+
+## Publication failure
+
+Keep the worktree, results file, summary file, and publication journal. Never bypass `skill-set-pr publish`. A `prepared` state may safely reconcile whether the expected-SHA push took effect; `gate_passed` and `commenting` never push again. If the remote is neither the pinned old HEAD nor recorded local HEAD, stop for user inspection.
+
+## Structured runner error
+
+The runner emits failure JSON on stderr with `error.code`, `error.message`, and `error.recovery`. Follow the recovery field and retain the JSON in the final report.

@@ -1,182 +1,118 @@
 ---
 name: bumping-version
-description: Bump a project's version with changelog update — auto-detects version files (plugin.json, package.json, pyproject.toml, Cargo.toml, gemspec, VERSION, ...). Use when user says "bump", "version up", or "release". Per-repo policy (base branch, extra files, commit message) read from CLAUDE.md / AGENTS.md.
+description: Inspects, previews, prepares, and direct-pushes approved semantic-version Git commits with consistent manifests and policy-driven changelog updates. Use when the user asks to bump a version, choose patch/minor/major, prepare a release commit, reconcile a release operation, or push an approved version commit to a base branch. Do not use for package-registry publishing, deployment, or tagging an already-versioned commit.
+allowed-tools: "Bash(${CLAUDE_PLUGIN_ROOT}/bin/skill-set-release:*)"
 ---
 
 # Bumping Version
 
-Bump a project's version, update its changelog, commit on top of the latest base branch, and either push directly or fall back to opening a PR if the base is protected.
+Use the bundled release runner for all inspection and mutation. It reads one immutable base snapshot, isolates preparation from the user's checkout, binds preparation to an accepted preview, and requires separate approval before publication.
 
-The skill is repo-agnostic. Per-repo policy lives in `CLAUDE.md` / `AGENTS.md` under a `## Versioning` section. Defaults apply when the section is absent.
+## Dependencies and policy
+
+The runner preflights Bash 3.2 or newer, `git`, `gh`, and `jq`. Report `MISSING_DEPENDENCY` and stop.
+
+It reads the committed `## Versioning` policy from the base snapshot:
+
+- `Base branch`
+- `Commit message`, with a `{version}` placeholder
+- `Extra version files`, as comma-separated repository-relative paths
+- `Changelog categories`, defaulting to `Added, Improved, Fixed`
+
+Supported manifests include Claude plugin and package JSON, `pyproject.toml`, `Cargo.toml`, Python `__version__`, gemspecs, Ruby `VERSION`, root `VERSION` and `version.txt`, plus configured extra files.
 
 ## Workflow
 
-### 0. Preflight & worktree setup
+### 1. Inspect the immutable base
 
-1. **Determine the base branch:**
-   - First check the repo's `## Versioning` section for `Base branch:`.
-   - Fall back to `git symbolic-ref refs/remotes/origin/HEAD | sed 's|.*/||'` (e.g., `main`).
-
-2. **Sync the base:**
+Run:
 
 ```bash
-git fetch origin <base>
+"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-release" inspect --repo .
 ```
 
-3. **Create a temporary worktree on the latest base.** This isolates the bump from the user's current checkout — no preflight cleanliness required.
+Pass `--base BRANCH` only when the user selected a base. With `origin`, the runner resolves and fetches its latest exact base SHA. Without `origin`, it uses the committed local base. Dirty files and other local branches never supply release input.
+
+Report `base`, `base_sha`, manifests, mismatches, changelog status, policy, and `recent_commits`. Stop on mismatch, unsupported versions, missing manifests, or missing `CHANGELOG.md`; never choose a source of truth silently.
+
+### 2. Preview
+
+Recommend a semantic-version level from the inspected commits and ask the user to choose `patch`, `minor`, or `major`. A generic release request is not approval.
+
+Run the selected dry preview:
 
 ```bash
-WT_PATH=".git/worktrees/bump-$(date +%s)"
-git worktree add "$WT_PATH" "origin/<base>"
+"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-release" prepare --repo . --level patch --dry-run
 ```
 
-All subsequent steps use `git -C "$WT_PATH" ...`.
+Preserve an explicit `--base`. For a user-provided changelog entry or commit message, add `--changelog-file PATH` or `--message-file PATH` to both preview and prepare. Relative paths are resolved from the caller directory; the runner owns immutable copies during preparation.
 
-### 1. Analyze changes since last bump
+Show `base_sha`, `version`, `changed_paths`, `changelog_entry`, `changelog_categories`, and `commit_message`. Retain `base_sha` and `input_digest` exactly; together they identify the accepted preview.
 
-Run two separate Bash calls (no `$(...)` substitution — Claude Code blocks it):
+### 3. Prepare with compare-and-swap
+
+After the user accepts the preview, run the same arguments without `--dry-run` and add both preview values:
 
 ```bash
-# Call 1: find last bump commit on base
-git -C "$WT_PATH" log --oneline --grep="^chore: bump\|^chore: release" -1 --format="%H" origin/<base>
+"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-release" prepare --repo . --level patch \
+  --expected-base-sha BASE_SHA \
+  --expected-input-digest INPUT_DIGEST
 ```
 
-Read the SHA from the output. If empty, treat the first commit on base as the start. Then:
+The runner stops before creating a worktree if the remote base, policy, manifests, date, or managed input changed. Otherwise it creates an external temporary worktree and local `skill-set/release-v...` branch, updates every discovered manifest plus `CHANGELOG.md`, stages only those paths, commits once, and verifies the final commit scope after hooks.
+
+Present `base`, `base_sha`, `version`, `commit_sha`, `changed_paths`, and the complete `diff`. Preserve `state_file` and `commit_sha` as publication inputs.
+
+### 4. Ask for publication approval
+
+Ask one explicit question in the user's language:
+
+```text
+Push prepared commit COMMIT_SHA directly to origin/BASE now?
+```
+
+If declined, keep the commit and branch but remove the worktree:
 
 ```bash
-# Call 2: list commits since last bump (replace <SHA> with output from Call 1)
-git -C "$WT_PATH" log --oneline <SHA>..origin/<base>
+"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-release" cleanup --state-file STATE_FILE --mode declined
 ```
 
-Reading from `origin/<base>` ensures the changelog reflects only merged commits.
+### 5. Publish and clean up
 
-### 2. Load repo context
-
-Read the `## Versioning` section (case-insensitive header match) from `CLAUDE.md` first, then `AGENTS.md`. Recognized keys (all optional):
-
-- `Base branch:` — overrides auto-detection.
-- `Commit message:` — template; `{version}` placeholder replaced. Default: `chore: bump version to {version}`.
-- `Extra version files:` — comma-separated paths to also update (in addition to auto-detected ones).
-- `Changelog categories:` — override defaults (`Added`, `Improved`, `Fixed`).
-
-If the section is missing, all defaults apply.
-
-### 3. Detect version files & current version
-
-Scan in order, list every file found and its current version:
-
-| Ecosystem | File pattern | Field |
-|---|---|---|
-| Claude plugin | `**/.claude-plugin/plugin.json` | `.version` (JSON) |
-| Node | `package.json` | `.version` (JSON) |
-| Python (modern) | `pyproject.toml` | `[project].version` or `[tool.poetry].version` |
-| Python (legacy) | `**/__init__.py` | line `__version__ =` |
-| Rust | `Cargo.toml` | `[package].version` |
-| Ruby | `*.gemspec`, `lib/**/version.rb` | `spec.version =` / `VERSION =` |
-| Generic | `VERSION`, `version.txt` (root only) | whole file (one line) |
-| Repo-specified | from `Extra version files:` | regex `version[:= ]+"?(\d+\.\d+\.\d+)"?` |
-
-Display the discovered files with their current version.
-
-### 4. Verify version consistency
-
-All discovered files must show the same current version. If any differ, stop and ask which to take as truth before proceeding.
-
-### 5. Suggest semver level
-
-Based on the commit list, recommend `patch` / `minor` / `major` with one-line rationale, then ask the user to choose. Use the user's language for the prompt.
-
-```
-[In user's language]
-
-Changes since last bump:
-- [commit summary 1]
-- [commit summary 2]
-
-Current version: X.Y.Z
-Suggested: <patch|minor|major> (reason)
-
-Which level?
-- [1] patch
-- [2] minor
-- [3] major
-```
-
-### 6. Update files
-
-Apply the new version to every discovered manifest. For changelog (`CHANGELOG.md` at repo root):
-
-- Format: Keep a Changelog (`## [X.Y.Z] - YYYY-MM-DD`).
-- New entry prepended after the file header, before the previously-latest entry.
-- Categories from context (default `Added` / `Improved` / `Fixed`).
-- Date is today.
-
-If `CHANGELOG.md` is absent, ask whether to create it; declining skips the changelog step.
-
-### 7. Commit
-
-Inside worktree: stage all updated files + changelog, create a single commit. Message uses the repo context template (default `chore: bump version to X.Y.Z`).
+Only after an affirmative answer, run:
 
 ```bash
-git -C "$WT_PATH" add -A
-git -C "$WT_PATH" commit -m "chore: bump version to X.Y.Z"
+"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-release" publish --state-file STATE_FILE \
+  --expected-commit COMMIT_SHA --approve
 ```
 
-### 8. Push or PR fallback
+The runner verifies state, origin identity, and remote base SHA before a normal direct push. It never force-pushes or creates a pull request fallback.
+
+On success:
 
 ```bash
-# 1st attempt: push directly to base
-git -C "$WT_PATH" push origin HEAD:<base>
+"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-release" cleanup --state-file STATE_FILE --mode success
 ```
 
-If push **succeeds** → proceed to cleanup.
-
-If push **fails**, capture stderr and check for a protection-error pattern (regex `GH006|protected branch|remote rejected|hook declined`). On match, fall back to PR:
+On authentication, protection, or base-race failure, preserve both recovery artifacts:
 
 ```bash
-git -C "$WT_PATH" branch bump-version-X.Y.Z
-git -C "$WT_PATH" push -u origin bump-version-X.Y.Z
-gh -C "$WT_PATH" pr create \
-  --base <base> \
-  --head bump-version-X.Y.Z \
-  --title "chore: bump version to X.Y.Z" \
-  --body "$(cat <<'EOF'
-## Changelog
-
-<paste the new CHANGELOG entry here>
-EOF
-)"
+"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-release" cleanup --state-file STATE_FILE --mode failure
 ```
 
-Emit the PR URL to the user.
+If publication or cleanup completed externally but state persistence failed, retry the same command. The runner reconciles an exact remote commit and already-removed exact worktree or branch idempotently.
 
-If the failure does **not** match the protection pattern (e.g., network error, auth issue), report the error verbatim, leave the worktree for inspection, and stop.
+If the user later requests a pull request, treat that as a new `/skill-set:git:pr` request; do not initiate it here.
 
-### 9. Cleanup
+## Errors
 
-```bash
-git worktree remove "$WT_PATH"
-```
+Failures are JSON on stderr with `error.code`, `error.message`, and `error.recovery`.
 
-Always print the original branch name back to the user so they know nothing changed in their working tree.
+- `BASE_RACE`, `INPUT_CHANGED`: discard the old preview and run a new dry preview.
+- `VERSION_MISMATCH`, `CHANGELOG_MISSING`: resolve repository content before retrying.
+- `APPROVAL_REQUIRED`: ask the user; never add approval yourself.
+- `COMMIT_SCOPE_MISMATCH`, `POST_COMMIT_WORKTREE_DIRTY`: preserve and inspect the isolated branch and worktree.
+- `PUSH_AUTH_FAILED`, `PUSH_PROTECTED`, `PUSH_FAILED`: report recovery paths and stop.
+- `STATE_WRITE_FAILED`: restore state-directory writes, then retry the exact publish or cleanup command.
 
-## Rules
-
-- Bump commit is always its own commit (never mixed with other work).
-- Changelog date is today.
-- Version inconsistency across manifests blocks automatic progress — always ask.
-- Never `--force` push.
-- If `gh` is missing or unauthenticated when PR fallback is needed, instruct the user to run `gh auth login` and re-run the skill; do not silently fail.
-
-## Repo-context interface (example)
-
-In `CLAUDE.md` or `AGENTS.md`:
-
-```markdown
-## Versioning
-
-- **Base branch**: main
-- **Commit message**: chore: bump version to {version}
-- **Extra version files**: docs/install.md
-- **Changelog categories**: Added, Improved, Fixed
-```
+Use the user's language for recommendations, approval prompts, errors, and reports. Keep arguments, paths, branch names, and JSON fields unchanged.

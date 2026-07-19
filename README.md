@@ -22,7 +22,7 @@ Runtime totals: **12 skills, 7 legacy commands, 4 PR agents, 0 hooks, 0 MCP serv
 | Skill | Description |
 |---|---|
 | `autofixing-and-escalating` | Classifies actionable findings from linters, tests, security scans, audits, and PR reviews as obvious or ambiguous, then applies only explicitly authorized fixes. |
-| `bumping-version` | Bump a project's version with changelog update — auto-detects version files (plugin.json, package.json, pyproject.toml, Cargo.toml, gemspec, VERSION, ...). |
+| `bumping-version` | Inspects, previews, prepares, and direct-pushes approved semantic-version Git commits with consistent manifests and policy-driven changelog updates. |
 | `creating-skills` | Guides the full skill lifecycle — creating, evaluating, and optimizing Claude skills. |
 | `developing-test-first` | Enforces strict Red/Green/Refactor TDD discipline before writing production code. |
 | `driving-with-tests` | Guides test strategy beyond TDD — running suites before changes (orient), exploring beyond test coverage (probe), guarding tests as specification, and designing multi-layer test architectures. |
@@ -30,7 +30,7 @@ Runtime totals: **12 skills, 7 legacy commands, 4 PR agents, 0 hooks, 0 MCP serv
 | `guarding-agent-directives` | Guards agent directive files (CLAUDE.md, AGENTS.md, referenced documents) against bloat by verifying every proposed addition through strict criteria while preserving user authority. |
 | `improving-architecture` | Surfaces deep-module refactor candidates across a codebase using domain vocabulary and Ousterhout's depth/seam framing — applies the deletion test, presents candidates with locality and leverage justifications, and hands off to the `grilling-plans` skill for the chosen candidate's design. |
 | `managing-git-workflow` | Safely inspects repository state and executes explicitly authorized commits, pushes, and pull-request creation through a constrained runner. |
-| `shipping-pr` | Ships a PR end-to-end — creates the PR if missing, polls CI checks and CodeRabbit reviews until they stabilize, then auto-invokes the resolving-pr-blockers agent to fix blockers, and loops on push-triggered re-runs until the PR is clean or max-cycles reached. |
+| `shipping-pr` | Drives an existing or newly requested pull request through deterministic CI, review, and blocker-resolution cycles until it is verified clean or reaches a terminal stop. |
 | `writing-clear-prose` | Guides drafting and revising non-fiction prose — reports, proposals, technical documents, and explanatory text — using four core principles (concreteness, transcreation, steel man, brevity). |
 | `zooming-out-on-code` | Draws a higher-level system map of unfamiliar internal/project code in the project's domain vocabulary — describes the module's responsibility, callers, dependencies, and sibling modules without diving into implementation details. |
 
@@ -43,17 +43,17 @@ Runtime totals: **12 skills, 7 legacy commands, 4 PR agents, 0 hooks, 0 MCP serv
 | `/skill-set:git:pr` | Create or find a pull request from committed changes |
 | `/skill-set:git:push` | Push existing commits with remote SHA protection |
 | `/skill-set:plan:grill` | Adversarially interrogate an existing plan or design before implementation. |
-| `/skill-set:pr:fix` | Resolve all PR blockers — CI failures, merge conflicts, and review feedback |
-| `/skill-set:pr:ship` | Ship a PR end-to-end — create (if needed), poll CI and CodeRabbit, auto-fix blockers, repeat until clean |
+| `/skill-set:pr:fix` | Resolve PR blockers in one isolated, publication-gated cycle |
+| `/skill-set:pr:ship` | Ship a PR through resumable CI, review, and blocker-resolution cycles |
 
 ### PR Agents
 
 | Agent | Description |
 |---|---|
-| `ci-failure-resolver` | Analyzes and fixes CI workflow failures by extracting logs from failed GitHub Actions runs, parsing error patterns, and applying the autofixing-and-escalating skill. |
-| `merge-conflict-resolver` | Resolves merge conflicts by fetching the target branch, identifying conflicting files, and applying the autofixing-and-escalating skill to classify each conflict as obvious or ambiguous. |
-| `pr-review-feedback` | Processes PR review comments — classifies feedback as obvious or ambiguous using the autofixing-and-escalating skill, auto-fixes obvious items, discusses ambiguous items with rationale and recommendation. |
-| `resolving-pr-blockers` | Resolves all PR blockers — CI failures, merge conflicts, and review feedback. |
+| `ci-failure-resolver` | Analyzes current-HEAD CI failures and applies authorized, unambiguous fixes inside a resolver worktree. |
+| `merge-conflict-resolver` | Resolves an authorized merge conflict inside the isolated remote-HEAD worktree for a PR. |
+| `pr-review-feedback` | Processes unresolved actionable PR review threads on the current HEAD inside an authorized resolver worktree. |
+| `resolving-pr-blockers` | Resolves one authorized PR-blocker cycle in an isolated remote-HEAD worktree, then performs a single publication gate. |
 
 ### Standard Layout
 

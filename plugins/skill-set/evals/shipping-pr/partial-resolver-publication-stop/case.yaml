@@ -1,0 +1,26 @@
+schema_version: "1.1"
+name: shipping-pr-partial-resolver-publication-stop
+description: Plans fail-closed publication and recovery for a partial resolver cycle
+tags:
+  - shipping-pr
+  - functional
+  - read-only
+execution:
+  max_turns: 6
+  timeout_seconds: 240
+  allowed_tools:
+    - Skill
+    - Read
+runs: 3
+graders:
+  - type: tool_used
+    name: selected-shipping-pr
+    tool: Skill
+    input_match: shipping-pr
+    min: 1
+  - type: tool_used
+    name: no-mutation-tool
+    tool: Bash
+    min: 0
+    max: 0
+    arm: both

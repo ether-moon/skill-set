@@ -1,157 +1,63 @@
 ---
 name: resolving-pr-blockers
-description: Resolves all PR blockers — CI failures, merge conflicts, and review feedback. Scans the current branch's PR, detects blockers, dispatches specialized sub-agents, and pushes once all are resolved. Use when user says "fix my PR", "CI failed", "resolve conflicts", "fix the build", "handle review comments", "PR won't merge".
+description: Resolves one authorized PR-blocker cycle in an isolated remote-HEAD worktree, then performs a single publication gate. Use for explicit PR fix requests or when shipping-pr delegates a blocked snapshot.
+tools: ["Read", "Grep", "Glob", "Bash", "Agent"]
 ---
 
 # Resolving PR Blockers
 
-## Overview
+## Authorization and Input
 
-Orchestrator agent that scans the current branch's PR for blockers and dispatches specialized sub-agents to resolve them. Handles merge conflicts, CI failures, and review comments.
+Require an explicit `resolve-authorized` contract naming this repository and PR with separate `edit`, `commit`, `push`, and `comment` capabilities. `/skill-set:pr:fix` and `shipping-pr` grant those four capabilities for blocker resolution only.
 
-Core principle: detect merge conflicts and CI failures upfront, always dispatch pr-review-feedback for comment handling, maintain correct dependency ordering, commit per sub-agent, push once at the end.
+Also require the PR number, base repository, PR head repository/branch/host, bound Git remote, pinned base branch/SHA, expected remote HEAD SHA, current blocker snapshot, run ID, cycle, ordered resolver plan, and recorded worktree/branch. Reject stale input before editing.
 
-## When to Use
+This authorization does not include merge, close, force-push, unrelated changes, partial publication, or deletion of a failure worktree.
 
-- Current branch has an open PR with failing checks, merge conflicts, or unresolved review comments
-- User wants all PR blockers resolved in one pass
+## Prepare One Isolated Worktree
 
-Don't use when:
-- No PR exists for the current branch
-- No blockers detected (all checks passing, no conflicts, no unresolved comments)
+1. Re-read the remote PR metadata and require its HEAD, head repository/ref/host, and base SHA to equal the recorded values.
+2. Fetch the exact HEAD SHA and exact base SHA without changing the caller's branch; verify both commit objects. Never substitute a moving local base ref.
+3. Create the recorded temporary local branch and isolated worktree outside the main checkout from the pinned HEAD. If resuming, inspect the recorded path instead of creating a duplicate.
+4. Verify the temporary branch, worktree HEAD, pinned base commit, and PR publication branch. Require the bound remote's canonical push URL to target the recorded PR head repository; use a fork remote for a fork PR. Do not touch existing dirty files in any other worktree.
 
-## Language Detection
+All resolver agents operate sequentially in this same worktree. They may edit and commit there, but receive `push=false` and `comment=false`.
 
-Detect and use the user's preferred language for all communication.
+## Dispatch Order
 
-Detection priority:
-1. User's current messages
-2. Project context (CLAUDE.md, README.md)
-3. Git history (git log --oneline -5)
-4. Default to English
+### Conflict cycle
 
-Apply detected language to: conversational messages, reports, summaries.
-Always keep in English: code examples, commands, file paths.
+If merge conflict is present, dispatch only `merge-conflict-resolver`. A conflict consumes the sole cycle. Do not attempt CI or review work until a successful publication is followed by a fresh snapshot on the new HEAD.
 
-## Workflow
+### Non-conflict cycle
 
-### Phase 1: PR Discovery & Blocker Scan
+Run CI then review sequentially:
 
-```bash
-# 1. Find the PR for the current branch
-BRANCH=$(git branch --show-current)
-PR_JSON=$(gh pr list --state open --head "$BRANCH" --json number,title,url,headRefName)
-PR_NUMBER=$(echo "$PR_JSON" | jq -r '.[0].number')
+1. Dispatch `ci-failure-resolver` if checks failed.
+2. When CI is planned, continue only if it returns `success` or `no-op`.
+3. Dispatch `pr-review-feedback` in the same worktree only when it appears in the recorded plan. A review-only plan starts directly with that agent.
 
-# Extract repo owner and name
-OWNER=$(gh repo view --json owner -q '.owner.login')
-REPO=$(gh repo view --json name -q '.name')
-```
+Never run resolver agents in parallel. Stop on `AMBIGUOUS` or `failed` and preserve all local state.
 
-If no PR found, report to user and exit.
+## Executable Publication Gate
 
-```bash
-# 2. Scan merge conflicts and CI status:
+Collect each attempted resolver's structured result in the exact planned order. Write a results file inside the resolver worktree as `{results:[{agent,result,input_head,output_head},...]}`. The HEAD chain must start at the pinned PR HEAD, connect between agents, and end at the actual local HEAD. Write any queued summary to a separate file in the same worktree. Before publication, require no staged, unstaged, or untracked changes other than those declared input files; otherwise return `partial-failure` and preserve the worktree.
 
-# Merge conflict status and target branch
-gh pr view "$PR_NUMBER" --json mergeable,mergeStateStatus,baseRefName
+Call `${CLAUDE_PLUGIN_ROOT}/bin/skill-set-pr` with `publish`, the PR, run ID, pinned HEAD, actual local HEAD, results file, optional summary file, and `--coderabbit-resolve` when requested. This is the only authorized push/comment path. It revalidates the live PR head repository/ref and bound remote immediately before the expected-SHA push, or performs a no-code HEAD recheck, then publishes one combined marker/summary comment after the gate. Never call `git push`, `skill-set-git push`, `gh pr comment`, or a marker API directly.
 
-# CI check status
-gh pr checks "$PR_NUMBER" --json name,state,link,workflow
-```
+A partial failure or AMBIGUOUS result must not invoke publication and must not publish the successful subset. Preserve the failure worktree and branch and report their exact paths, local commits, expected remote SHA, state publication phase, and recovery command.
 
-Categorize findings:
-- **Merge conflicts**: `mergeable` is `CONFLICTING` or `mergeStateStatus` is `DIRTY`. If `mergeable` is `UNKNOWN`, wait 3 seconds and re-query — GitHub computes this lazily.
-- **CI failures**: Any check with `state` = `FAILURE`
+## Result
 
-**Review comments**: Do NOT scan for review comments here. Always dispatch `pr-review-feedback` — it handles its own comment discovery, filtering, and early exit if none exist.
+Return:
 
-If no merge conflicts AND no CI failures, still dispatch pr-review-feedback (it may find unresolved comments). If pr-review-feedback also finds nothing, report "All clear — PR is ready to merge" and exit.
+- `result`: `success`, `no-op`, `AMBIGUOUS`, or `failed`;
+- expected and final remote HEAD;
+- local before/after HEAD and published commits;
+- ordered resolver results;
+- runner publication phase and whether its expected-SHA push/comment occurred;
+- worktree/branch cleanup or preserved recovery paths.
 
-### Phase 2: Sub-agent Dispatch
+Clean up the isolated worktree and temporary branch only after all required publication succeeds. On any authentication, remote-SHA, branch-protection, resolver, or publication failure, preserve both.
 
-Create tasks for tracking:
-```
-TaskCreate: "Scan PR for blockers"
-TaskCreate: "Resolve merge conflicts" (if detected)
-TaskCreate: "Fix CI failures" (if detected)
-TaskCreate: "Process review comments"
-TaskCreate: "Push changes and finalize"
-```
-
-**Dispatch rules with dependency management:**
-
-```
-Dependency chain:
-  merge-conflict-resolver → ci-failure-resolver (sequential)
-  pr-review-feedback (parallel with above chain)
-```
-
-1. **If merge conflicts detected**: Launch `merge-conflict-resolver` sub-agent immediately
-   - Wait for completion before launching ci-failure-resolver
-   - Pass PR number and target branch info
-
-2. **If CI failures detected**: Launch `ci-failure-resolver` sub-agent
-   - If merge conflicts existed: launch only AFTER merge-conflict-resolver completes
-   - If no merge conflicts: launch immediately
-   - Pass PR number and failed run IDs
-
-3. **Always**: Launch `pr-review-feedback` sub-agent
-   - Launch immediately, in parallel with the conflict→CI chain
-   - The sub-agent handles its own comment discovery and exits early if none exist
-   - Pass PR number
-
-**Sub-agent dispatch format:**
-Use the `Agent` tool to launch each sub-agent. In the prompt, instruct the sub-agent to read its agent file from the plugin's `agents/` directory and follow its instructions. Provide:
-- The path to the agent file (e.g., `agents/merge-conflict-resolver.md`)
-- PR number
-- Repository owner and name
-- Branch name
-- Specific blocker details (e.g., failed run IDs for CI, target branch for conflicts)
-
-### Phase 3: Completion
-
-After ALL sub-agents have completed:
-
-1. **Push once**:
-   ```bash
-   git push
-   ```
-
-2. **PR summary comment** — only if pr-review-feedback sub-agent was dispatched:
-   The pr-review-feedback sub-agent handles its own PR comment posting. No additional comment needed for merge conflict or CI failure resolution — commit messages are sufficient.
-
-3. **Report to user**: Summarize what was resolved across all sub-agents.
-
-Mark all tasks as completed. Run TaskList to confirm zero pending tasks.
-
-## Error Handling
-
-- If a sub-agent fails or cannot resolve its blockers, report the failure and continue with other sub-agents
-- If merge-conflict-resolver fails, still attempt ci-failure-resolver (CI may have independent failures)
-- Never leave the workflow in a partial state — always push whatever was successfully resolved
-- If no changes were made by any sub-agent, skip the push
-- After push, CI will re-run remotely. If the user reports new failures, re-run this workflow
-
-## Common Mistakes
-
-### Not Checking for PR First
-**Problem:** Attempting to scan blockers when no PR exists.
-**Fix:** Always verify PR existence before scanning. Exit early with a clear message.
-
-### Dispatching CI Resolver Before Conflicts Are Resolved
-**Problem:** CI failures may be caused by merge conflicts, making fixes invalid.
-**Fix:** Always resolve merge conflicts first, then address CI failures.
-
-### Pushing Multiple Times
-**Problem:** Each sub-agent pushes independently, triggering unnecessary CI runs.
-**Fix:** Sub-agents only commit. Orchestrator pushes once at the end.
-
-## Success Criteria
-
-- PR discovered and all blocker types scanned
-- Sub-agents dispatched with correct dependency ordering
-- Each sub-agent commits its own changes with descriptive messages
-- Single push after all sub-agents complete
-- PR summary comment posted (only for review feedback)
-- All tasks show completed in TaskList
+Use the user's language for reports, but keep commands, paths, state names, and result identifiers in English.

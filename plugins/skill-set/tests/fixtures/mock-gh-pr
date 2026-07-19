@@ -1,0 +1,217 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+printf '%s\n' "$*" >>"$MOCK_GH_LOG"
+
+if [[ ${0##*/} == skill-set-git ]]; then
+  [[ ${1:-} == push ]] || { printf 'unsupported mock skill-set-git invocation\n' >&2; exit 64; }
+  if [[ $MOCK_GH_SCENARIO == publication-push-fail ]]; then
+    printf '%s\n' '{"ok":false,"error":{"code":"mock_push_failed"}}' >&2
+    exit 1
+  fi
+  local_head=$(git rev-parse HEAD)
+  printf '%s\n' "$local_head" >"$MOCK_GH_HEAD_FILE"
+  if [[ $MOCK_GH_SCENARIO == publication-malformed-push ]]; then
+    printf '%s\n' '{not-json'
+  else
+    jq -cn --arg sha "$local_head" '{ok:true,pushed:true,remote_sha:$sha}'
+  fi
+  exit 0
+fi
+
+next_count() {
+  local name=$1
+  local file=$MOCK_GH_DIR/$name.count
+  local count=0
+  [[ -f $file ]] && count=$(<"$file")
+  count=$((count + 1))
+  printf '%s\n' "$count" >"$file"
+  printf '%s\n' "$count"
+}
+
+if [[ ${1:-} == repo && ${2:-} == view ]]; then
+  printf '%s\n' '{"nameWithOwner":"owner/repo"}'
+  exit 0
+fi
+
+if [[ ${1:-} == pr && ${2:-} == list ]]; then
+  if [[ $MOCK_GH_SCENARIO == malformed-pr-list ]]; then
+    printf '%s\n' '[{"reviews":42,"comments":[]}]'
+  elif [[ $MOCK_GH_SCENARIO == coderabbit-active ]]; then
+    printf '%s\n' '[{"reviews":[{"author":{"login":"coderabbitai[bot]"}}],"comments":[]}]'
+  else
+    printf '%s\n' '[]'
+  fi
+  exit 0
+fi
+
+if [[ ${1:-} == pr && ${2:-} == view ]]; then
+  count=$(next_count pr-view)
+  if [[ $MOCK_GH_SCENARIO == malformed ]]; then
+    printf '%s\n' '{not-json'
+    exit 0
+  fi
+  sha=$MOCK_GH_HEAD
+  [[ ! -f $MOCK_GH_HEAD_FILE ]] || sha=$(<"$MOCK_GH_HEAD_FILE")
+  head_repo=${MOCK_GH_HEAD_REPO:-owner/repo}
+  head_branch=${MOCK_GH_HEAD_BRANCH:-feature}
+  github_host=${MOCK_GH_HOST:-example.test}
+  if [[ $MOCK_GH_SCENARIO == head-change && $count -gt 1 ]]; then
+    sha=$MOCK_GH_NEW_HEAD
+  elif [[ $MOCK_GH_SCENARIO == head-race && $count -gt 2 ]]; then
+    sha=$MOCK_GH_NEW_HEAD
+  fi
+  if [[ $MOCK_GH_SCENARIO == publication-remote-race && $count -eq 6 ]]; then
+    git remote set-url origin https://example.test/attacker/repo.git
+  fi
+  mergeable=MERGEABLE
+  merge_state=CLEAN
+  pr_state=OPEN
+  if [[ $MOCK_GH_SCENARIO == conflict ]]; then
+    mergeable=CONFLICTING
+    merge_state=DIRTY
+  elif [[ $MOCK_GH_SCENARIO == closed ]]; then
+    pr_state=CLOSED
+  elif [[ $MOCK_GH_SCENARIO == close-race && $count -gt 2 ]]; then
+    pr_state=CLOSED
+  fi
+  jq -cn --arg sha "$sha" --arg base "$MOCK_GH_BASE_SHA" --arg mergeable "$mergeable" \
+    --arg merge_state "$merge_state" --arg state "$pr_state" --arg head_repo "$head_repo" \
+    --arg head_branch "$head_branch" --arg host "$github_host" \
+    '{number:17,headRefOid:$sha,headRefName:$head_branch,
+      headRepository:{nameWithOwner:$head_repo},baseRefOid:$base,baseRefName:"main",
+      mergeable:$mergeable,mergeStateStatus:$merge_state,state:$state,
+      url:("https://" + $host + "/owner/repo/pull/17")}'
+  exit 0
+fi
+
+if [[ ${1:-} == pr && ${2:-} == comment ]]; then
+  body_file=
+  while [[ $# -gt 0 ]]; do
+    if [[ $1 == --body-file ]]; then body_file=$2; shift 2; else shift; fi
+  done
+  [[ -n $body_file && -f $body_file ]] || { printf 'missing body file\n' >&2; exit 64; }
+  if [[ $MOCK_GH_SCENARIO == publication-comment-fail ]]; then
+    printf 'mock comment failure\n' >&2
+    exit 1
+  fi
+  command cp "$body_file" "$MOCK_GH_DIR/comment.body"
+  printf '%s\n' '{"url":"https://example.test/comment/1"}'
+  exit 0
+fi
+
+if [[ ${1:-} == pr && ${2:-} == checks ]]; then
+  count=$(next_count checks)
+  if [[ $MOCK_GH_SCENARIO == malformed-checks ]]; then
+    printf '%s\n' '[1]'
+    exit 0
+  fi
+  if [[ $MOCK_GH_SCENARIO == no-required ]]; then
+    printf "%s\n" "no required checks reported on the 'feature' branch" >&2
+    exit 1
+  fi
+  bucket=$MOCK_GH_SCENARIO
+  check_name=verify
+  if [[ $MOCK_GH_SCENARIO == registration-delay ]]; then
+    if [[ $count -eq 1 ]]; then
+      printf "%s\n" "no required checks reported on the 'feature' branch" >&2
+      exit 1
+    elif [[ $count -eq 2 ]]; then
+      bucket=pending
+    else
+      bucket=pass
+    fi
+  elif [[ $MOCK_GH_SCENARIO == fail-a ]]; then
+    bucket=fail
+    check_name=lint
+  elif [[ $MOCK_GH_SCENARIO == fail-b ]]; then
+    bucket=fail
+    check_name='test'
+  fi
+  [[ $bucket == delayed && $count -eq 1 ]] && bucket=pending
+  [[ $bucket == delayed && $count -gt 1 ]] && bucket=pass
+  case "$bucket" in
+    fail|cancel|pending|pass|skipping) ;;
+    *) bucket=pass ;;
+  esac
+  jq -cn --arg bucket "$bucket" --arg name "$check_name" \
+    '[{bucket:$bucket,name:$name,state:($bucket | ascii_upcase),link:("https://example.test/check/" + $name),workflow:"CI"}]'
+  case "$bucket" in
+    pending) exit 8 ;;
+    fail|cancel) exit 1 ;;
+    *) exit 0 ;;
+  esac
+fi
+
+if [[ ${1:-} == api && ${2:-} == graphql ]]; then
+  if [[ $MOCK_GH_SCENARIO == malformed-threads ]]; then
+    jq -cn '{data:{repository:{pullRequest:{reviewThreads:{nodes:[{id:"thread-1",isResolved:false,isOutdated:false,comments:{nodes:[{body:42}]}}],pageInfo:{hasNextPage:false,endCursor:null}}}}}}'
+  elif [[ $MOCK_GH_SCENARIO == pagination ]]; then
+    if [[ "$*" == *'cursor=page-2'* ]]; then
+      jq -cn '{data:{repository:{pullRequest:{reviewThreads:{nodes:[{id:"thread-101",isResolved:false,isOutdated:false,comments:{nodes:[{author:{login:"reviewer"},body:"Page two blocker",path:"fixture.txt",line:1}]}}],pageInfo:{hasNextPage:false,endCursor:null}}}}}}'
+    else
+      jq -cn '{data:{repository:{pullRequest:{reviewThreads:{nodes:[range(0;100) | {id:("thread-" + tostring),isResolved:true,isOutdated:false,comments:{nodes:[]}}],pageInfo:{hasNextPage:true,endCursor:"page-2"}}}}}}'
+    fi
+  elif [[ $MOCK_GH_SCENARIO == unresolved ]]; then
+    jq -cn '{data:{repository:{pullRequest:{reviewThreads:{nodes:[{id:"thread-1",isResolved:false,isOutdated:false,comments:{nodes:[{author:{login:"reviewer"},body:"Please fix this",path:"fixture.txt",line:1}]} }],pageInfo:{hasNextPage:false,endCursor:null}}}}}}'
+  elif [[ $MOCK_GH_SCENARIO == praise-only ]]; then
+    jq -cn '{data:{repository:{pullRequest:{reviewThreads:{nodes:[{id:"thread-praise",isResolved:false,isOutdated:false,comments:{nodes:[{author:{login:"reviewer"},body:"LGTM!",path:"fixture.txt",line:1}]}}],pageInfo:{hasNextPage:false,endCursor:null}}}}}}'
+  elif [[ $MOCK_GH_SCENARIO == praise-with-request ]]; then
+    jq -cn '{data:{repository:{pullRequest:{reviewThreads:{nodes:[{id:"thread-request",isResolved:false,isOutdated:false,comments:{nodes:[{author:{login:"reviewer"},body:"LGTM, but please fix this",path:"fixture.txt",line:1}]}}],pageInfo:{hasNextPage:false,endCursor:null}}}}}}'
+  elif [[ $MOCK_GH_SCENARIO == thread-change ]]; then
+    count=$(next_count graphql)
+    body='First request'
+    [[ $count -gt 1 ]] && body='Updated request with different requirements'
+    jq -cn --arg body "$body" '{data:{repository:{pullRequest:{reviewThreads:{nodes:[{id:"thread-1",isResolved:false,isOutdated:false,comments:{nodes:[{author:{login:"reviewer"},body:$body,path:"fixture.txt",line:1}]}}],pageInfo:{hasNextPage:false,endCursor:null}}}}}}'
+  else
+    jq -cn '{data:{repository:{pullRequest:{reviewThreads:{nodes:[],pageInfo:{hasNextPage:false,endCursor:null}}}}}}'
+  fi
+  exit 0
+fi
+
+if [[ ${1:-} == api && ${2:-} == repos/*/issues/*/comments* ]]; then
+  if [[ -f $MOCK_GH_DIR/comment.body ]]; then
+    jq -Rs '[{body:.}]' <"$MOCK_GH_DIR/comment.body"
+  else
+    printf '%s\n' '[]'
+  fi
+  exit 0
+fi
+
+if [[ ${1:-} == api && ${2:-} == repos/*/commits/*/check-runs* ]]; then
+  if [[ $MOCK_GH_SCENARIO == coderabbit-check-delay ]]; then
+    count=$(next_count coderabbit-check)
+    if [[ $count -eq 1 ]]; then
+      printf '%s\n' '{"check_runs":[{"name":"CodeRabbit","status":"in_progress","conclusion":null,"app":{"slug":"coderabbitai"}}]}'
+    else
+      printf '%s\n' '{"check_runs":[{"name":"CodeRabbit","status":"completed","conclusion":"success","app":{"slug":"coderabbitai"}}]}'
+    fi
+  else
+    printf '%s\n' '{"check_runs":[]}'
+  fi
+  exit 0
+fi
+
+if [[ ${1:-} == api && ${2:-} == repos/*/commits/*/status ]]; then
+  state=absent
+  if [[ $MOCK_GH_SCENARIO == malformed-coderabbit ]]; then
+    printf '%s\n' '{"statuses":[{"context":42,"state":"success"}]}'
+    exit 0
+  elif [[ $MOCK_GH_SCENARIO == coderabbit-delay ]]; then
+    count=$(next_count coderabbit)
+    state=pending
+    [[ $count -gt 1 ]] && state=success
+  elif [[ $MOCK_GH_SCENARIO == coderabbit-failure ]]; then
+    state=failure
+  fi
+  if [[ $state == absent ]]; then
+    printf '%s\n' '{"statuses":[]}'
+  else
+    jq -cn --arg state "$state" '{statuses:[{context:"CodeRabbit",state:$state}]}'
+  fi
+  exit 0
+fi
+
+printf 'unsupported mock gh invocation: %s\n' "$*" >&2
+exit 64
