@@ -1,0 +1,43 @@
+schema_version: "1.1"
+name: bumping-version-patch-bump-package-json
+description: Migrated functional evaluation for bumping-version
+tags:
+  - bumping-version
+  - functional
+  - migrated
+context:
+  scaffold_script: fixtures/scaffold.sh
+execution:
+  max_turns: 30
+  timeout_seconds: 900
+  allowed_tools:
+    - Skill
+    - Read
+    - Write
+    - Edit
+    - Bash
+runs: 3
+graders:
+  - type: file_exists
+    name: package-created
+    path: outputs/package.json
+  - type: regex
+    name: package-version
+    target:
+      source: file
+      path: outputs/package.json
+    pattern: '"version"\\s*:\\s*"1\\.0\\.1"'
+  - type: regex
+    name: changelog-heading
+    target:
+      source: file
+      path: outputs/CHANGELOG.md
+    pattern: '^## \\[1\\.0\\.1\\] - [0-9]{4}-[0-9]{2}-[0-9]{2}$'
+    flags: m
+  - type: regex
+    name: fixed-section
+    target:
+      source: file
+      path: outputs/CHANGELOG.md
+    pattern: '^### Fixed$'
+    flags: m

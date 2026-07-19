@@ -1,0 +1,30 @@
+schema_version: "1.1"
+name: improving-architecture-deletion-test-on-thin-wrapper
+description: Migrated functional evaluation for improving-architecture
+tags:
+  - improving-architecture
+  - functional
+  - migrated
+context:
+  scaffold_script: fixtures/scaffold.sh
+execution:
+  max_turns: 30
+  timeout_seconds: 900
+  allowed_tools:
+    - Skill
+    - Read
+    - Write
+    - Edit
+    - Bash
+runs: 3
+graders:
+  - type: file_exists
+    name: result-created
+    path: outputs/deletion-test-result.md
+  - type: regex
+    name: delete-verdict
+    target:
+      source: file
+      path: outputs/deletion-test-result.md
+    pattern: "DELETE-AND-INLINE"
+    flags: i

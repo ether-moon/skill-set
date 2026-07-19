@@ -1,0 +1,1 @@
+Add the following rule to CLAUDE.md: 'Run tests with `npm test --runInBand` because the database fixture cannot handle parallel writes — running in parallel produces nondeterministic failures.' Run the verification workflow, save its full report to `outputs/verification-output.md`, and act on the result.

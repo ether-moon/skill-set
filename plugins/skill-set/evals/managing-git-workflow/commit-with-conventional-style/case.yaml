@@ -1,0 +1,37 @@
+schema_version: "1.1"
+name: managing-git-workflow-commit-with-conventional-style
+description: Migrated functional evaluation for managing-git-workflow
+tags:
+  - managing-git-workflow
+  - functional
+  - migrated
+context:
+  scaffold_script: fixtures/setup.sh
+execution:
+  max_turns: 30
+  timeout_seconds: 900
+  allowed_tools:
+    - Skill
+    - Read
+    - Write
+    - Edit
+    - Bash
+runs: 3
+graders:
+  - type: file_exists
+    name: commit-message-created
+    path: outputs/commit-message.txt
+  - type: regex
+    name: conventional-scoped-subject
+    target:
+      source: file
+      path: outputs/commit-message.txt
+    pattern: '^feat\\(parser\\): .{1,57}$'
+    flags: m
+  - type: tool_used
+    name: no-push
+    tool: Bash
+    input_match: 'git\s+push'
+    min: 0
+    max: 0
+    arm: both

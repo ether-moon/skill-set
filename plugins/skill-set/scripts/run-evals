@@ -1,0 +1,218 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+plugin_dir=$(cd -- "$script_dir/.." && pwd)
+repo_dir=$(cd -- "$plugin_dir/../.." && pwd)
+
+usage() {
+  printf '%s\n' \
+    'Usage: run-evals [options]' \
+    '' \
+    'Compare the candidate plugin, its no-plugin ablation arm, and the' \
+    'post-deletion baseline at commit 95c1b2a.' \
+    '' \
+    'Options:' \
+    '  --candidate PATH       Candidate plugin directory (default: current plugin)' \
+    '  --baseline-ref REF     Baseline git ref (default: 95c1b2a)' \
+    '  --output-dir PATH      Result directory (default: evals/results/<timestamp>)' \
+    '  --model MODEL          Override the evaluated model' \
+    '  --judge-model MODEL    Override the LLM grader model' \
+    '  --max-cost-usd USD     Stop after the configured cost ceiling' \
+    '  --runs N               Override runs per case' \
+    '  --case GLOB            Restrict cases by name' \
+    '  --tag TAG              Restrict cases by tag; repeatable' \
+    '  --plan                 Print the two eval commands without running them' \
+    '  -h, --help             Show this help'
+}
+
+require_command() {
+  command -v "$1" >/dev/null 2>&1 || {
+    printf 'Missing required command: %s\n' "$1" >&2
+    exit 127
+  }
+}
+
+candidate=$plugin_dir
+baseline_ref=95c1b2a
+output_dir=
+model=
+judge_model=
+max_cost_usd=
+runs=
+case_glob=
+plan_only=false
+tags=()
+
+while (($#)); do
+  case $1 in
+    --candidate|--baseline-ref|--output-dir|--model|--judge-model|--max-cost-usd|--runs|--case)
+      (($# >= 2)) || { printf '%s requires a value\n' "$1" >&2; exit 2; }
+      option=$1
+      value=$2
+      shift 2
+      case $option in
+        --candidate) candidate=$value ;;
+        --baseline-ref) baseline_ref=$value ;;
+        --output-dir) output_dir=$value ;;
+        --model) model=$value ;;
+        --judge-model) judge_model=$value ;;
+        --max-cost-usd) max_cost_usd=$value ;;
+        --runs) runs=$value ;;
+        --case) case_glob=$value ;;
+      esac
+      ;;
+    --tag)
+      (($# >= 2)) || { printf '%s requires a value\n' "$1" >&2; exit 2; }
+      tags+=("$2")
+      shift 2
+      ;;
+    --plan) plan_only=true; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) printf 'Unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+for dependency in bash git jq claude; do
+  require_command "$dependency"
+done
+[[ -d "$candidate/evals" ]] || { printf 'Candidate has no evals directory: %s\n' "$candidate" >&2; exit 2; }
+candidate=$(cd -- "$candidate" && pwd -P)
+git -C "$repo_dir" rev-parse --verify "$baseline_ref^{commit}" >/dev/null
+
+if [[ -z $output_dir ]]; then
+  output_dir=$candidate/evals/results/$(date -u +%Y%m%dT%H%M%SZ)
+fi
+
+common_args=(--scaffold --threshold 0 --allow-tools Bash Write Edit Skill)
+[[ -n $model ]] && common_args+=(--model "$model")
+[[ -n $judge_model ]] && common_args+=(--judge-model "$judge_model")
+[[ -n $runs ]] && common_args+=(--runs "$runs")
+[[ -n $case_glob ]] && common_args+=(--case "$case_glob")
+if ((${#tags[@]})); then
+  for tag in "${tags[@]}"; do common_args+=(--tag "$tag"); done
+fi
+
+candidate_args=("${common_args[@]}")
+baseline_args=("${common_args[@]}")
+candidate_budget=
+baseline_budget=
+if [[ -n $max_cost_usd ]]; then
+  candidate_budget=$(jq -nr --arg budget "$max_cost_usd" '$budget | tonumber * 2 / 3')
+  baseline_budget=$(jq -nr --arg budget "$max_cost_usd" '$budget | tonumber / 3')
+  candidate_args+=(--max-cost-usd "$candidate_budget")
+  baseline_args+=(--max-cost-usd "$baseline_budget")
+fi
+
+candidate_command=(claude plugin eval "$candidate" --ablation with-without "${candidate_args[@]}" --output-dir "$output_dir/candidate" --json "$output_dir/candidate.json")
+
+if [[ $plan_only == true ]]; then
+  printf 'Candidate/no-plugin: '
+  printf '%q ' "${candidate_command[@]}"
+  printf '\nBaseline plugin: materialize %s, overlay candidate evals, then run with --ablation none.\n' "$baseline_ref"
+  exit 0
+fi
+
+mkdir -p "$output_dir"
+: >"$output_dir/arm-status.tsv"
+temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/skill-set-evals.XXXXXX")
+trap 'rm -rf "$temporary_dir"' EXIT
+
+git -C "$repo_dir" archive "$baseline_ref" plugins/skill-set | tar -x -C "$temporary_dir"
+baseline_plugin=$temporary_dir/plugins/skill-set
+rm -rf "$baseline_plugin/evals"
+cp -R "$candidate/evals" "$baseline_plugin/evals"
+rm -rf "$baseline_plugin/evals/results"
+rm -f "$baseline_plugin/.mcp.json"
+
+baseline_command=(claude plugin eval "$baseline_plugin" --ablation none "${baseline_args[@]}" --output-dir "$output_dir/baseline" --json "$output_dir/baseline.json")
+
+run_eval_arm() {
+  local arm=$1
+  shift
+  local status
+  set +e
+  "$@"
+  status=$?
+  set -e
+  case $status in
+    0) printf '%s\tcomplete\n' "$arm" >>"$output_dir/arm-status.tsv" ;;
+    2)
+      printf '%s\tpartial-budget\n' "$arm" >>"$output_dir/arm-status.tsv"
+      printf 'Eval arm %s reached its allocated cost target; preserving partial results.\n' "$arm" >&2
+      ;;
+    *)
+      jq -n --arg arm "$arm" --argjson exit_code "$status" \
+        '{error: "eval-arm-failed", arm: $arm, exit_code: $exit_code}' >&2
+      return "$status"
+      ;;
+  esac
+}
+
+run_eval_arm candidate-and-no-plugin "${candidate_command[@]}"
+run_eval_arm deletion-baseline "${baseline_command[@]}"
+
+[[ -s "$output_dir/candidate.json" ]] || { printf 'Candidate eval produced no JSON result.\n' >&2; exit 1; }
+[[ -s "$output_dir/baseline.json" ]] || { printf 'Baseline eval produced no JSON result.\n' >&2; exit 1; }
+
+candidate_sha=$(git -C "$candidate" rev-parse HEAD 2>/dev/null || printf 'unversioned')
+candidate_dirty=true
+candidate_fingerprint=unversioned
+if candidate_git_root=$(git -C "$candidate" rev-parse --show-toplevel 2>/dev/null); then
+  candidate_scope=$(git -C "$candidate" rev-parse --show-prefix)
+  candidate_scope=${candidate_scope%/}
+  candidate_state=$(mktemp "$temporary_dir/candidate-state.XXXXXX")
+  git -C "$candidate_git_root" diff --binary HEAD -- "$candidate_scope" >"$candidate_state"
+  while IFS= read -r -d '' untracked_file; do
+    printf 'untracked\0%s\0%s\0' "$untracked_file" \
+      "$(git -C "$candidate_git_root" hash-object -- "$untracked_file")" >>"$candidate_state"
+  done < <(git -C "$candidate_git_root" ls-files --others --exclude-standard -z -- "$candidate_scope")
+  candidate_fingerprint=$(git hash-object "$candidate_state")
+  if [[ ! -s $candidate_state ]]; then candidate_dirty=false; fi
+fi
+baseline_sha=$(git -C "$repo_dir" rev-parse "$baseline_ref^{commit}")
+claude_version=$(claude --version)
+partial_budget=false
+if rg -q $'\tpartial-budget$' "$output_dir/arm-status.tsv"; then partial_budget=true; fi
+jq -n \
+  --arg candidate_sha "$candidate_sha" \
+  --argjson candidate_dirty "$candidate_dirty" \
+  --arg candidate_fingerprint "$candidate_fingerprint" \
+  --arg baseline_ref "$baseline_ref" \
+  --arg baseline_sha "$baseline_sha" \
+  --arg claude_version "$claude_version" \
+  --arg model "$model" \
+  --arg judge_model "$judge_model" \
+  --arg max_cost_usd "$max_cost_usd" \
+  --arg candidate_budget "$candidate_budget" \
+  --arg baseline_budget "$baseline_budget" \
+  --arg runs "$runs" \
+  --arg case_glob "$case_glob" \
+  --arg tags "$(IFS=,; printf '%s' "${tags[*]-}")" \
+  --argjson partial_budget "$partial_budget" \
+  --arg generated_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  '{candidate_sha: $candidate_sha, candidate_dirty: $candidate_dirty, candidate_fingerprint: $candidate_fingerprint, baseline_ref: $baseline_ref, baseline_sha: $baseline_sha, claude_version: $claude_version, model: $model, judge_model: $judge_model, max_cost_usd: $max_cost_usd, cost_allocation: {candidate_and_no_plugin: $candidate_budget, deletion_baseline: $baseline_budget, semantics: "per-arm target; each CLI invocation may overrun by one agent run"}, partial_budget: $partial_budget, runs: $runs, filters: {case: $case_glob, tags: ($tags | split(",") | map(select(length > 0)))}, generated_at: $generated_at, operator_tool_grants: ["Bash", "Write", "Edit", "Skill"], baseline_normalization: ["remove unused .mcp.json"], arms: ["candidate", "no-plugin", "baseline"], review_required: true}' \
+  >"$output_dir/metadata.json"
+
+jq -n \
+  --slurpfile metadata "$output_dir/metadata.json" \
+  --slurpfile candidate "$output_dir/candidate.json" \
+  --slurpfile baseline "$output_dir/baseline.json" \
+  '{
+    metadata: $metadata[0],
+    candidate_and_no_plugin: $candidate[0],
+    deletion_baseline: $baseline[0],
+    acceptance_review: {
+      status: "pending-human-review",
+      safety_violations_required: 0,
+      trigger_precision_required: 0.9,
+      trigger_recall_required: 0.9,
+      baseline_regression_allowed: false
+    }
+  }' >"$output_dir/combined-results.json"
+
+run_status='runs-finished'
+if [[ $partial_budget == true ]]; then run_status=partial-budget; fi
+jq -n --arg status "$run_status" --arg output_dir "$output_dir" --arg baseline_sha "$baseline_sha" \
+  '{status: $status, output_dir: $output_dir, baseline_sha: $baseline_sha, arms: ["candidate", "no-plugin", "baseline"], review_required: true}'

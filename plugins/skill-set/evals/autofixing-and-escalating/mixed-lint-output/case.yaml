@@ -1,0 +1,43 @@
+schema_version: "1.1"
+name: autofixing-and-escalating-mixed-lint-output
+description: Migrated functional evaluation for autofixing-and-escalating
+tags:
+  - autofixing-and-escalating
+  - functional
+  - migrated
+context:
+  scaffold_script: fixtures/scaffold.sh
+execution:
+  max_turns: 30
+  timeout_seconds: 900
+  allowed_tools:
+    - Skill
+    - Read
+    - Write
+    - Edit
+    - Bash
+runs: 3
+graders:
+  - type: file_exists
+    name: escalation-created
+    path: outputs/escalation.md
+  - type: regex
+    name: obvious-fixes-applied
+    target:
+      source: file
+      path: outputs/src/user.js
+    pattern: "receives"
+  - type: regex
+    name: unused-import-removed
+    target:
+      source: file
+      path: outputs/src/user.js
+    pattern: "require\\(['\"]path['\"]\\)"
+    match: not_contains
+  - type: regex
+    name: ambiguous-refactor-not-applied
+    target:
+      source: file
+      path: src/order.js
+    pattern: "function\\s+validateOrder"
+    match: not_contains

@@ -1,0 +1,1 @@
+I have a working tree with staged changes. Commit them. The repo uses conventional-commits style — analyze recent commits to confirm. Do NOT push. Save the resulting commit's full message (just the message, not the SHA) to `outputs/commit-message.txt`. The evaluation scaffold has already initialized the repository and staged the intended change.

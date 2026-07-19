@@ -1,0 +1,96 @@
+name: Evaluate skill-set models
+
+on:
+  schedule:
+    - cron: '23 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: Runs per case (release review normally uses 3)
+        required: false
+        default: '3'
+      max_cost_usd:
+        description: Hard evaluation cost ceiling
+        required: false
+        default: '40'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: skill-set-model-evaluation
+  cancel-in-progress: false
+
+jobs:
+  model-evaluation:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install tested Claude Code
+        run: npm install --global @anthropic-ai/claude-code@2.1.215
+
+      - name: Run candidate, no-plugin, and deletion-baseline arms
+        id: eval
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          REQUESTED_RUNS: ${{ github.event.inputs.runs || '1' }}
+          MAX_COST_USD: ${{ github.event.inputs.max_cost_usd || '25' }}
+        run: |
+          mkdir -p eval-results
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            printf 'Model evaluation skipped: ANTHROPIC_API_KEY is not configured.\n' > eval-results/run.log
+            printf 'status=skipped-no-credentials\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          set +e
+          plugins/skill-set/scripts/run-evals \
+            --output-dir eval-results \
+            --runs "$REQUESTED_RUNS" \
+            --max-cost-usd "$MAX_COST_USD" \
+            > eval-results/run.log 2>&1
+          eval_status=$?
+          set -e
+          printf 'exit_code=%s\n' "$eval_status" >> "$GITHUB_OUTPUT"
+          if [ "$eval_status" -eq 0 ]; then
+            printf 'status=finished-needs-human-review\n' >> "$GITHUB_OUTPUT"
+          elif grep -q 'plugin eval.*early access\|plugin eval` is currently in early access' eval-results/run.log; then
+            printf 'status=skipped-early-access-gate\n' >> "$GITHUB_OUTPUT"
+          else
+            printf 'status=failed\n' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Explain feature-gated or failed runs
+        if: always()
+        run: |
+          status='${{ steps.eval.outputs.status }}'
+          case "$status" in
+            skipped-early-access-gate)
+              echo '::notice::Claude plugin eval is still feature-gated for this CLI/account. Artifacts contain the diagnostic.'
+              ;;
+            skipped-no-credentials)
+              echo '::notice::Configure ANTHROPIC_API_KEY to enable the weekly model evaluation.'
+              ;;
+            failed)
+              sed -n '1,240p' eval-results/run.log
+              exit 1
+              ;;
+          esac
+
+      - name: Upload evaluation artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: skill-set-model-eval-${{ github.run_id }}
+          path: eval-results/
+          if-no-files-found: error
+          retention-days: 30

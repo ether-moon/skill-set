@@ -1,0 +1,1 @@
+Apply the deletion test to `src/utils/string-helper.ts` in this fixture. Decide whether the module is shallow (and should be inlined) or deep (and should stay). Save your reasoning to `outputs/deletion-test-result.md`, with a clear final verdict (one of: KEEP / DELETE-AND-INLINE / NEEDS-MORE-INFO).

@@ -1,0 +1,1 @@
+Bump this Claude plugin's version. Commits since the last release include both new features and bug fixes — apply a minor bump. The plugin manifest is at `.claude-plugin/plugin.json`. Do not push or create worktrees; just update the version files and changelog. Save modified files to the outputs directory.

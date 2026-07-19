@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+plugin_dir=$(cd -- "$script_dir/.." && pwd)
+require_trigger_matrix=false
+
+usage() {
+  printf '%s\n' \
+    'Usage: validate-evals [--require-trigger-matrix]' \
+    '' \
+    'Validate official Claude plugin eval layout, local paths, grader metadata,' \
+    'case-name uniqueness, and optionally 8-10 positive plus 8-10 negative' \
+    'trigger cases for every active skill.'
+}
+
+case ${1:-} in
+  '') ;;
+  --require-trigger-matrix) require_trigger_matrix=true ;;
+  -h|--help) usage; exit 0 ;;
+  *) printf 'Unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
+esac
+
+fail() {
+  printf 'Eval validation failed: %s\n' "$*" >&2
+  exit 1
+}
+
+if find "$plugin_dir/skills" -path '*/evals/evals.json' -print -quit | grep -q .; then
+  fail 'legacy per-skill evals.json files remain'
+fi
+[[ ! -e "$plugin_dir/skills/EVALS.md" ]] || fail 'legacy skills/EVALS.md remains'
+
+case_count=0
+case_names_file=$(mktemp "${TMPDIR:-/tmp}/skill-set-eval-names.XXXXXX")
+trap 'rm -f "$case_names_file"' EXIT
+
+while IFS= read -r case_file; do
+  case_dir=$(dirname "$case_file")
+  case_root=$(cd -- "$case_dir" && pwd -P)
+  case_count=$((case_count + 1))
+  rg -q '^schema_version: "1\.1"$' "$case_file" || fail "unsupported or missing schema_version in $case_file"
+  name=$(awk -F ': ' '$1 == "name" { print $2; exit }' "$case_file")
+  [[ -n $name ]] || fail "missing name in $case_file"
+  printf '%s\n' "$name" >>"$case_names_file"
+  rg -q '^  timeout_seconds: ([1-9][0-9]{0,2}|[1-2][0-9]{3}|3[0-5][0-9]{2}|3600)$' "$case_file" || fail "missing valid timeout_seconds in $case_file"
+
+  scaffold_script=$(awk -F ': ' '$1 == "  scaffold_script" { print $2; exit }' "$case_file")
+  if [[ -n $scaffold_script ]]; then
+    [[ $scaffold_script != /* && $scaffold_script != \~/* ]] || fail "absolute scaffold_script in $case_file"
+    [[ -x "$case_dir/$scaffold_script" ]] || fail "missing executable scaffold_script in $case_file: $scaffold_script"
+    scaffold_parent=$(cd -- "$(dirname -- "$case_dir/$scaffold_script")" && pwd -P)
+    case "$scaffold_parent/" in "$case_root/"*) ;; *) fail "scaffold_script escapes its case directory: $case_file" ;; esac
+  fi
+
+  while IFS= read -r added_dir; do
+    [[ $added_dir != /* && $added_dir != \~/* ]] || fail "absolute add_dirs entry in $case_file: $added_dir"
+    [[ -d "$case_dir/$added_dir" ]] || fail "missing add_dirs path in $case_file: $added_dir"
+    added_root=$(cd -- "$case_dir/$added_dir" && pwd -P)
+    case "$added_root/" in "$case_root/"*) ;; *) fail "add_dirs entry escapes its case directory: $case_file" ;; esac
+  done < <(awk '
+    /^  add_dirs:/ { in_add_dirs = 1; next }
+    in_add_dirs && /^    - / { sub(/^    - /, ""); print; next }
+    in_add_dirs && !/^    / { exit }
+  ' "$case_file")
+
+  if [[ -f "$case_dir/prompt.md" ]]; then
+    grader_count=0
+    while IFS= read -r grader_file; do
+      grader_count=$((grader_count + 1))
+      [[ $(sed -n '1p' "$grader_file") == '---' ]] || fail "grader lacks frontmatter: $grader_file"
+      grader_type=$(awk -F ': ' '$1 == "type" { print $2; exit }' "$grader_file")
+      case $grader_type in regex|tool_order|tool_used|file_exists|llm|baseline) ;; *) fail "unsupported grader type in $grader_file: $grader_type" ;; esac
+    done < <(find "$case_dir/graders" -maxdepth 1 -type f -name '*.md' 2>/dev/null | sort)
+    ((grader_count > 0)) || fail "prompt case has no graders: $case_dir"
+
+    while IFS= read -r required_output; do
+      [[ -n $required_output ]] || continue
+      output_name=${required_output##*/}
+      rg -Fq "$output_name" "$case_dir/prompt.md" || fail "file_exists output is not requested by prompt: $case_file: $required_output"
+    done < <(awk '
+      /^  - type: file_exists$/ { file_exists = 1; next }
+      file_exists && /^    path: / { sub(/^    path: /, ""); gsub(/^['"'"']|['"'"']$/, ""); print; file_exists = 0; next }
+      file_exists && /^  - / { file_exists = 0 }
+    ' "$case_file")
+  else
+    rg -q '^  prompt:' "$case_file" || fail "case has neither prompt.md nor execution.prompt: $case_file"
+    rg -q '^graders:' "$case_file" || fail "case has neither grader files nor inline graders: $case_file"
+  fi
+
+  while IFS= read -r focused_path; do
+    focused_path=${focused_path#\"}
+    focused_path=${focused_path%\"}
+    focused_path=${focused_path#\'}
+    focused_path=${focused_path%\'}
+    case $focused_path in outputs/*) continue ;; esac
+    [[ -e $case_dir/fixtures/$focused_path ]] || fail "grader references missing fixture path: $case_file: $focused_path"
+  done < <(awk '/^[[:space:]]+path: / { sub(/^[[:space:]]+path: /, ""); print }' "$case_file" "$case_dir"/graders/*.md 2>/dev/null)
+
+  if rg -n '(^|[ (])(/Users/|/home/|/tmp/|~/)' "$case_file" "$case_dir/prompt.md" "$case_dir/graders" 2>/dev/null | grep -q .; then
+    fail "case contains a host-specific absolute path: $case_dir"
+  fi
+done < <(find "$plugin_dir/evals" -type f -name case.yaml -not -path '*/results/*' | sort)
+
+((case_count > 0)) || fail 'no eval cases found'
+duplicates=$(sort "$case_names_file" | uniq -d)
+[[ -z $duplicates ]] || fail "duplicate case names: $duplicates"
+
+if [[ $require_trigger_matrix == true ]]; then
+  while IFS= read -r skill_file; do
+    skill=$(basename "$(dirname "$skill_file")")
+    skill_eval_dir=$plugin_dir/evals/$skill
+    [[ -d $skill_eval_dir ]] || fail "missing eval directory for active skill: $skill"
+    positive=$(rg -l '^  - trigger-positive$' "$skill_eval_dir" -g case.yaml | wc -l | tr -d ' ')
+    negative=$(rg -l '^  - trigger-negative$' "$skill_eval_dir" -g case.yaml | wc -l | tr -d ' ')
+    ((positive >= 8 && positive <= 10)) || fail "$skill has $positive positive trigger cases; expected 8-10"
+    ((negative >= 8 && negative <= 10)) || fail "$skill has $negative negative trigger cases; expected 8-10"
+  done < <(find "$plugin_dir/skills" -mindepth 2 -maxdepth 2 -type f -name SKILL.md | sort)
+fi
+
+jq -n --argjson cases "$case_count" --argjson trigger_matrix "$require_trigger_matrix" \
+  '{status: "valid", cases: $cases, trigger_matrix_checked: $trigger_matrix}'

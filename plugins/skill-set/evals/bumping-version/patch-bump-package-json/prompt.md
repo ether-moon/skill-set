@@ -1,0 +1,1 @@
+Bump this project's version. The recent commits since the last bump are bug fixes only — apply a patch bump. Do NOT push or create a worktree (the fixture is not a real git repo). Update `package.json` and `CHANGELOG.md`, then save both modified files under the outputs directory with the same relative paths.

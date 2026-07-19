@@ -1,0 +1,36 @@
+schema_version: "1.1"
+name: guarding-agent-directives-accept-specific-rule
+description: Migrated functional evaluation for guarding-agent-directives
+tags:
+  - guarding-agent-directives
+  - functional
+  - migrated
+context:
+  scaffold_script: fixtures/scaffold.sh
+execution:
+  max_turns: 30
+  timeout_seconds: 900
+  allowed_tools:
+    - Skill
+    - Read
+    - Write
+    - Edit
+    - Bash
+runs: 3
+graders:
+  - type: file_exists
+    name: verification-created
+    path: outputs/verification-output.md
+  - type: regex
+    name: rule-added
+    target:
+      source: file
+      path: CLAUDE.md
+    pattern: "npm test --runInBand"
+  - type: regex
+    name: justification-added
+    target:
+      source: file
+      path: CLAUDE.md
+    pattern: "database fixture|parallel"
+    flags: i
