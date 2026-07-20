@@ -1,0 +1,1 @@
+Apply the deletion test to `src/utils/string-helper.ts` and return a ranked architecture candidate report in your response. Include Files, Evidence, Problem, Proposed seam, Locality gain, Leverage gain, Test impact, and Risks. Stop after the candidate; do not write files, design an API, or invoke another skill.

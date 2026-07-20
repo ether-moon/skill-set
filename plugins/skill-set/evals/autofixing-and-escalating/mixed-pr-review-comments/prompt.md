@@ -1,0 +1,1 @@
+A reviewer left comments on this PR. The comments are in `review-comments.md` and the changed file is `src/auth.js`. Process the comments: auto-apply OBVIOUS fixes to `src/auth.js` and produce `escalation.md` for AMBIGUOUS items. Save the modified `src/auth.js` and `escalation.md` to the outputs directory.

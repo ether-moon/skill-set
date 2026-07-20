@@ -1,18 +1,17 @@
 ---
-description: Ship a PR end-to-end — create (if needed), poll CI and CodeRabbit, auto-fix blockers, repeat until clean
+description: Ship a PR through resumable CI, review, and blocker-resolution cycles
+allowed-tools: Skill
 ---
 
-Invoke the `shipping-pr` skill to drive the full PR lifecycle: PR creation (delegated to `managing-git-workflow`), CI/CodeRabbit polling, blocker resolution (delegated to `resolving-pr-blockers`), and re-polling after each fix-push cycle until the PR is clean or convergence fails.
+Invoke the `shipping-pr` skill with the user's arguments.
 
-**Flags (all optional):**
-- `--max-cycles N` — max ship cycles (default: 3)
-- `--ci-timeout 30` — total CI wait budget per cycle in minutes (default: 30)
-- `--review-timeout 10` — CodeRabbit incremental review wait per cycle in minutes (default: 10)
-- `--no-coderabbit` — disable CodeRabbit detection and waiting
-- `--no-create` — fail if no PR exists for the current branch (skip PR creation)
-- `--required-only=BOOL` — wait only on required checks (default: true; pass `--required-only=false` to wait on advisory checks too)
+Supported flags and defaults:
 
-**Behavior:**
-- Each cycle posts its own PR summary comment via `pr-review-feedback` (intended; CodeRabbit resolution included when applicable)
-- Pauses for user input on AMBIGUOUS items inside the fix step, then resumes the cycle
-- Exits early on PR closure, convergence failure (fix produced no new commit), or max-cycles reached
+- `--max-cycles N` — resolver attempts, default 3
+- `--ci-timeout MIN` — current-HEAD CI deadline, default 30
+- `--review-timeout MIN` — current-HEAD CodeRabbit deadline, default 10
+- `--no-coderabbit` — disable CodeRabbit completion checks
+- `--no-create` — fail when the current branch has no PR
+- `--required-only=BOOL` — select required checks only, default true
+
+The workflow keeps state in the repository's Git common directory and rejects concurrent active runs. It binds publication to the live PR head repository/ref and the selected remote's canonical push URL, including fork remotes. Resume existing state instead of starting a second loop. Never include dirty files, publish partial resolver work, force-push, merge, pull, or rebase.

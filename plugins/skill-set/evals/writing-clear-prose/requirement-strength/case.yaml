@@ -1,0 +1,40 @@
+schema_version: "1.1"
+name: writing-clear-prose-requirement-strength
+description: Preserves normative strength and uncertainty while revising
+tags:
+  - writing-clear-prose
+  - functional
+context:
+  scaffold_script: fixtures/scaffold.sh
+execution:
+  max_turns: 12
+  timeout_seconds: 480
+  allowed_tools:
+    - Skill
+    - Read
+    - Write
+    - Edit
+runs: 3
+graders:
+  - type: tool_used
+    name: selected-writing-clear-prose
+    tool: Skill
+    input_match: writing-clear-prose
+    min: 1
+  - type: file_exists
+    name: revision-created
+    path: outputs/revised.md
+  - type: regex
+    name: mandatory-retention
+    target:
+      source: file
+      path: outputs/revised.md
+    pattern: '(must|required to).*7 years|7 years.*(must|required)'
+    flags: i
+  - type: regex
+    name: approval-uncertainty
+    target:
+      source: file
+      path: outputs/revised.md
+    pattern: 'may begin after approval'
+    flags: i

@@ -2,6 +2,15 @@
 
 Step-by-step process for drafting non-fiction prose from scratch.
 
+## Table of Contents
+
+- [Step 1: Define Purpose and Audience](#step-1-define-purpose-and-audience)
+- [Step 2: Create Outline](#step-2-create-outline)
+- [Step 3: Apply Context Zero](#step-3-apply-context-zero)
+- [Step 4: Draft Section by Section](#step-4-draft-section-by-section)
+- [Step 5: Internal Review](#step-5-internal-review)
+- [Document Type Templates](#document-type-templates)
+
 ## Step 1: Define Purpose and Audience
 
 Before writing anything, answer these three questions:
@@ -65,7 +74,7 @@ Before sharing the draft, run a quick self-review:
 
 1. Read the title and all section headers in sequence — do they tell the full story?
 2. Read only the first sentence of each section — do they form a coherent argument?
-3. Check for anti-patterns (see `anti-patterns.md`)
+3. Remove cliches, filler, fabricated precision, unsupported stakes, and mechanical sentence patterns
 4. Verify concreteness: highlight any sentence that can't be fact-checked
 
 ## Document Type Templates

@@ -1,0 +1,29 @@
+schema_version: "1.1"
+name: improving-architecture-shallow-validators-cluster
+description: Migrated functional evaluation for improving-architecture
+tags:
+  - improving-architecture
+  - functional
+  - migrated
+context:
+  scaffold_script: fixtures/scaffold.sh
+execution:
+  max_turns: 30
+  timeout_seconds: 900
+  allowed_tools:
+    - Skill
+    - Read
+runs: 3
+graders:
+  - type: tool_used
+    name: selected-improving-architecture
+    tool: Skill
+    input_match: improving-architecture
+    min: 1
+  - type: tool_used
+    name: no-grilling-handoff
+    tool: Skill
+    input_match: grilling-plans
+    min: 0
+    max: 0
+    arm: both

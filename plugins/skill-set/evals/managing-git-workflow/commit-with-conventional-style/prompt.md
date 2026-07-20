@@ -1,0 +1,1 @@
+I have a working tree with staged changes. Commit them. The repo uses conventional-commits style — analyze recent commits to confirm. Do NOT push. The evaluation scaffold captures the resulting commit's full message in `outputs/commit-message.txt`; do not create that artifact yourself. The repository is already initialized and the intended change is staged.

@@ -5,6 +5,7 @@
 - [Skill Won't Upload](#skill-wont-upload) (SKILL.md not found, invalid frontmatter, invalid name)
 - [Skill Doesn't Trigger](#skill-doesnt-trigger)
 - [Skill Triggers Too Often](#skill-triggers-too-often)
+- [Evaluations Fail or Cannot Run](#evaluations-fail-or-cannot-run)
 - [MCP Connection Issues](#mcp-connection-issues)
 - [Instructions Not Followed](#instructions-not-followed) (verbosity, buried instructions, ambiguity, validation scripts, model laziness)
 - [Large Context Issues](#large-context-issues)
@@ -138,6 +139,35 @@ description: PayFlow payment processing for e-commerce. Use specifically for onl
    - Skill references correct MCP tool names
    - Check MCP server documentation
    - Tool names are case-sensitive
+
+---
+
+## Evaluations Fail or Cannot Run
+
+### Layout or schema failure
+
+- Parse every `case.yaml` and grader frontmatter as YAML rather than relying on text patterns.
+- Verify the case has a non-empty prompt, at least one grader, a bounded timeout, and valid fixture paths.
+- Keep fixtures and scaffold scripts within their case directory.
+- Run deterministic generators with `--check` so generated trigger cases cannot drift from their catalog.
+
+### Trigger metrics look better than behavior
+
+- Confirm all 8-10 positive and 8-10 negative cases ran for every skill.
+- Compute precision and recall per skill, not only across the plugin.
+- Use near misses rather than unrelated negatives.
+- Inspect actual Skill calls; do not infer triggering only from a plausible final answer.
+
+### Baseline comparison is misleading
+
+- Materialize the exact baseline commit or prior skill version.
+- Use the same prompts, fixtures, model, judge, tool grants, and run count in each arm.
+- Treat missing baseline cases or partial-budget results as incomplete, not as zero or a pass.
+- Keep the evaluated model and LLM judge different; use a Sonnet-tier or larger judge.
+
+### `claude plugin eval` is feature-gated
+
+Preserve the exact CLI diagnostic. Keep official cases, deterministic graders, fixture execution, and plugin validation green so the model run is ready when access is enabled. Report the run as blocked or unavailable; never estimate scores from manual inspection.
 
 ---
 

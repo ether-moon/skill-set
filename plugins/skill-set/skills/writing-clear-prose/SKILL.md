@@ -1,133 +1,101 @@
 ---
 name: writing-clear-prose
-description: Guides drafting and revising non-fiction prose — reports, proposals, technical documents, and explanatory text — using four core principles (concreteness, transcreation, steel man, brevity). Use when user asks to write, draft, compose, revise, edit, proofread, rewrite, polish, tighten, shorten, or improve prose, or says "make this clearer", "this is too wordy", "review my writing", or "help me write a proposal".
+description: Drafts and revises substantive non-fiction such as reports, proposals, technical documents, and explanatory articles. Use when a user asks to compose or materially improve a document's clarity, structure, specificity, concision, or factual fidelity; do not use for short operational text, creative work, or software-authoring metadata.
 ---
 
 # Writing Clear Prose
 
-## Overview
+## Scope
 
-Produces clear, concrete, credible non-fiction prose through two workflows:
+Use this skill for substantial non-fiction documents:
 
-1. **Drafting**: Create new text from scratch → `reference/drafting.md`
-2. **Revising**: Improve existing text → `reference/revising.md`
+- reports and research summaries;
+- proposals and decision documents;
+- technical documentation and design explanations; and
+- explanatory or persuasive articles grounded in supplied evidence.
 
-Both workflows apply four core principles (concreteness, transcreation, steel man argumentation, brevity) to eliminate vagueness, jargon, and filler.
+Do not trigger for these near misses:
 
-## When to Use
+- skill authoring or SKILL.md changes;
+- commit and PR messages;
+- code comments, docstrings, or identifiers;
+- creative writing, fiction, poetry, or slogans;
+- everyday conversation, chat, email, or short status updates.
 
-**Writing triggers** — user asks to:
-- Write, draft, or compose a report, proposal, document, or explanation
-- Create technical documentation or persuasive text
+Handle those requests directly or with a more specific workflow. Do not hand off automatically.
 
-**Revision triggers** — user asks to:
-- Revise, edit, proofread, or improve existing text
-- Make text clearer, more concise, or more persuasive
-- Review prose quality
+## Choose the Workflow
 
-**Do NOT use for**:
-- Creative fiction, poetry, or marketing copy
-- Daily communication (email, Slack, chat)
-- Commit messages → `managing-git-workflow`
-- Skill creation → `creating-skills`
-- Code comments or docstrings (too short for this workflow)
+- **Draft** when the user supplies goals, facts, and constraints but no document. Read `reference/drafting.md`.
+- **Revise** when text already exists. Read `reference/revising.md` and preserve its factual contract.
 
-## Workflow Selection
+Both paths use `reference/principles.md`; use `reference/anti-patterns.md` as a diagnostic, not a style generator.
 
-| Task | Start Here | Also Read |
-|------|-----------|-----------|
-| Draft from scratch | `reference/drafting.md` | `reference/principles.md` |
-| Revise existing text | `reference/revising.md` | `reference/anti-patterns.md` |
-| Understand principles | `reference/principles.md` | `reference/anti-patterns.md` |
+## Establish the Factual Contract
 
-## Core Principles
+Before drafting or revising, identify:
 
-Four principles in priority order. Full details with sourcing: `reference/principles.md`
+```text
+Purpose: what the reader should know, believe, or do
+Audience: assumed knowledge and decision authority
+Facts and requirements: supplied claims, numbers, constraints, terminology
+Sources: citations or artifacts that support claims
+Unknowns: information that must remain qualified or be requested
+Scope: included and excluded topics
+```
 
-### 1. Concreteness Over Abstraction
+Preserve this contract through every pass. A clearer sentence is worse if it changes truth, obligation, uncertainty, or technical semantics.
 
-Replace vague claims with specific, observable details. If a sentence can't be fact-checked, it's too abstract.
+## Draft
 
-- Before: "We significantly improved performance."
-- After: "Response time dropped from 1200ms to 340ms."
+1. Lead with the outcome or decision the reader needs.
+2. Build an outline whose headings carry the argument.
+3. Put one main claim in each section and support it with supplied evidence.
+4. Define technical terms on first use and keep one term per concept.
+5. State unknowns honestly instead of filling gaps.
+6. Run the rubric and source-fidelity check before returning the draft.
 
-**Critical caveat**: Concreteness requires real data. If no measurement exists, do NOT invent numbers. Describe the observable change without fabricating metrics. A vague truth is better than a precise lie.
+## Revise
 
-### 2. Transcreation Over Translation
+Work in this order:
 
-Adapt foreign-language sources and domain jargon naturally. Annotate technical terms on first use.
+1. **Structure** — surface purpose, fix order, merge repetition, remove irrelevant sections.
+2. **Clarity** — make referents and logic explicit; define terms.
+3. **Specificity** — replace abstraction only with supported details.
+4. **Concision** — remove words and sections without losing meaning.
+5. **Fidelity** — compare every factual, numerical, normative, and technical claim with the source.
 
-- Before: "We applied CQRS with event sourcing on the aggregate root."
-- After: "We separated read and write models (CQRS) and stored every state change as an event."
+Show material changes or a concise change summary when the user needs to review meaning, not only style.
 
-### 3. Steel Man Argumentation
+## Acceptance Rubric
 
-Present opposing viewpoints in their strongest form before your rebuttal. If the other side wouldn't recognize their argument in your summary, you haven't steel-manned it.
+All criteria must pass:
 
-- Before: "Some people think testing is a waste of time, but they're wrong."
-- After: "Integration tests catch real user-facing bugs that unit tests miss. However, their 10x longer runtime slows development — we measured 45 minutes per PR cycle."
+- **Clarity** — the intended reader can follow each claim and referent without guessing.
+- **Structure** — the lead and section order serve the stated purpose; each section adds information.
+- **Specificity** — concrete details are relevant and supported, with unknowns labeled.
+- **Concision** — every sentence contributes meaning; no repeated conclusion or filler remains.
+- **Facts and requirements** — source facts, constraints, uncertainty, terminology, and obligations are preserved.
 
-### 4. Brevity and Clarity
+Hard fail: any invented or unsupported number or claim.
 
-Every sentence earns its place. Cut words that don't add meaning.
+Hard fail: any change to technical meaning, requirement strength, uncertainty, or source attribution.
 
-- Before: "In order to facilitate the process of onboarding" (8 words)
-- After: "To onboard" (2 words)
+When a hard fail appears, restore the source meaning and revise again. Never trade fidelity for fluency.
 
-## Language Detection
+## Principles
 
-Detect and use the user's preferred language for all output text:
+- Prefer concrete, verifiable language to abstraction, but never fabricate precision.
+- Adapt jargon and translated material for the audience while preserving intent.
+- Present the strongest relevant counterargument before rebutting it.
+- Prefer direct verbs, stable terms, and the shortest wording that preserves meaning.
 
-1. Check user's message language
-2. Check project documentation language
-3. Check recent git commit patterns
-4. Default to English if no clear indication
+## Failure Handling
 
-**Adapt**: All user-facing messages, reports, feedback
-**Keep in English**: Code examples, technical terms, file paths
+- Missing evidence: keep the claim qualitative or mark it as unknown.
+- Conflicting sources: expose the conflict; do not silently choose one.
+- Unclear requirement strength: preserve the original modal verb and ask if needed.
+- Revision would change scope: identify the proposed addition separately rather than inserting it.
+- Source is unavailable: limit changes to structure and wording that can be proven meaning-preserving.
 
-## Red Flags
-
-If you catch yourself doing any of these, stop and correct:
-
-| Red Flag | Fix |
-|---|---|
-| Fabricating numbers to sound concrete | Only use numbers from real data. No data? Describe the change without metrics. |
-| Starting with background the reader already knows | Start where the reader's knowledge ends — wasted context loses the reader |
-| Using "robust", "leverage", "delve", "tapestry" | These signal AI-generated text; use concrete language (see `reference/anti-patterns.md`) |
-| Writing abstract claims without examples | Add a specific data point or measurement |
-| Ending a sentence with "-ing" filler ("highlighting its importance") | Delete the -ing phrase — strongest single AI tell per tropes.fyi |
-| Using "It's not X — it's Y" structure | State the point directly; limit to 1 per document at most |
-| Summarizing at every level (paragraph, section, document) | One summary per document, at the top — repetition dilutes the argument |
-| Every bullet starts with **bold label** | Vary bullet structure |
-| Skipping structure review, going straight to style | Always revise structure before style — polishing sentences in the wrong section wastes effort |
-| Hedging every claim ("might possibly perhaps") | One hedge maximum per claim |
-| Using different terms for the same concept | Pick one term, use it consistently — synonym drift confuses readers |
-| Ignoring counter-arguments in persuasive text | Steel man the strongest objection |
-
-Full anti-pattern catalog with sentence, tone, structural, and formatting patterns: `reference/anti-patterns.md`
-
-## Quick Reference
-
-**Drafting** (full workflow: `reference/drafting.md`):
-1. Define purpose, audience, and scope
-2. Create outline (progressive disclosure)
-3. Apply context zero (reader has no prior knowledge)
-4. Draft section by section (one claim per section)
-5. Internal review before sharing
-
-**Revising** (full checklist: `reference/revising.md`):
-1. **Structure**: Purpose visible, one claim per section, logical flow
-2. **Clarity**: Context zero, concrete claims, terms defined
-3. **Style**: Active voice, no AI cliches, brevity applied
-4. **Consistency**: Terminology, formatting, references, tone
-
-## Troubleshooting
-
-| Issue | Solution |
-|---|---|
-| Text still feels vague after revision | Run the concreteness diagnostic: can each sentence be fact-checked? |
-| Document is too long | Check if each section serves the stated purpose; cut sections that don't |
-| Tone is inconsistent | Pick formal or informal in Step 1 and enforce during Pass 4 |
-| Counter-arguments feel weak | You're straw-manning; restate the objection as its proponent would |
-
+Use the requested document language and audience tone. Keep code, paths, API names, and citations exact.

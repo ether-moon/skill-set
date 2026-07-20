@@ -1,0 +1,23 @@
+schema_version: "1.1"
+name: zooming-out-on-code-trigger-positive-03
+description: Should select zooming-out-on-code for a representative request
+tags:
+  - zooming-out-on-code
+  - trigger-positive
+execution:
+  prompt: "What calls this package, what does it depend on, and what sits beside it?"
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 3
+graders:
+  - type: tool_used
+    name: selected-zooming-out-on-code
+    tool: Skill
+    input_match: "zooming-out-on-code"
+    min: 1
+  - type: llm
+    name: workflow-outcome
+    criteria: "Pass only if the response performs read-only orientation and reports exactly Responsibility, Callers, Dependencies, Siblings, and Unknowns without recommendations, edits, or architecture redesign."
+    focus: last_message

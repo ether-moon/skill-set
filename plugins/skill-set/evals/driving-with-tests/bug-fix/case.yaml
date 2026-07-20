@@ -1,0 +1,18 @@
+schema_version: "1.1"
+name: driving-with-tests-bug-fix
+description: Selects a failing regression test for a bug fix
+tags:
+  - driving-with-tests
+  - functional
+execution:
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 3
+graders:
+  - type: tool_used
+    name: selected-driving-with-tests
+    tool: Skill
+    input_match: driving-with-tests
+    min: 1

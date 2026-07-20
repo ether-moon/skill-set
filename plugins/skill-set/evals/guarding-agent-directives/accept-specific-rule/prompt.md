@@ -1,0 +1,1 @@
+Verify this proposed CLAUDE.md addition: 'Run tests with `npm test --runInBand` because the database fixture cannot handle parallel writes — running in parallel produces nondeterministic failures.' Return the full five-question report and exact proposed diff, then stop for my final confirmation. Do not edit files yet.

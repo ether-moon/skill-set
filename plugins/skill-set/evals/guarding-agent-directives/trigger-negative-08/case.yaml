@@ -1,0 +1,25 @@
+schema_version: "1.1"
+name: guarding-agent-directives-trigger-negative-08
+description: Should not select guarding-agent-directives for a near-miss request
+tags:
+  - guarding-agent-directives
+  - trigger-negative
+execution:
+  prompt: "Write a normal README section describing installation."
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 3
+graders:
+  - type: tool_used
+    name: did-not-select-guarding-agent-directives
+    tool: Skill
+    input_match: "guarding-agent-directives"
+    min: 0
+    max: 0
+    arm: both
+  - type: llm
+    name: appropriate-scope
+    criteria: "Pass only if the response does not invoke or recommend guarding-agent-directives and instead handles the request directly or identifies a more appropriate workflow without forcing it into this skill's scope."
+    focus: last_message

@@ -1,79 +1,48 @@
-# Polling — Cycle Steps 2–4
+# Snapshot and Polling Contract
 
-These three steps run inside the cycle loop in `SKILL.md`. They wait for the new HEAD's checks to register, wait for CI to stabilize (chunked under the Bash 10-min cap), and optionally wait for CodeRabbit's review to complete.
+`skill-set-pr snapshot --pr <number> --expected-run-id <id>` performs one bounded, compare-and-swap observation from `polling`. Wait 30 seconds between polling snapshots. This bounded cadence avoids GitHub hammering while absolute state-file deadlines survive model re-entry.
 
-## Step 2: Wait for new HEAD's check-runs to register
+## Stable-HEAD Read
 
-After Step 0 (or after fix push in prior cycle), GitHub takes 15–60 s to register `check_runs` for the new SHA. `gh pr checks --watch` without this guard may report stale results from the previous SHA.
+Each snapshot reads the PR HEAD SHA, repository, branch, and host before and after checks, review threads, and CodeRabbit status. If that binding differs, the runner:
 
-```bash
-TARGET_SHA=$(gh pr view --json headRefOid -q .headRefOid)
-WAITED=0
-while [ $WAITED -lt 60 ]; do
-  COUNT=$(gh api "repos/$OWNER/$REPO/commits/$TARGET_SHA/check-runs" -q '.total_count' 2>/dev/null || echo 0)
-  [ "$COUNT" -gt 0 ] && break
-  sleep 5; WAITED=$((WAITED + 5))
-done
-# COUNT == 0 after 60s = no workflows triggered for this SHA (e.g., docs-only change with path filter)
-```
+1. discards every intermediate result;
+2. stores the new HEAD;
+3. resets CI and review deadlines from the current time;
+4. returns `polling` with `discarded=true`.
 
-## Step 3: CI stabilization (chunked, model re-entry safe)
+If the stored HEAD changed before the snapshot but the two current reads agree, current results are valid and deadlines still reset.
 
-Bash tool's hard limit is ~10 min. Use 9-minute chunks of `gh pr checks --watch` with re-entry between chunks. Track elapsed time; abort if `--ci-timeout` exceeded.
+## Checks
 
-```bash
-REQ_FLAG=""
-[ "$REQUIRED_ONLY" = "true" ] && REQ_FLAG="--required"
+The runner calls `gh pr checks --json bucket,name,state,link,workflow` and optionally `--required`. Buckets are classified as:
 
-CI_DEADLINE=$(( $(date +%s) + CI_TIMEOUT_MIN * 60 ))
+| Bucket | Meaning |
+|---|---|
+| `pass`, `skipping` | Satisfied |
+| `fail`, `cancel` | Blocked |
+| `pending` or unknown | Polling until the CI deadline |
 
-while [ $(date +%s) -lt $CI_DEADLINE ]; do
-  # 540s = 9 min, leaves headroom under Bash 10-min limit.
-  # Possible exits: 0=all pass, 8=in_progress remains, 124=timeout cap hit,
-  # other non-zero=failures present. We always re-check status next, so we
-  # discard the watch's exit code — it's an intermediate signal.
-  "$TIMEOUT_BIN" 540 gh pr checks "$PR" $REQ_FLAG --watch --interval 30 || true
+Pending at the deadline becomes `timed_out`. For a new HEAD, zero selected checks remain `polling` for a 60-second registration grace so a fresh push cannot appear clean before workflows register. After that grace, a repository with genuinely no selected checks may satisfy the check condition. If checks were observed and later disappear, polling continues until the CI deadline.
 
-  STATES=$(gh pr checks "$PR" $REQ_FLAG --json state -q '[.[].state] | unique')
-  PENDING=$(echo "$STATES" | jq '[.[] | select(. == "PENDING" or . == "QUEUED" or . == "IN_PROGRESS")] | length')
-  [ "$PENDING" = "0" ] && break
-done
-```
+## Review Threads
 
-If deadline hit without stabilization: report "CI did not stabilize within $CI_TIMEOUT_MIN min" and exit (do not invoke resolver on indeterminate state).
+The runner queries GraphQL `reviewThreads(first:100, after:$cursor)` and follows `pageInfo.endCursor` until `hasNextPage=false`. An actionable thread is unresolved, not outdated, and has a non-empty latest comment. There is no 100-thread truncation.
 
-## Step 4: CodeRabbit review-completion wait (only if WAIT_CR)
+Praise and summary-only acknowledgements are filtered by one deliberately narrow whole-message rule. The runner ASCII-lowercases the latest body, replaces ASCII punctuation with spaces, collapses whitespace, and trims it. Only an exact normalized match for `lgtm`, `looks good`, `looks good to me`, `great work`, `great job`, `nice work`, `well done`, `thanks`, `thank you`, `approved`, `all good`, `ship it`, `summary`, `review summary`, `code review summary`, or `walkthrough` is non-actionable; a trimmed body consisting only of `👍`, `✅`, or `🎉` is also non-actionable. A praise phrase followed by any request remains actionable.
 
-CodeRabbit publishes a **commit status** named `CodeRabbit` (`context == "CodeRabbit"` on the legacy commit-status API). It sits at `pending` while CodeRabbit reviews and flips to `success`/`failure`/`error` once the review — inline comments and the review object — is fully posted. That status is the real completion signal: poll it instead of guessing a fixed timeout. A fixed wait conflates "CodeRabbit hasn't finished yet" with "CodeRabbit finished and found nothing" — the premature-clean bug (see `troubleshooting.md`, "any fixed value is wrong somewhere").
+Any unresolved actionable thread makes the snapshot `blocked`.
 
-`--review-timeout` (default 30 min) is only a safety cap for a CodeRabbit that never finishes — not the expected wait. The outcome is the `REVIEW_VERIFIED` flag: `false` means the review never completed, and Step 7 refuses to call the PR clean on that basis.
+## CodeRabbit
 
-This wait can exceed the Bash tool's 10-min limit, so it is chunked like Step 3. Carry the absolute `REVIEW_DEADLINE` epoch across re-entries so the 30-min cap is measured from the cycle's start, not reset per chunk.
+Initialization accepts `--coderabbit-required auto|true|false`. Auto mode detects recent repository use. When required, snapshots query both commit statuses and check-runs for the current HEAD and match CodeRabbit by context, name, or app.
 
-```bash
-REVIEW_VERIFIED=false
-[ "$WAIT_CR" = "true" ] && {
-  # REVIEW_DEADLINE persists across model re-entries — set once per cycle.
-  : "${REVIEW_DEADLINE:=$(( $(date +%s) + REVIEW_TIMEOUT_MIN * 60 ))}"
-  CHUNK_END=$(( $(date +%s) + 540 ))   # 9-min chunk, headroom under Bash 10-min limit
+Successful or neutral completion satisfies the completion signal; actionable comments are still evaluated through review threads. Failure, error, cancellation, timeout, or action-required is blocked. Pending or absent remains `polling` until the review deadline, then becomes `timed_out`.
 
-  while [ $(date +%s) -lt $REVIEW_DEADLINE ] && [ $(date +%s) -lt $CHUNK_END ]; do
-    # Status is queried on TARGET_SHA directly, so unlike the old review-object
-    # poll there is no stale-result risk — no commit_id filter needed.
-    CR_STATE=$(gh api "repos/$OWNER/$REPO/commits/$TARGET_SHA/status" \
-      | jq -r '[.statuses[] | select(.context | ascii_downcase | test("coderabbit"))]
-               | (.[0].state // "absent")')
-    case "$CR_STATE" in
-      success|failure|error)
-        # Terminal state = CodeRabbit finished this commit. failure/error still
-        # count as done — the review comments are what later steps consume.
-        REVIEW_VERIFIED=true; break ;;
-      pending|absent)
-        # Still reviewing, or status not yet registered for this SHA.
-        sleep 30 ;;
-    esac
-  done
-}
-```
+## Mergeability
 
-If the chunk ends with `REVIEW_VERIFIED=false` and `REVIEW_DEADLINE` is not yet reached, re-enter this step (carrying the same `REVIEW_DEADLINE`). If the deadline is reached while still `false`, CodeRabbit did not finish within `--review-timeout` min — carry `REVIEW_VERIFIED=false` into Step 5; Step 7 will report the PR as not-verified rather than clean.
+`CONFLICTING` or `DIRTY` is blocked. An unknown mergeability result is polling, never clean.
+
+## Fingerprint
+
+The blocker fingerprint covers the observed HEAD; normalized check identities, states, and buckets; conflict state; unresolved thread IDs and latest-comment content; and CodeRabbit state. After a resolver returns to polling, only a fresh snapshot can declare `stalled`, and only when both HEAD and fingerprint remain unchanged.

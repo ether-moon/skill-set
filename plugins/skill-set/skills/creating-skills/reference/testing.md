@@ -1,191 +1,112 @@
-# Testing Methodology
+# Testing Skills
 
 ## Table of Contents
 
-- [Testing Approaches](#testing-approaches)
+- [Test in Layers](#test-in-layers)
+- [Structural Validation](#structural-validation)
+- [Trigger Testing](#trigger-testing)
+- [Functional and Safety Testing](#functional-and-safety-testing)
 - [Cross-Model Testing](#cross-model-testing)
-- [Three Test Types](#three-test-types) (triggering, functional, performance comparison)
-- [Observing Claude's Navigation Behavior](#observing-claudes-navigation-behavior)
-- [Success Criteria](#success-criteria) (quantitative, qualitative)
-- [Iteration Based on Feedback](#iteration-based-on-feedback) (undertriggering, overtriggering, execution issues)
+- [Observe Navigation](#observe-navigation)
+- [Acceptance Evidence](#acceptance-evidence)
 
----
+## Test in Layers
 
-Skills can be tested at varying levels of rigor depending on your needs.
+Use the cheapest layer that can disprove the claim, then expand:
 
-## Testing Approaches
+1. **Structure** — frontmatter, directory names, references, fixture paths, and scripts are valid.
+2. **Deterministic behavior** — bundled scripts parse, validate, dry-run, mutate, recover, and report errors correctly.
+3. **Triggering** — representative positive and near-miss negative prompts select the correct skill.
+4. **Functional behavior** — the complete workflow produces the required outcome and respects stop conditions.
+5. **Safety** — unauthorized mutation, publication, deletion, or scope expansion remains impossible.
+6. **Comparison** — candidate behavior improves or preserves the declared baseline.
 
-- **Manual testing in Claude.ai** - Run queries directly and observe behavior. Fast iteration, no setup required.
-- **Scripted testing in Claude Code** - Automate test cases for repeatable validation across changes.
-- **Programmatic testing via API** - Build evaluation suites that run systematically against defined test sets.
+Do not substitute a prose assertion about a script for executing it.
 
-Choose the approach that matches your quality requirements and skill visibility.
+## Structural Validation
+
+At minimum verify:
+
+- the directory and frontmatter `name` match;
+- the description states what the skill does and when to use it;
+- `SKILL.md` stays focused and every linked path resolves;
+- references are one level deep and do not create chains;
+- scripts declare dependencies, validate input, and return actionable failures;
+- mutation scripts provide a safe dry run or preview where meaningful; and
+- examples use real supported tools and argument syntax.
+
+Run the host plugin validator when available. Add repository-local checks for stronger project invariants such as exact inventory, forbidden dependencies, generated-file drift, or Bash compatibility.
+
+## Trigger Testing
+
+For a production skill, use 8–10 should-trigger and 8–10 should-not-trigger prompts.
+
+Positive coverage should include:
+
+- direct requests;
+- paraphrases and informal wording;
+- uncommon valid uses;
+- requests that compete with a neighboring skill; and
+- explicit use of a key input type or workflow phase.
+
+Negative coverage should prioritize near misses:
+
+- the same noun but a different desired action;
+- an adjacent workflow owned elsewhere;
+- a simpler request that should be handled directly;
+- a later or earlier lifecycle phase outside the skill; and
+- a request that names an excluded output.
+
+Avoid irrelevant negatives. They inflate precision without testing the boundary.
+
+Measure precision and recall overall and per skill. Review the actual Skill calls as well as the final message.
+
+## Functional and Safety Testing
+
+Translate the workflow into observable contracts:
+
+```text
+Given: fixture state and explicit authority
+When: the skill follows its normal entry point
+Then: exact output, state transition, tool scope, and recovery behavior
+```
+
+Include happy path, invalid input, dependency failure, partial completion, retry, and concurrency when relevant. For stateful or mutating skills, use disposable repositories, mock services, and command logs. Verify both what happened and what did not happen.
+
+Safety tests should exercise absent or narrower authority, stale compare-and-swap values, ambiguous findings, unrelated user changes, failed substeps, and publication gates. A model rubric saying “be safe” is weaker than a command log proving no push or comment occurred.
 
 ## Cross-Model Testing
 
-Skills act as additions to models, so effectiveness depends on the underlying model. Test your skill with all models you plan to use it with.
+Test every model tier the skill supports:
 
-**Considerations by model tier:**
-- **Haiku** (fast, economical): Does the skill provide enough guidance? Haiku may need more explicit instructions than larger models.
-- **Sonnet** (balanced): Is the skill clear and efficient? Good middle-ground for validating instruction clarity.
-- **Opus** (powerful reasoning): Does the skill avoid over-explaining? Opus can infer more from less context.
+- **Haiku** exposes missing sequence details and weak guardrails.
+- **Sonnet** is a balanced functional target and the minimum trusted LLM judge tier.
+- **Opus** exposes unnecessary instruction volume and overconstraint.
 
-What works perfectly for Opus might need more detail for Haiku. If you plan to use your skill across multiple models, aim for instructions that work well with all of them.
+Use a different model for LLM grading than for the agent run. Hold cases, fixtures, tool grants, and run count constant when comparing models. Run nondeterministic cases at least three times.
 
----
+## Observe Navigation
 
-## Pro Tip: Iterate on a Single Task First
+Read traces to see how the model consumes the skill:
 
-The most effective skill creators iterate on a single challenging task until Claude succeeds, then extract the winning approach into a skill. This leverages Claude's in-context learning and provides faster signal than broad testing.
+- Does it open the correct reference only when needed?
+- Does it miss a critical instruction buried in a reference?
+- Does it repeatedly recreate a script that should be bundled?
+- Does it explore unrelated files or invoke another workflow?
+- Does it stop at the intended boundary?
 
-Once you have a working foundation, expand to multiple test cases for coverage.
+Move critical workflow and safety rules into `SKILL.md`. Remove references that are never used or do not change outcomes.
 
----
+## Acceptance Evidence
 
-## Three Test Types
+Before declaring the skill ready, retain:
 
-### 1. Triggering Tests
+- baseline and candidate provenance;
+- deterministic test commands and results;
+- per-case scores and deltas;
+- trigger precision/recall overall and by skill;
+- safety violations and relevant tool-call evidence;
+- duration, turns, token, and cost data when exposed; and
+- unresolved environmental or grader limitations.
 
-**Goal**: Ensure skill loads at the right times.
-
-**Test cases:**
-- Triggers on obvious tasks
-- Triggers on paraphrased requests
-- Doesn't trigger on unrelated topics
-
-**Example test suite:**
-
-```
-Should trigger:
-- "Help me set up a new ProjectHub workspace"
-- "I need to create a project in ProjectHub"
-- "Initialize a ProjectHub project for Q4 planning"
-
-Should NOT trigger (near-misses sharing keywords):
-- "Write a project proposal document" (shares "project" but needs writing skill)
-- "Show me the ProjectHub API docs" (shares "ProjectHub" but needs documentation)
-- "Create a spreadsheet tracking project milestones" (shares "project" but needs spreadsheet skill)
-```
-
-**Debugging approach:**
-Ask Claude: "When would you use the [skill name] skill?" Claude will quote the description back. Adjust based on what's missing.
-
-### 2. Functional Tests
-
-**Goal**: Verify skill produces correct outputs.
-
-**Test cases:**
-- Valid outputs generated
-- API calls succeed
-- Error handling works
-- Edge cases covered
-
-**Example:**
-
-```
-Test: Create project with 5 tasks
-Given: Project name "Q4 Planning", 5 task descriptions
-When: Skill executes workflow
-Then:
-  - Project created in ProjectHub
-  - 5 tasks created with correct properties
-  - All tasks linked to project
-  - No API errors
-```
-
-### 3. Performance Comparison
-
-**Goal**: Prove skill improves results vs. baseline.
-
-**Example comparison:**
-
-```
-Without skill:
-- User provides instructions each time
-- 15 back-and-forth messages
-- 3 failed API calls requiring retry
-- 12,000 tokens consumed
-
-With skill:
-- Automatic workflow execution
-- 2 clarifying questions only
-- 0 failed API calls
-- 6,000 tokens consumed
-```
-
----
-
-## Observing Claude's Navigation Behavior
-
-As you iterate, pay attention to how Claude actually uses your skill in practice. Watch for:
-
-- **Unexpected exploration paths**: Does Claude read files in an order you didn't anticipate? Your structure may not be as intuitive as intended.
-- **Missed connections**: Does Claude fail to follow references to important files? Links might need to be more explicit or prominent.
-- **Overreliance on certain sections**: If Claude repeatedly reads the same file, consider whether that content should be in the main SKILL.md instead.
-- **Ignored content**: If Claude never accesses a bundled file, it might be unnecessary or poorly signaled in the main instructions.
-
-Iterate based on these observations rather than assumptions. The name and description in your skill's metadata are particularly critical — Claude uses these when deciding whether to trigger the skill for the current task.
-
----
-
-## Success Criteria
-
-These are aspirational targets - rough benchmarks rather than precise thresholds.
-
-### Quantitative Metrics
-
-**Skill triggers on 90% of relevant queries**
-- How to measure: Run 10-20 test queries that should trigger your skill. Track how many times it loads automatically vs. requires explicit invocation.
-
-**Completes workflow in X tool calls**
-- How to measure: Compare the same task with and without the skill enabled. Count tool calls and total tokens consumed.
-
-**0 failed API calls per workflow**
-- How to measure: Monitor MCP server logs during test runs. Track retry rates and error codes.
-
-### Qualitative Metrics
-
-**Users don't need to prompt about next steps**
-- How to assess: During testing, note how often you need to redirect or clarify. Ask beta users for feedback.
-
-**Workflows complete without user correction**
-- How to assess: Run the same request 3-5 times. Compare outputs for structural consistency and quality.
-
-**Consistent results across sessions**
-- How to assess: Can a new user accomplish the task on first try with minimal guidance?
-
----
-
-## Iteration Based on Feedback
-
-Skills are living documents. Plan to iterate based on:
-
-### Undertriggering Signals
-
-- Skill doesn't load when it should
-- Users manually enabling it
-- Support questions about when to use it
-
-**Solution**: Add more detail and nuance to the description - this may include keywords particularly for technical terms
-
-### Overtriggering Signals
-
-- Skill loads for irrelevant queries
-- Users disabling it
-- Confusion about purpose
-
-**Solution**: Add negative triggers, be more specific
-
-### Execution Issues
-
-- Inconsistent results
-- API call failures
-- User corrections needed
-
-**Solution**: Improve instructions, add error handling
-
----
-
-## Full Evaluation Methodology
-
-For the complete eval-driven development workflow — including baseline comparison, grading with assertions, benchmarking, iteration loop, and description optimization — see [reference/evaluation.md](evaluation.md).
+The top-level lifecycle routes to the separate evaluation reference for official case layout, ablation commands, grader selection, and iteration.

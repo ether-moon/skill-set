@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+plugin_dir=$(cd -- "$script_dir/.." && pwd)
+repo_dir=$(cd -- "$plugin_dir/../.." && pwd)
+
+command -v perl >/dev/null 2>&1 || { printf 'Missing required command: perl\n' >&2; exit 127; }
+
+violations=$(mktemp "${TMPDIR:-/tmp}/skill-set-reference-errors.XXXXXX")
+trap 'rm -f "$violations"' EXIT
+
+check_file() {
+  local file=$1
+  local line_number target clean_target base_path
+  while IFS=$'\t' read -r line_number target; do
+    target=${target#<}
+    target=${target%>}
+    case $target in
+      ''|'#'*|http://*|https://*|mailto:*|app://*|skill:*) continue ;;
+    esac
+    clean_target=${target%%#*}
+    clean_target=${clean_target%% \"*}
+    [[ -n $clean_target ]] || continue
+    case $file in
+      "$plugin_dir"/skills/*/reference/*.md)
+        case $clean_target in
+          *.md)
+            printf '%s:%s: nested reference chain; link this file directly from SKILL.md: %s\n' \
+              "$file" "$line_number" "$target" >>"$violations"
+            continue
+            ;;
+        esac
+        ;;
+    esac
+    if [[ $clean_target == /* || $clean_target == \~/* ]]; then
+      printf '%s:%s: host-specific absolute link: %s\n' "$file" "$line_number" "$target" >>"$violations"
+      continue
+    fi
+    if [[ $file == "$plugin_dir/"* && $clean_target == ../* ]]; then
+      printf '%s:%s: plugin-local link escapes plugin root: %s\n' "$file" "$line_number" "$target" >>"$violations"
+      continue
+    fi
+    base_path=$(dirname "$file")/$clean_target
+    [[ -e $base_path ]] || printf '%s:%s: missing local link target: %s\n' "$file" "$line_number" "$target" >>"$violations"
+  done < <(perl -ne '
+    if (/^\s*```/) { $fenced = !$fenced; next }
+    next if $fenced;
+    while (/\]\(([^)]+)\)/g) { print "$.\t$1\n" }
+  ' "$file")
+}
+
+check_backtick_paths() {
+  local file=$1
+  local line_number target resolved skill_root
+  while IFS=$'\t' read -r line_number target; do
+    # Match the documentation marker literally.
+    # shellcheck disable=SC2016
+    case $target in
+      '${CLAUDE_PLUGIN_ROOT}/'*) resolved=$plugin_dir/${target#'${CLAUDE_PLUGIN_ROOT}/'} ;;
+      reference/*)
+        skill_root=${file#"$plugin_dir/skills/"}
+        skill_root=${skill_root%%/*}
+        resolved=$plugin_dir/skills/$skill_root/$target
+        ;;
+      agents/*|commands/*|scripts/*|bin/*|evals/*|skills/*) resolved=$plugin_dir/$target ;;
+      */reference/*) resolved=$plugin_dir/skills/$target ;;
+      *) continue ;;
+    esac
+    [[ -e $resolved ]] || printf '%s:%s: missing backticked plugin path: %s\n' "$file" "$line_number" "$target" >>"$violations"
+  done < <(perl -ne '
+    if (/^\s*```/) { $fenced = !$fenced; next }
+    next if $fenced;
+    while (/`([^`]+)`/g) { print "$.\t$1\n" }
+  ' "$file")
+}
+
+check_file "$repo_dir/README.md"
+check_file "$repo_dir/AGENTS.md"
+while IFS= read -r markdown_file; do
+  check_file "$markdown_file"
+done < <(find "$plugin_dir" -type f -name '*.md' -not -path '*/evals/results/*' | sort)
+
+while IFS= read -r active_doc; do
+  check_backtick_paths "$active_doc"
+done < <(
+  find "$plugin_dir/skills" -mindepth 2 -maxdepth 2 -type f -name SKILL.md
+  find "$plugin_dir/agents" "$plugin_dir/commands" -type f -name '*.md'
+)
+
+if [[ -s $violations ]]; then
+  printf 'Local reference validation failed:\n' >&2
+  sed -n '1,240p' "$violations" >&2
+  exit 1
+fi
+
+printf '{"status":"valid","scope":"active plugin documentation"}\n'

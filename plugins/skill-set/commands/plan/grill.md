@@ -1,15 +1,13 @@
 ---
-description: Adversarially interrogate an existing plan or design before implementation. Walks the decision tree one question at a time with recommended answers, prefers codebase exploration over questions, and surfaces contradictions between stated intent and actual code.
+description: Stress-test an existing plan one decision per turn, stopping after five user questions with a Confirmed, Rejected, and Unresolved ledger.
 ---
 
-Invoke the `grilling-plans` skill to stress-test the current plan, design, or proposal. The skill walks the decision tree one branch at a time, provides a recommended answer with each question, reads the codebase rather than asking when possible, and surfaces contradictions between user statements and actual code.
+Invoke `grilling-plans` for the current plan, RFC, design, or proposal.
 
-**When to use this command:**
-- Between `superpowers:brainstorming` (creation) and `superpowers:writing-plans` (lock-down)
-- Before invoking `superpowers:executing-plans`
-- Right before a PR description is finalized
-- After picking a candidate from `improving-architecture`
+Verify present-state claims from the read-only codebase before asking. Ask one question per turn with evidence, 2–3 alternatives, and one recommendation. After a default maximum of five user questions, stop and return:
 
-**Outputs:**
-- A shared understanding sharp enough to feed into implementation planning
-- Optionally hands off to `building-shared-vocabulary` if a domain term is sharpened or an ADR-worthy decision crystallizes
+- Confirmed decisions
+- Rejected alternatives
+- Unresolved branches
+
+Do not modify the plan or repository. End with the ledger; continue only if the user explicitly requests another round.

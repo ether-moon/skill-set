@@ -1,127 +1,80 @@
 ---
 name: guarding-agent-directives
-description: Guards agent directive files (CLAUDE.md, AGENTS.md, referenced documents) against bloat by verifying every proposed addition through strict criteria while preserving user authority. Use when adding, modifying, or reviewing content in directive files, when user says "add a rule", "update CLAUDE.md", "new directive", "add instruction to AGENTS.md", or when any agent autonomously attempts to modify these files.
+description: Verifies proposed agent-directive additions and audits existing CLAUDE.md, AGENTS.md, and referenced instruction files for bloat, duplication, ambiguity, and placement. Use when adding, changing, or reviewing agent directives or when an agent proposes modifying them.
+allowed-tools: Read, Grep, Glob, Edit
 ---
 
 # Guarding Agent Directives
 
-## Overview
+## Modes
 
-**Core principle**: Agent directive files are loaded every session and determine what the model focuses on. Only the highest-value instructions deserve space here.
+Choose one explicit mode:
 
-> Perfection is achieved not when there is nothing more to add, but when there is nothing more to take away. — Antoine de Saint-Exupéry
+- `verify-addition` — evaluate one proposed directive and, after user approval, apply an exact reviewed diff.
+- `audit-existing` — read existing directives and return keep, revise, or remove recommendations. This mode is read-only and never changes files.
 
-When everything is important, nothing is important. 100 rules are followed worse than 3. This skill ensures every addition earns its place.
+Default to `audit-existing` for review requests and `verify-addition` only when an addition or modification is proposed.
 
-## When to Use
+Do not insert a canonical coding baseline or restore deleted baseline rules. Evaluate only the content in scope.
 
-- User requests adding content to CLAUDE.md, AGENTS.md, or their referenced documents
-- Agent autonomously attempts to modify any directive file
-- Reviewing or auditing existing directive content
+## Five Questions
 
-## Verification
+Evaluate every proposed addition or audited rule:
 
-Every proposed addition must pass 5 questions:
+| Check | Pass condition |
+|---|---|
+| Q1 Recurring? | The same project-specific failure is likely across sessions. |
+| Q2 Non-obvious? | A capable agent cannot infer it from code, standard practice, or nearby configuration. |
+| Q3 Novel? | Existing directives do not already express the same behavior. |
+| Q4 Actionable? | Compliance changes observable behavior and can be checked. |
+| Q5 Correct location? | The rule is placed at the narrowest scope where it is needed and will actually be loaded. |
 
-| # | Question | FAIL if... |
-|---|----------|------------|
-| Q1 | **Recurring?** — Would agents repeat this mistake every session? | One-time issue, not recurring |
-| Q2 | **Non-obvious?** — Can the agent NOT infer this from general knowledge? | Derivable from common sense or model defaults |
-| Q3 | **Novel?** — Is this not already covered by existing directives? | Duplicate of existing content in different words |
-| Q4 | **Actionable?** — Does this change concrete agent behavior? | Vague declaration with no behavioral effect |
-| Q5 | **Project-specific?** — Is this unique to this project? | Universal knowledge the agent already has |
+Q5 Correct location replaces any requirement that a user policy be unique to one project. Explicit user policy may be valid even when general; placement and context cost still matter.
 
-**On failure**: Present failed questions with reasoning. Offer choice:
-1. **Add anyway** — User judgment overrides (user has final authority)
-2. **Revise and re-verify** — Refine the content to pass
-3. **Don't add** — Discard
+Read [the detailed criteria](reference/verification.md) for examples.
 
-**See**: [reference/verification.md](reference/verification.md) for detailed criteria and examples
+## verify-addition
 
-## Workflow
+1. Identify exact content, intended behavior, target file, and proposer.
+2. Read the target and every directive it references; search for duplicates and contradictions.
+3. Report PASS/FAIL with evidence for all five questions.
+4. If any fail, offer `Add anyway`, `Revise`, and `Don't add`. A user override is authoritative.
+5. Recommend the narrowest correct location: existing reference, skill-local reference, or top-level directive only when globally necessary.
+6. Show the exact diff before mutation and ask for final confirmation.
+7. Apply only the confirmed diff, then show the resulting exact diff.
 
-```
-Input received
-  |
-Run 5 questions
-  |
-  +-- All pass? --yes--> Decide placement --> Review existing content --> Apply with confirmation
-  |
-  +-- Any fail? ------> Present results + 3 choices
-                            |
-                            +-- "Add anyway"  --> Decide placement (continue above)
-                            +-- "Revise"      --> Run 5 questions again
-                            +-- "Don't add"   --> Done
-```
+An autonomous agent proposal never supplies its own approval. Without user confirmation, stop after the report.
 
-### Step 1: Input received
+## audit-existing
 
-Detect the proposed addition. Identify:
-- What content is being proposed
-- Which file(s) would be affected
-- Who initiated (user request or agent's own attempt)
+For each in-scope rule, return:
 
-### Step 2: Run verification
-
-Evaluate all 5 questions. Present a brief pass/fail summary with one-line reasoning per question.
-
-**Example output format:**
-
-```
-Proposed: "Always use pnpm, not npm"
-
-Q1 Recurring?       PASS — Agent defaults to npm every session
-Q2 Non-obvious?     PASS — Custom tooling choice not inferable
-Q3 Novel?           PASS — Not covered by existing directives
-Q4 Actionable?      PASS — Clear tool substitution
-Q5 Project-specific? PASS — Only applies to this repo
-
-Result: 5/5 passed. Recommend adding.
+```text
+Rule: <quoted or summarized directive with path>
+Verdict: keep | revise | remove
+Q1–Q5: <evidence>
+Reason: <duplication, ambiguity, scope, staleness, or value>
+Suggested wording/location: <only for revise>
 ```
 
-### Step 3: Placement decision
+The audit-existing mode is read-only: do not edit, consolidate, remove, or add directives. Present recommendations for user selection.
 
-Directive files are loaded every session, so placement affects token cost. Recommend the most specific home:
+## Placement
 
-1. **Existing reference file** — Extends an existing section? Add there.
-2. **New reference file + one-line link** — New area that doesn't fit existing files? Create a reference file and add a one-line pointer from CLAUDE.md/AGENTS.md.
-3. **CLAUDE.md/AGENTS.md body** — Only for truly top-level declarations (the project's table of contents).
-4. **Skill-internal reference** — Task-specific guidance that only matters when a particular skill triggers.
+Prefer the narrowest loaded location:
 
-Present the recommendation with reasoning. User confirms.
+1. an existing task- or domain-specific referenced file;
+2. a new focused reference plus one concise link from its parent directive;
+3. the top-level CLAUDE.md or AGENTS.md only for rules that affect nearly every session.
 
-### Step 4: Review existing content
+Do not create a reference merely to hide low-value text. A rule must pass the other checks first.
 
-Scan the target file for:
-- **Duplicates** — Same instruction, different words
-- **Contradictions** — New content conflicts with existing
-- **Superseded content** — Old instruction made redundant by the new one
+## Failure Handling
 
-If found, suggest removal or modification. If nothing to remove, proceed — well-maintained directives may have nothing to cut.
+- Referenced file missing: report the broken directive chain before evaluating placement.
+- Duplicate but clearer wording: recommend revise/replace, not another copy.
+- Contradiction: quote both rules and leave the choice to the user.
+- User override after failure: preserve the rationale, show the exact diff, and respect the decision.
+- Batch request in verify-addition: evaluate each addition independently or switch to audit-existing with user agreement.
 
-### Step 5: Apply
-
-**Write all directive content in English.** English consumes fewer tokens and is the language LLMs perform best in.
-
-Write the content. Present the exact diff to user for final confirmation. Modify file only after approval.
-
-## Red Flags
-
-These patterns indicate the verification workflow was skipped or short-circuited:
-
-- Adding to directive files without running verification first
-- Skipping verification because the content "feels important"
-- Adding vague or aspirational statements ("write clean code", "be thorough")
-- Duplicating what existing directives already express in different words
-- Adding universal knowledge the model already has
-- Overriding the user's explicit decision after a verification failure
-
-Any of these? Go back and run the verification workflow.
-
-## Quick Reference
-
-**Verification summary:** Recurring? Non-obvious? Novel? Actionable? Project-specific?
-
-**Placement priority:** Existing reference file > New reference file + TOC link > Direct in CLAUDE.md/AGENTS.md
-
-**User authority:** User can override any verification failure. Present reasoning, respect the decision.
+Write repository directive content in English. Use the user's language for reports and decisions.

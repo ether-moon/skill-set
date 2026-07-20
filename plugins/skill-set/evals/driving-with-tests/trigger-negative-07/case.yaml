@@ -1,0 +1,25 @@
+schema_version: "1.1"
+name: driving-with-tests-trigger-negative-07
+description: Should not select driving-with-tests for a near-miss request
+tags:
+  - driving-with-tests
+  - trigger-negative
+execution:
+  prompt: "List architectural seams that could make this package more testable."
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 3
+graders:
+  - type: tool_used
+    name: did-not-select-driving-with-tests
+    tool: Skill
+    input_match: "driving-with-tests"
+    min: 0
+    max: 0
+    arm: both
+  - type: llm
+    name: appropriate-scope
+    criteria: "Pass only if the response does not invoke or recommend driving-with-tests and instead handles the request directly or identifies a more appropriate workflow without forcing it into this skill's scope."
+    focus: last_message

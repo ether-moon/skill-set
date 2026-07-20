@@ -1,187 +1,53 @@
 # Pull Request Workflow
 
-Create a pull request with auto-generated title and description, automatically committing and pushing if needed. Self-contained — no delegation to other workflows.
+Create a PR from committed work only, or return the existing PR URL.
 
-## Prerequisites
+## 1. Inspect the Committed Scope
 
-- Git repository with GitHub remote
-- `gh` CLI installed and authenticated
-- Not on master/main branch
-- Changes to include in PR (committed, uncommitted, or pushed)
-
-## Call Summary
-
-| Step | Type | Bash Calls |
-|------|------|------------|
-| 1. Gather git context | read (git) | 1 |
-| 2. Check existing PR | read (gh) | 1 |
-| 3. Commit and push (if needed) | write (git) | 0~1 |
-| 4. Analyze PR scope | read (git) | 1 |
-| 5. Generate PR content | analysis | 0 |
-| 6. Create PR and open | write (gh) | 1 |
-| **Total** | | **4~5** |
-
-## Steps
-
-### 1. Gather Git Context (1 Bash call)
-
-Collect all needed git information in a single call:
+Run with the intended base:
 
 ```bash
-git branch --show-current; git status --porcelain; git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || echo "NO_UPSTREAM"; git log --oneline -10; git diff HEAD --stat; git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "main"
+"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git" inspect --base "<base-branch>"
 ```
 
-**Parse the output into 6 sections:**
-1. **Branch** (`git branch --show-current`): Current branch name — abort if `main` or `master`
-2. **Status** (`git status --porcelain`): Uncommitted changes — empty means all committed
-3. **Upstream** (`git rev-parse ...`): Tracking branch or `NO_UPSTREAM`
-4. **Log** (`git log --oneline -10`): Recent commit patterns and style
-5. **Diff stat** (`git diff HEAD --stat`): Summary of uncommitted changes
-6. **Base branch** (`git symbolic-ref ...`): Default branch name (e.g., `main` or `master`). Use this as `BASE` in all subsequent steps.
+Use only `pr_scope.range`, `pr_scope.files`, and committed history to generate the title and body. The range is `origin/<base>...HEAD`. Never describe dirty changes as part of the PR.
 
-**Exit if:** Branch is `main` or `master` → Inform user: "Cannot create PR from main/master branch."
+Show staged, unstaged, and untracked paths as **excluded from the PR**. If any exist, obtain explicit confirmation that they should remain excluded before creating a new PR.
 
-**Extract ticket number** from branch name (match patterns like `PROJ-123`, `TEAM-456`).
+## 2. Prepare the Body File
 
-### 2. Check Existing PR (1 Bash call)
+Generate a concrete title and body in the user's language while preserving technical identifiers. Allocate the body file first:
 
 ```bash
-gh pr list --head "BRANCH_NAME" --json number,url --jq '.[0]'
+"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git" input-prepare --kind pr-body
 ```
 
-Replace `BRANCH_NAME` with the branch from step 1.
+The allocated file contains exactly `SKILL_SET_INPUT_REPLACE_ME`. Use the scoped Edit capability on the returned `path`, replacing that exact `old_string` with the complete body as `new_string`. Do not interpolate it into a shell command. The runner rejects an empty body or a remaining sentinel before any push or PR operation, consumes a managed body after successful creation or existing-PR discovery, and preserves it on recoverable failure. Use `input-discard` if the user cancels.
 
-**Exit if:** PR already exists → Output its URL and stop.
+Suggested body sections are Summary, Changes, and Test Plan when the committed evidence supports them. Do not invent tests.
 
-### 3. Commit and Push if Needed (0~1 Bash call)
-
-**Skip this step** if status from step 1 is empty AND upstream exists (already pushed).
-
-If uncommitted changes exist, generate a commit message first:
-
-**Commit message guidelines:**
-- **Language:** Match the project's language. Default to English if unclear.
-- **Style:** Follow patterns from the log output in step 1.
-- **Ticket numbers:** Include if extracted from branch name in step 1.
-- **Clarity:** Describe what changed and why.
-
-Then execute the appropriate command:
-
-**Uncommitted changes + no upstream:**
-```bash
-git add -A && git commit -m "$(cat <<'EOF'
-Generated commit message
-EOF
-)" && git push -u origin "$(git branch --show-current)"
-```
-
-**Uncommitted changes + upstream exists:**
-```bash
-git add -A && git commit -m "$(cat <<'EOF'
-Generated commit message
-EOF
-)" && git push
-```
-
-**All committed + no upstream:**
-```bash
-git push -u origin "$(git branch --show-current)"
-```
-
-**All committed + upstream exists:**
-Skip — already pushed.
-
-### 4. Analyze PR Scope (1 Bash call)
-
-Get the full scope of changes for PR description:
+## 3. Preview
 
 ```bash
-git log --oneline origin/BASE..HEAD; git diff --stat origin/BASE..HEAD
+"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git" pr-create \
+  --base "<base-branch>" \
+  --title "<pull-request-title>" \
+  --body-file /tmp/pull-request-body.md \
+  --confirm-dirty-excluded \
+  --dry-run
 ```
 
-Replace `BASE` with the base branch detected in step 1.
+Omit `--confirm-dirty-excluded` when the working tree and index are clean. The preview reports the exact committed scope and whether existing commits need publication.
 
-**Parse the output into 2 sections:**
-1. **Commits**: All commits since diverging from base branch
-2. **Change summary**: Files and lines changed
+## 4. Create or Reuse
 
-### 5. Generate PR Title and Description (no Bash call)
+Invoke the same command without `--dry-run`. The runner first checks for an open PR from the current branch.
 
-**Language:** Match the project's language. Default to English if unclear.
+- Existing PR: returns `existing:true`, `created:false`, and its URL without publication or duplication.
+- New PR: rechecks the observed remote SHA, publishes existing commits only when required, passes the body file directly to GitHub CLI, and returns `created:true` with the URL.
 
-**Title format:**
-```
-TICKET-123: Feature summary
-```
+The operation never commits dirty files. A PR request authorizes the necessary push of existing commits, but no other Git mutation.
 
-**If no ticket number:**
-```
-Feature summary
-```
+## Recovery
 
-**Description format:**
-```markdown
-## Summary
-- Summary of changes (bullet points)
-
-## Changes
-- Specific change details
-
-## Test Plan
-- [ ] Test item 1
-- [ ] Test item 2
-```
-
-**Analysis for content:**
-- Read commit messages from step 4
-- Summarize overall purpose
-- List specific changes from diff stat
-- Generate test checklist based on changes
-
-### 6. Create PR and Open in Browser (1 Bash call)
-
-```bash
-gh pr create --title "Generated title" --body "$(cat <<'EOF'
-## Summary
-- Summary of changes
-
-## Changes
-- Specific change details
-
-## Test Plan
-- [ ] Test item 1
-EOF
-)" --base BASE && gh pr view --web
-```
-
-**Important:** Use HEREDOC for PR body to handle multi-line content correctly.
-
-**Output to user:**
-- PR URL
-- PR title
-- Success message
-
-**Example output:**
-```
-Pull request created: https://github.com/owner/repo/pull/123
-  Title: PROJ-123: Add user authentication flow
-
-Opening in browser...
-```
-
-## Common Issues
-
-**Issue:** "Not in a git repository" or "No GitHub remote"
-**Fix:** Verify repository setup. This workflow requires GitHub remote.
-
-**Issue:** "gh: command not found"
-**Fix:** Install GitHub CLI: `brew install gh` (macOS) and authenticate with `gh auth login`
-
-**Issue:** "Pull request already exists"
-**Fix:** Automatically detected in step 2. Outputs existing PR URL instead.
-
-**Issue:** Can't determine appropriate PR description
-**Fix:** Analyze more context with `git diff --name-only origin/BASE..HEAD` or `git diff origin/BASE..HEAD` (use the base branch detected in step 1).
-
-**Issue:** Push rejected (diverged branches)
-**Fix:** Run `git pull --rebase` then retry step 3.
+Stop on `dirty_exclusion_unconfirmed`, `remote_changed`, `remote_ahead`, or `diverged`. Report the separate dirty lists and committed range so the user can make the next decision. If PR creation fails after a successful branch push, report that the remote branch remains available and do not create a second commit.

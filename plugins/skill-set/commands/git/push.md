@@ -1,7 +1,7 @@
 ---
-description: Push changes to remote using the managing-git-workflow skill
+description: Push existing commits with remote SHA protection
+argument-hint: "[remote or branch context]"
+allowed-tools: "Bash(${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git:*)"
 ---
 
-Use the managing-git-workflow skill to push changes to remote repository with automatic commit if there are uncommitted changes.
-
-Execute the push workflow from the skill.
+Use the `managing-git-workflow` skill's push workflow. Inspect and record the destination SHA, preview the publication, then push existing commits only. Dirty files remain excluded. Do not create a commit or reconcile diverged history automatically.

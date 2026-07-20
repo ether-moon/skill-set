@@ -1,169 +1,147 @@
 ---
 name: shipping-pr
-description: "Ships a PR end-to-end — creates the PR if missing, polls CI checks and CodeRabbit reviews until they stabilize, then auto-invokes the resolving-pr-blockers agent to fix blockers, and loops on push-triggered re-runs until the PR is clean or max-cycles reached. Use when the user says 'ship this PR', 'wait for CI and fix', 'auto-fix until clean', 'PR autopilot', or wants unattended PR closure."
-allowed-tools: "Bash(git:*) Bash(gh:*) Bash(jq:*) Bash(timeout:*) Bash(gtimeout:*) Bash(sleep:*) Bash(test:*) Bash(echo:*) Bash(date:*) Bash(command:*)"
+description: Drives an existing or newly requested pull request through deterministic CI, review, and blocker-resolution cycles until it is verified clean or reaches a terminal stop. Use when the user asks to ship a PR, wait for CI and fix it, run PR autopilot, or keep resolving blockers until the PR is ready.
+allowed-tools: "Bash(${CLAUDE_PLUGIN_ROOT}/bin/skill-set-pr:*) Bash(${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git:*) Bash(gh pr view:*) Bash(git fetch:*) Bash(git cat-file:*) Bash(git worktree:*) Bash(mktemp:*) Bash(sleep:*) Agent"
 ---
 
 # Shipping PR
 
-## Overview
+## Purpose
 
-Closed-loop orchestrator that takes a PR from creation to clean-merge-ready state without manual intervention between cycles. Polls CI and CodeRabbit reviews in-session, dispatches the existing `resolving-pr-blockers` agent on detected blockers, and re-polls after the agent's push triggers fresh CI runs.
+Orchestrate a resumable PR loop without embedding GitHub polling logic in a prompt. `${CLAUDE_PLUGIN_ROOT}/bin/skill-set-pr` owns snapshots, deadlines, concurrency, and state transitions. The resolver agents own edits in an isolated worktree.
 
-**Core principle:** Reuse — delegates PR creation to `managing-git-workflow` and blocker resolution to `resolving-pr-blockers`. This skill only adds the polling loop and convergence logic.
+The user request grants `resolve-authorized` with `edit=true`, `commit=true`, `push=true`, and `comment=true` for this PR only. It does not authorize force-push, unrelated changes, merging, or publishing partial resolver work.
 
 ## When to Use
 
-**Use when:**
-- User wants to walk away after creating a PR and have it driven to a clean state
-- User says "ship the PR", "wait for CI then fix", "auto-fix until merged-ready", "PR autopilot"
-- A PR exists (or should be created) and CI/CodeRabbit need time to produce feedback
+Use for end-to-end PR shipping, repeated CI/review polling, or an explicit request to fix blockers until clean.
 
-**Don't use when:**
-- User wants only to create a PR without waiting (use `/skill-set:git:pr` instead)
-- User wants only to fix existing blockers right now (use `/skill-set:pr:fix`)
-- The PR is already merged or closed
+Do not use for:
 
-## Examples
+- PR creation only; use `managing-git-workflow`.
+- A single immediate blocker pass; use `/skill-set:pr:fix`.
+- Merging or closing a PR.
+- A PR that is already merged or closed.
 
-**Default — current branch, auto-detect CodeRabbit, 3 cycles:**
-```text
-/skill-set:pr:ship
-```
-Creates the PR if missing, waits for required CI checks (≤30 min) and CodeRabbit's review-completion status on the new HEAD (≤30 min), runs `resolving-pr-blockers` if blockers found, then re-polls after the resolver's push. Stops at clean PR, max-cycles=3, or convergence failure.
+## Defaults
 
-**Single attempt, fail fast on no-progress:**
-```text
-/skill-set:pr:ship --max-cycles 1
-```
-One poll-fix-poll round. Useful for "try once, report back."
+| Flag | Default | Meaning |
+|---|---:|---|
+| `--max-cycles` | 3 | Maximum resolver attempts |
+| `--ci-timeout` | 30 minutes | Current-HEAD check deadline |
+| `--review-timeout` | 10 minutes | Current-HEAD CodeRabbit deadline; preserves the legacy command default |
+| `--no-coderabbit` | off | Disable CodeRabbit completion requirement |
+| `--no-create` | off | Refuse to create a missing PR |
+| `--required-only` | true | Select required checks only |
 
-**Wait on advisory checks too (preview deploys, coverage):**
-```text
-/skill-set:pr:ship --required-only=false
-```
-Switches `gh pr checks --watch` to also block on advisory states. Use only when the workflow guarantees they finish — otherwise CI never stabilizes.
+## Common Scenarios
 
-## Language Detection
-
-Detect and use the user's preferred language for all conversational output. Detection priority: (1) user's current messages, (2) project context (CLAUDE.md, README.md), (3) git history (`git log --oneline -5`), (4) default to English.
-
-Apply detected language to: status messages, cycle reports, completion summaries, error messages.
-Always keep in English: bash commands, file paths, technical identifiers.
-
-## Defaults & Flags
-
-| Flag | Default | Purpose |
-|------|---------|---------|
-| `--max-cycles N` | 3 | Hard cap on poll→fix cycles before giving up |
-| `--ci-timeout MIN` | 30 | Per-cycle wall clock cap for CI stabilization |
-| `--review-timeout MIN` | 30 | Per-cycle safety cap on waiting for CodeRabbit's review-completion status |
-| `--no-coderabbit` | off | Force-disable CodeRabbit waiting regardless of detection |
-| `--no-create` | off | Error out if no PR exists for current branch (don't create) |
-| `--required-only=BOOL` | true | Wait only on required checks (false = wait on advisory checks too) |
+- “Ship this PR and keep fixing blockers” runs the full resumable loop with the default limits.
+- “Resume PR 42” loads the active run and branches on its persisted status/publication phase without starting a duplicate resolver.
+- “Is this PR truly clean?” snapshots the same HEAD across checks, paginated threads, mergeability, and CodeRabbit; pending evidence is reported rather than resolved.
 
 ## Workflow
 
-### Step 0: Environment + PR discovery
+### 1. Resolve the PR
+
+Use `${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git` with `inspect --base <base>` to report committed scope and dirty files. If no PR exists and `--no-create` is off, follow `managing-git-workflow`'s PR confirmation flow and call its `pr-create` operation. Dirty files remain excluded and require explicit exclusion confirmation.
+
+Record the resulting repository and PR number. Never auto-commit working-tree changes for shipping.
+
+### 2. Initialize or resume
+
+Convert minute flags to seconds, then run:
 
 ```bash
-# Resolve a working `timeout` binary. macOS ships without GNU coreutils, so
-# users typically install `gtimeout` via Homebrew. Fail fast with install
-# guidance rather than silently skipping the chunk cap (which would let
-# Step 3 hang past the Bash tool's 10-min hard limit).
-if command -v timeout >/dev/null 2>&1; then
-  TIMEOUT_BIN=timeout
-elif command -v gtimeout >/dev/null 2>&1; then
-  TIMEOUT_BIN=gtimeout
-else
-  echo "ERROR: neither 'timeout' nor 'gtimeout' available. Install coreutils:"
-  echo "  macOS: brew install coreutils"
-  echo "  Linux: apt-get install coreutils  (or equivalent)"
-  exit 1
-fi
-
-BRANCH=$(git branch --show-current)
-PR_JSON=$(gh pr view --json number,headRefOid,baseRefName,url,state 2>/dev/null || echo "")
-
-if [ -z "$PR_JSON" ]; then
-  if [ "$NO_CREATE" = "true" ]; then
-    echo "ERROR: No PR for branch $BRANCH and --no-create set"; exit 1
-  fi
-  # Delegate PR creation to managing-git-workflow's PR workflow
-  # Read managing-git-workflow/reference/pr.md and execute it
-  # AFTER creation completes, re-fetch — the delegated workflow does not return PR_JSON.
-  PR_JSON=$(gh pr view --json number,headRefOid,baseRefName,url,state)
-  if [ -z "$PR_JSON" ]; then
-    echo "ERROR: PR creation reported success but gh pr view returned nothing"; exit 1
-  fi
-fi
-
-PR=$(echo "$PR_JSON" | jq -r .number)
-HEAD_SHA=$(echo "$PR_JSON" | jq -r .headRefOid)
-OWNER=$(gh repo view --json owner -q '.owner.login')
-REPO=$(gh repo view --json name -q '.name')
+${CLAUDE_PLUGIN_ROOT}/bin/skill-set-pr init \
+  --pr "$PR" --repo "$REPO" \
+  --max-cycles "$MAX_CYCLES" \
+  --ci-timeout-seconds "$CI_TIMEOUT_SECONDS" \
+  --review-timeout-seconds "$REVIEW_TIMEOUT_SECONDS" \
+  --required-only "$REQUIRED_ONLY" \
+  --coderabbit-required "$CODERABBIT_MODE"
 ```
 
-If `state` is `MERGED` or `CLOSED`, report and exit immediately.
+Use `--resume` only when the runner reports an active run. State lives under the repository's Git common directory, so linked worktrees share one lock and one run. Branch on the returned status: snapshot only `polling`; handle `blocked`, `awaiting_user`, and `resolving` before polling again. A resumed `resolving` run must use its recorded `resolution` metadata and must never dispatch a duplicate resolver. Resume a journaled `prepared`, `gate_passed`, or `commenting` publication by calling `publish` with the unchanged files; the runner reconciles the remote HEAD and hidden comment marker. If its phase is `pending`, report the recorded worktree/branch and treat the interrupted attempt as `partial-failure`. A resumed `awaiting_user` run remains paused with its saved result and recovery paths until the user explicitly decides.
 
-### Step 1: CodeRabbit activation detection
+### 3. Snapshot
 
-Skip if `--no-coderabbit`. Otherwise inspect the most recently merged PR for CodeRabbit activity:
+Call `skill-set-pr snapshot --pr "$PR" --expected-run-id "$RUN_ID"`. The JSON result is authoritative. See [polling.md](reference/polling.md) for classification rules.
+
+- `polling`: report current counts, wait 30 seconds, then call `snapshot` again with the same run ID. Do not reset the run or poll more frequently.
+- `blocked`: continue to resolution.
+- `awaiting_user`: present the unresolved decision and stop until the user responds.
+- `clean`, `timed_out`, `closed`, or `failed`: call `finish` with the same `--from`, `--status`, and `--expected-run-id`, then report that terminal result.
+- `stalled`: report unchanged HEAD and blocker fingerprint; do not retry automatically.
+
+### 4. Resolve one cycle
+
+Read `headRefOid`, `headRefName`, `headRepository.nameWithOwner`, `baseRefOid`, `baseRefName`, and the PR URL host, then re-read them and require they still equal the blocked snapshot. Choose an absolute temporary worktree path and branch. Pin and fetch both exact SHAs without moving the caller's branch. Bind `$REMOTE` to a push URL whose canonical host and `owner/repo` equal the PR head repository; for a fork PR this is normally a fork remote, not the base repository's `origin`. Select the ordered resolver plan: merge alone for a conflict; otherwise CI first when checks failed, then review when actionable threads exist.
+
+Transition from `blocked` to `resolving` with the returned `run_id`, `--increment-cycle`, one `--resolver-agent` per planned agent, and all recovery fields:
 
 ```bash
-WAIT_CR=false
-HAS_CR=$(gh pr list --state merged --limit 1 --json reviews,comments \
-  | jq '[.[] | (.reviews // []) + (.comments // []) | .[] |
-        select((.author.login // .user.login // "") | test("coderabbitai"))] | length')
-[ "$HAS_CR" -gt 0 ] && WAIT_CR=true
-echo "CodeRabbit waiting: $WAIT_CR"
+${CLAUDE_PLUGIN_ROOT}/bin/skill-set-pr transition \
+  --pr "$PR" --from blocked --to resolving --expected-run-id "$RUN_ID" \
+  --increment-cycle --worktree "$WORKTREE" --resolver-branch "$RESOLVER_BRANCH" \
+  --remote "$REMOTE" --remote-branch "$HEAD_BRANCH" \
+  --expected-remote-sha "$HEAD_SHA" --base-sha "$BASE_SHA" --base-branch "$BASE_BRANCH" \
+  --resolver-agent "$RESOLVER_AGENT"
 ```
 
-Limiting to 1 PR keeps the check cheap and makes the activation signal a recency signal: if CodeRabbit didn't touch the most recent merge, treat the repo as not currently using it. This is more reliable than checking for `.coderabbit.yaml` because the GitHub App can be installed at the org level without a repo-local config.
+For a CI-plus-review cycle, repeat `--resolver-agent` in that order. Then invoke `resolving-pr-blockers` with:
 
-### Cycle loop (Steps 2–8 repeat until clean, max-cycles, or convergence failure)
+- repository and PR number;
+- snapshot HEAD and blocker fingerprint;
+- pinned base SHA/ref, PR head repository/branch/host, bound remote, and recorded worktree/branch;
+- current cycle;
+- the explicit capability contract;
+- the requirement to use one isolated remote-HEAD worktree.
 
-The whole block below runs inside this skeleton — any `exit 0`/`exit 1` inside Steps 2–8 terminates the entire skill, while `break` would just leave the loop:
+Follow [blocker-resolution.md](reference/blocker-resolution.md). A conflict consumes the entire cycle. Without conflict, CI resolution runs before review resolution in the same worktree.
+
+### 5. Publish and record the resolver outcome
+
+Each attempted agent writes one ordered entry to a results file inside the resolver worktree with `agent`, `result`, `input_head`, and `output_head`. Queue one summary file there; request `--coderabbit-resolve` when its marker is needed. Only the runner may push or comment:
 
 ```bash
-cycle=1
-while [ $cycle -le $MAX_CYCLES ]; do
-  echo "=== ship cycle $cycle / $MAX_CYCLES ==="
-  # [Step 2] Wait for new HEAD's check-runs to register
-  # [Step 3] CI stabilization (chunked)
-  # [Step 4] CodeRabbit review-completion wait
-  # [Step 5] Blocker assessment
-  # [Step 6] Dispatch resolving-pr-blockers
-  # [Step 7] Convergence check (may exit 0 clean / exit 1 stuck)
-  # [Step 8] Cycle bookkeeping (may exit 1 on max-cycles, else cycle++)
-done
+${CLAUDE_PLUGIN_ROOT}/bin/skill-set-pr publish \
+  --pr "$PR" --expected-run-id "$RUN_ID" \
+  --expected-head-sha "$HEAD_SHA" --expected-local-head-sha "$LOCAL_HEAD_SHA" \
+  --results-file "$RESULTS_FILE" --summary-file "$SUMMARY_FILE"
 ```
 
-**Steps 2–4 (polling):** see `reference/polling.md` for bash details.
+`publish` rejects missing, reordered, ambiguous, failed, or partial results before mutation. Except for the declared results/summary inputs, the resolver worktree must have no staged, unstaged, or untracked changes; this prevents publishing a committed subset while leaving partial edits behind. It revalidates the live PR head repository/ref and the remote push URL, including once immediately before a code push. For code changes it invokes exactly one expected-SHA `skill-set-git push`; for no-code activity it revalidates the unchanged remote HEAD. It combines the summary and optional CodeRabbit marker into one hidden-ID comment after that gate. Its publication journal makes the same intent safe to resume without a second successful push or duplicate comment.
 
-**Steps 5–8 (blocker assessment, dispatch, convergence):** see `reference/blocker-resolution.md`.
+- Successful `publish`: transition `resolving -> polling` with `--resolver-attempt` and `--resolver-result success` or `no-op`, then snapshot again. The transition is rejected unless the publication journal is `complete`.
+- AMBIGUOUS decision: transition `resolving -> awaiting_user` with `--resolver-attempt --resolver-result ambiguous`; do not push.
+- Partial or failed attempt: transition to `failed` or `awaiting_user` with `--resolver-attempt` and its result; do not push and preserve the worktree.
+- No progress: return to `polling` as a `no-op`. Only the next snapshot may produce `stalled` after observing the same HEAD and blocker fingerprint.
 
-## Reuse Map
+Every transition supplies `--from`, `--to`, and `--expected-run-id`. Treat a compare-and-swap rejection as fresh external state: reload rather than overwriting it.
 
-| Concern | Owner |
-|---------|-------|
-| PR creation (commit + push + `gh pr create`) | `managing-git-workflow/reference/pr.md` (delegate in Step 0) |
-| CI failure resolution | `ci-failure-resolver` agent (via `resolving-pr-blockers`) |
-| Merge conflict resolution | `merge-conflict-resolver` agent (via `resolving-pr-blockers`) |
-| Review comment processing | `pr-review-feedback` agent (via `resolving-pr-blockers`) |
-| Per-cycle PR summary comment | `pr-review-feedback` (one comment per cycle is intentional) |
+## Clean Verdict
 
-This skill adds **only** the polling loop, SHA tracking, and convergence guard.
+Declare clean only when one snapshot confirms all of the following for the same HEAD at query start and finish:
 
-## Common Mistakes
+- no merge conflict;
+- every selected check is `pass` or `skipping`;
+- no fail, cancel, pending, or timeout result;
+- no unresolved actionable review thread;
+- when CodeRabbit is active, its current-HEAD commit status or check-run completed successfully.
 
-See `reference/troubleshooting.md` for the full Problem/Fix list — six common pitfalls including stale check reads, CodeRabbit review timeouts misjudged as clean, advisory-check waits, and `mergeable == UNKNOWN` mishandling.
+If HEAD changes, discard the old results. The runner resets the check deadline, review deadline, and check-registration grace before snapshotting the new HEAD.
 
-## Success Criteria
+## Output
 
-- Loop terminates with one of: clean PR, max-cycles reached, convergence failure, CI timeout, or PR closed/merged
-- Each cycle's report includes: cycle number, CI failure count, conflict status, HEAD SHA before/after fix
-- No spurious early-clean exits from stale checks or stale reviews
-- A pending or incomplete CodeRabbit review never yields a clean verdict — Step 7 reports "not verified" (`exit 1`) instead
-- Interactive AMBIGUOUS prompts from `pr-review-feedback` reach the user and the loop resumes after their response
-- Bash tool's 10-min limit never causes data loss (chunked re-entry preserves cycle state)
+Use the user's language for progress and the final report. Include PR URL/number, terminal status, HEAD, cycle count, check summary, review-thread count, and preserved recovery path if resolution failed. Keep commands, state names, and file paths in English.
+
+## Safety Rules
+
+- Never force-push, pull, or rebase.
+- Never run two active shipping loops for the same PR.
+- Never push if any attempted resolver failed or returned AMBIGUOUS.
+- Publish summary comments and resolution markers only after the publication gate succeeds.
+- Preserve the failure worktree and branch; report how to inspect them.
+
+See [troubleshooting.md](reference/troubleshooting.md) for recovery.

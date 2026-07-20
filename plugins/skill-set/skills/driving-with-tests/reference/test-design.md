@@ -2,6 +2,17 @@
 
 **Load this reference when:** designing test strategy for a new feature, deciding which test layer to use, or setting up testability architecture.
 
+## Table of Contents
+
+- [Test Layer Taxonomy](#test-layer-taxonomy)
+- [Layer Selection Guide](#layer-selection-guide)
+- [Test Bus / API Separation](#test-bus--api-separation)
+- [Specification-by-Example](#specification-by-example)
+- [Coverage Strategy](#coverage-strategy)
+- [Property-Based Testing](#property-based-testing)
+- [Contract Testing](#contract-testing)
+- [The Bottom Line](#the-bottom-line)
+
 ## Test Layer Taxonomy
 
 | Layer | Speed | Scope | Purpose | Tradeoff |

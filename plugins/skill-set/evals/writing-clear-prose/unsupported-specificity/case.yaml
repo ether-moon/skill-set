@@ -1,0 +1,41 @@
+schema_version: "1.1"
+name: writing-clear-prose-unsupported-specificity
+description: Refuses to invent precision when the source lacks measurements
+tags:
+  - writing-clear-prose
+  - functional
+context:
+  scaffold_script: fixtures/scaffold.sh
+execution:
+  max_turns: 12
+  timeout_seconds: 480
+  allowed_tools:
+    - Skill
+    - Read
+    - Write
+    - Edit
+runs: 3
+graders:
+  - type: tool_used
+    name: selected-writing-clear-prose
+    tool: Skill
+    input_match: writing-clear-prose
+    min: 1
+  - type: file_exists
+    name: revision-created
+    path: outputs/revised.md
+  - type: regex
+    name: no-invented-percentage
+    target:
+      source: file
+      path: outputs/revised.md
+    pattern: '[0-9]+(?:\\.[0-9]+)?%'
+    match: not_contains
+  - type: regex
+    name: no-invented-speedup
+    target:
+      source: file
+      path: outputs/revised.md
+    pattern: '[0-9]+(?:\\.[0-9]+)?x'
+    flags: i
+    match: not_contains

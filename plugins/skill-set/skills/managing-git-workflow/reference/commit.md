@@ -1,88 +1,70 @@
 # Commit Workflow
 
-Create a commit with auto-generated message following project conventions and language preferences.
+Create one authorized commit without publishing it.
 
-## Prerequisites
+## 1. Inspect
 
-- Changes to commit (staged or unstaged)
-- Access to git repository
-
-## Call Summary
-
-| Step | Type | Bash Calls |
-|------|------|------------|
-| 1. Gather context | read | 1 |
-| 2. Generate message | analysis | 0 |
-| 3. Commit | write | 1 |
-| **Total** | | **2** |
-
-## Steps
-
-### 1. Gather Context (1 Bash call)
-
-Collect all needed information in a single call:
+Run:
 
 ```bash
-git status --porcelain; git log --oneline -10; git diff HEAD --stat; git branch --show-current
+"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git" inspect
 ```
 
-**Parse the output into 4 sections:**
-1. **Status** (`git status --porcelain`): File changes — empty means nothing to commit
-2. **Log** (`git log --oneline -10`): Recent commit patterns and style
-3. **Diff stat** (`git diff HEAD --stat`): Summary of what changed (works before staging)
-4. **Branch** (`git branch --show-current`): Current branch name for ticket extraction
+Report `working_tree.staged`, `working_tree.unstaged`, and `working_tree.untracked` separately. Retain `index_fingerprint` for the commit compare-and-swap check.
 
-**Exit if:** Status section is empty → Output appropriate message in project's language and stop.
+## 2. Select the Scope
 
-### 2. Generate Commit Message (no Bash call)
+Choose exactly one mode:
 
-Using the gathered context, generate the commit message:
+- Existing index: no scope flag. Use only when staged files exist.
+- Named paths: repeat `--path <path>` for paths the user selected.
+- Every change: use `--all` only when the user explicitly requested all current changes.
 
-**Guidelines:**
-- **Language:** Match the project's language. Check project docs, README, or existing commit message patterns for preference. Default to English if unclear.
-- **Style:** Follow patterns from the log output in step 1 — consistency with existing commits matters more than any specific convention.
-- **Ticket numbers:** Extract from branch name if present (match patterns like `PROJ-123`, `TEAM-456`).
-  - Example: `feature/PROJ-123-add-auth` -> `PROJ-123`
-- **Clarity:** Describe what changed and why.
+If paths were named while unrelated paths are already staged, the runner returns `unrelated_staged_paths`. Stop and ask whether to commit the existing index separately or revise the requested path scope.
 
-**Message format examples:**
-```
-PROJ-123: Improve user authentication logic
-TEAM-456: Add payment webhook handler
-Fix: Resolve empty projectDir error
-```
+If no staged files and no scope are available, ask the user for paths. Never widen scope by inference.
 
-### 3. Stage and Commit (1 Bash call)
+## 3. Preview the Exact Index
 
-Chain staging, commit, and verification in a single call:
+Preview without a message file or mutation:
 
 ```bash
-git add -A && git commit -m "$(cat <<'EOF'
-Generated commit message
-EOF
-)" && git log --oneline -1
+"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git" commit --dry-run --path path/to/file
 ```
 
-**Important:** Always use HEREDOC for messages with special characters or multi-line content.
+Repeat `--path` as needed, omit scope flags for the current index, or use explicit `--all`. Generate the message from `staged_preview.diff` and `staged_preview.stat`. For an existing index, `inspect.commit_context` contains the same message-generation context.
 
-**Output to user:**
-- Commit hash (first 7 characters)
-- Commit message
-- Brief summary of changes
+## 4. Prepare the Message File
 
-**Example output:**
+Match the repository's recent subject style and the user's language. Describe only the previewed diff. Include a ticket identifier from the branch only when it is actually present.
+
+Allocate a private file owned by the runner:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git" input-prepare --kind commit-message
 ```
-Commit created: a1b2c3d PROJ-123: Improve user authentication logic
-  3 files changed, 45 insertions(+), 12 deletions(-)
+
+The allocated file contains exactly `SKILL_SET_INPUT_REPLACE_ME`. Use the scoped Edit capability on the returned `path`, with that sentinel as `old_string` and the exact commit message as `new_string`. This works without broad file-write permission and keeps the file inside worktree-specific Git metadata, where it cannot enter a commit scope. Do not interpolate the message into a shell command.
+
+The runner rejects an empty file or any file where the sentinel remains, before creating a commit.
+
+## 5. Commit with Index CAS
+
+Use the fingerprint returned by the latest inspection:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git" commit \
+  --expected-index "<index-fingerprint>" \
+  --path path/to/file \
+  --message-file /tmp/commit-message.txt
 ```
 
-## Common Issues
+Use the same scope selected and previewed earlier. On success, report `commit.sha`, `commit.subject`, and `pushed:false`.
 
-**Issue:** "No changes to commit"
-**Fix:** User may have already committed. Check status output from step 1.
+The runner consumes the managed message allocation after a successful commit. If the user cancels first, call `input-discard --input-file <managed-path>`.
 
-**Issue:** Commit message contains quotes or special characters
-**Fix:** Always use HEREDOC format shown in step 3.
+If the runner returns `index_changed`, inspect again and re-confirm the scope. If it returns `nothing_staged` or `nothing_to_commit`, stop without creating an empty commit.
 
-**Issue:** Can't determine appropriate message style
-**Fix:** Analyze more commits with `git log --oneline -20` or ask user for guidance.
+## Dry-Run Guarantee
+
+`commit --dry-run` never changes HEAD or the real index. It uses a temporary index for path and all-change previews, so untracked files appear in the exact staged preview without being staged.

@@ -1,0 +1,1 @@
+Look at the `src/orders/` directory in this fixture and produce a ranked architecture candidate report in your response. For each candidate include Files, Evidence, Problem, Proposed seam, Locality gain, Leverage gain, Test impact, and Risks. Stop after presenting candidates and do not write files, design a concrete interface, or invoke another skill.

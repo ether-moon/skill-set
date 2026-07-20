@@ -1,0 +1,23 @@
+schema_version: "1.1"
+name: guarding-agent-directives-trigger-positive-06
+description: Should select guarding-agent-directives for a representative request
+tags:
+  - guarding-agent-directives
+  - trigger-positive
+execution:
+  prompt: "This directive failed one check, but I may override it; show the evidence and exact diff first."
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 3
+graders:
+  - type: tool_used
+    name: selected-guarding-agent-directives
+    tool: Skill
+    input_match: "guarding-agent-directives"
+    min: 1
+  - type: llm
+    name: workflow-outcome
+    criteria: "Pass only if the response applies the directive verification questions, including correct placement, and either verifies the proposed addition or audits existing directives without editing unless an exact change was authorized."
+    focus: last_message

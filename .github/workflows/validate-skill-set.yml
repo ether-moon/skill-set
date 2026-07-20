@@ -1,0 +1,66 @@
+name: Validate skill-set plugin
+
+on:
+  pull_request:
+    paths:
+      - '.claude-plugin/**'
+      - 'plugins/skill-set/**'
+      - 'README.md'
+      - 'AGENTS.md'
+      - '.github/workflows/validate-skill-set.yml'
+      - '.github/workflows/evaluate-skill-set.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.claude-plugin/**'
+      - 'plugins/skill-set/**'
+      - 'README.md'
+      - 'AGENTS.md'
+      - '.github/workflows/validate-skill-set.yml'
+      - '.github/workflows/evaluate-skill-set.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install deterministic validators
+        run: |
+          npm install --global @anthropic-ai/claude-code@2.1.215
+          sudo apt-get update
+          sudo apt-get install --yes shellcheck ruby
+
+      - name: Validate plugin and marketplace manifests
+        run: |
+          claude plugin validate --strict plugins/skill-set
+          claude plugin validate --strict .
+
+      - name: Check generated inventories and eval layout
+        run: |
+          plugins/skill-set/scripts/generate-inventory --check
+          plugins/skill-set/scripts/generate-trigger-evals --check
+          plugins/skill-set/scripts/validate-evals --require-trigger-matrix
+          plugins/skill-set/scripts/validate-references
+
+      - name: Run deterministic integration tests
+        run: plugins/skill-set/tests/run.sh
+
+      - name: Shellcheck plugin scripts
+        run: |
+          shellcheck_dirs=(plugins/skill-set/scripts plugins/skill-set/tests plugins/skill-set/evals)
+          if [ -d plugins/skill-set/bin ]; then shellcheck_dirs+=(plugins/skill-set/bin); fi
+          mapfile -d '' shellcheck_files < <(
+            find "${shellcheck_dirs[@]}" -type f \
+              \( -name '*.sh' -o -perm -u+x \) -print0
+          )
+          shellcheck -x "${shellcheck_files[@]}"

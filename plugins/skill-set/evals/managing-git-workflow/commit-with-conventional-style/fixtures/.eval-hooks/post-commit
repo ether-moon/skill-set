@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+repo_root=$(git rev-parse --show-toplevel)
+mkdir -p -- "$repo_root/outputs"
+git log -1 --format=%B >"$repo_root/outputs/commit-message.txt"

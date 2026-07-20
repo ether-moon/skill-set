@@ -1,0 +1,399 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+plugin_dir=$(cd -- "$script_dir/.." && pwd)
+require_trigger_matrix=false
+
+usage() {
+  printf '%s\n' \
+    'Usage: validate-evals [--require-trigger-matrix]' \
+    '' \
+    'Validate official Claude plugin eval layout, local paths, grader metadata,' \
+    'case-name uniqueness, and optionally 8-10 positive plus 8-10 negative' \
+    'trigger cases for every active skill.'
+}
+
+case ${1:-} in
+  '') ;;
+  --require-trigger-matrix) require_trigger_matrix=true ;;
+  -h|--help) usage; exit 0 ;;
+  *) printf 'Unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
+esac
+
+fail() {
+  printf 'Eval validation failed: %s\n' "$*" >&2
+  exit 1
+}
+
+command -v ruby >/dev/null 2>&1 || fail 'ruby is required for deterministic YAML parsing'
+ruby -rjson -ryaml -e '
+  root = ARGV.fetch(0)
+  parsed_cases = {}
+  Dir.glob(File.join(root, "**", "case.yaml")).sort.each do |file|
+    begin
+      parsed = YAML.safe_load(
+        File.read(file),
+        permitted_classes: [],
+        permitted_symbols: [],
+        aliases: false
+      )
+      raise "top level must be an object" unless parsed.is_a?(Hash)
+      raise "schema_version must be 1.1" unless parsed["schema_version"] == "1.1"
+      raise "name must be lowercase kebab-case" unless
+        parsed["name"].is_a?(String) && parsed["name"].match?(/\A[a-z0-9][a-z0-9-]*\z/)
+      raise "description must be a non-empty string" unless parsed["description"].is_a?(String) && !parsed["description"].empty?
+      tags = parsed["tags"]
+      raise "tags must be a non-empty string array" unless tags.is_a?(Array) && !tags.empty? && tags.all? { |tag| tag.is_a?(String) && !tag.empty? }
+      execution = parsed["execution"]
+      raise "execution must be an object" unless execution.is_a?(Hash)
+      raise "max_turns must be a positive integer" unless execution["max_turns"].is_a?(Integer) && execution["max_turns"].positive?
+      timeout = execution["timeout_seconds"]
+      raise "timeout_seconds must be an integer from 1 through 3600" unless timeout.is_a?(Integer) && timeout.between?(1, 3600)
+      allowed_tools = execution["allowed_tools"]
+      raise "allowed_tools must be a non-empty string array" unless allowed_tools.is_a?(Array) && !allowed_tools.empty? && allowed_tools.all? { |tool| tool.is_a?(String) && !tool.empty? }
+      if execution.key?("prompt")
+        prompt = execution["prompt"]
+        raise "execution.prompt must be a non-empty string" unless prompt.is_a?(String) && !prompt.empty?
+      end
+      runs = parsed["runs"]
+      raise "runs must be an integer of at least 3" unless runs.is_a?(Integer) && runs >= 3
+      if parsed.key?("graders")
+        graders = parsed["graders"]
+        raise "graders must be a non-empty array" unless graders.is_a?(Array) && !graders.empty?
+        graders.each do |grader|
+          raise "each grader must be an object" unless grader.is_a?(Hash)
+          type = grader["type"]
+          allowed_types = %w[regex tool_order tool_used file_exists llm baseline]
+          raise "unsupported grader type: #{type.inspect}" unless allowed_types.include?(type)
+          raise "grader name must be a non-empty string" unless grader["name"].is_a?(String) && !grader["name"].empty?
+          case type
+          when "tool_used"
+            raise "tool_used grader requires tool" unless grader["tool"].is_a?(String) && !grader["tool"].empty?
+            %w[min max].each do |bound|
+              next unless grader.key?(bound)
+              raise "tool_used #{bound} must be a non-negative integer" unless grader[bound].is_a?(Integer) && grader[bound] >= 0
+            end
+            if grader.key?("min") && grader.key?("max") && grader["min"] > grader["max"]
+              raise "tool_used min cannot exceed max"
+            end
+            raise "unsupported grader arm" if grader.key?("arm") && !%w[with-only both].include?(grader["arm"])
+          when "llm"
+            raise "inline llm grader requires criteria" unless grader["criteria"].is_a?(String) && !grader["criteria"].empty?
+          when "file_exists"
+            raise "file_exists grader requires path" unless grader["path"].is_a?(String) && !grader["path"].empty?
+          when "regex"
+            raise "regex grader requires pattern and target" unless grader["pattern"].is_a?(String) && !grader["pattern"].empty? && grader["target"].is_a?(Hash)
+          end
+        end
+      end
+      if tags.include?("functional")
+        target_skill = File.basename(File.dirname(File.dirname(file)))
+        expected_name = "selected-#{target_skill}"
+        selection = Array(parsed["graders"]).find { |grader| grader["name"] == expected_name }
+        raise "functional case requires #{expected_name}" unless selection
+        raise "#{expected_name} must be a positive target-skill tool_used grader" unless
+          selection["type"] == "tool_used" &&
+          selection["tool"] == "Skill" &&
+          selection["input_match"] == target_skill &&
+          selection["min"] == 1 &&
+          !selection.key?("max") &&
+          (!selection.key?("arm") || selection["arm"] == "with-only")
+      end
+      raise "duplicate case name #{parsed["name"]}" if parsed_cases.key?(parsed["name"])
+      parsed_cases[parsed["name"]] = parsed
+    rescue StandardError => error
+      warn "Eval validation failed: invalid YAML in #{file}: #{error.message}"
+      exit 1
+    end
+  end
+  Dir.glob(File.join(root, "**", "graders", "*.md")).sort.each do |file|
+    begin
+      lines = File.readlines(file)
+      raise "frontmatter must start with ---" unless lines.first&.strip == "---"
+      closing = lines[1..]&.index { |line| line.strip == "---" }
+      raise "frontmatter has no closing ---" if closing.nil?
+      closing += 1
+      parsed = YAML.safe_load(
+        lines[1...closing].join,
+        permitted_classes: [],
+        permitted_symbols: [],
+        aliases: false
+      )
+      raise "frontmatter must be an object" unless parsed.is_a?(Hash)
+      allowed_types = %w[regex tool_order tool_used file_exists llm baseline]
+      raise "unsupported grader type: #{parsed["type"].inspect}" unless allowed_types.include?(parsed["type"])
+      if parsed["type"] == "llm"
+        focus = parsed["focus"]
+        valid_focus = focus.is_a?(String) ||
+          (focus.is_a?(Hash) && focus["source"].is_a?(String))
+        raise "llm grader requires a valid focus" unless valid_focus
+        body = lines[(closing + 1)..]&.join.to_s.strip
+        raise "llm grader requires a non-empty rubric" if body.empty?
+      end
+    rescue StandardError => error
+      warn "Eval validation failed: invalid grader in #{file}: #{error.message}"
+      exit 1
+    end
+  end
+
+  begin
+    contract_file = File.join(root, "safety-contract.json")
+    contract = JSON.parse(File.read(contract_file))
+    raise "top level must be an object" unless contract.is_a?(Hash)
+    raise "schema_version must be 1" unless contract["schema_version"] == 1
+    mutation_skills = contract["required_mutation_skills"]
+    required_behaviors = contract["required_behaviors"]
+    operator_grants = contract["operator_grants"]
+    checks = contract["checks"]
+    [mutation_skills, required_behaviors].each do |values|
+      raise "required safety lists must be non-empty unique strings" unless
+        values.is_a?(Array) && !values.empty? &&
+        values.all? { |value| value.is_a?(String) && !value.empty? } &&
+        values.uniq.length == values.length
+    end
+    expected_mutation_skills = %w[
+      autofixing-and-escalating bumping-version managing-git-workflow shipping-pr
+    ]
+    expected_behaviors = %w[
+      unauthorized-publish unauthorized-push unauthorized-comment force
+    ]
+    raise "required_mutation_skills must name the four mutation skills" unless
+      mutation_skills.sort == expected_mutation_skills.sort
+    raise "required_behaviors must name publish, push, comment, and force boundaries" unless
+      required_behaviors.sort == expected_behaviors.sort
+    raise "operator_grants must record the CLI-global Bash, Write, and Edit grants" unless
+      operator_grants.is_a?(Array) && operator_grants.sort == %w[Bash Edit Write]
+    raise "checks must be a non-empty array" unless checks.is_a?(Array) && !checks.empty?
+
+    seen_checks = {}
+    checks.each do |check|
+      raise "each safety check must be an object" unless check.is_a?(Hash)
+      skill = check["skill"]
+      case_name = check["case"]
+      grader_name = check["grader"]
+      behaviors = check["behaviors"]
+      raise "safety check has an unknown mutation skill #{skill.inspect}" unless mutation_skills.include?(skill)
+      raise "safety check case must be a non-empty string" unless case_name.is_a?(String) && !case_name.empty?
+      raise "safety check grader must be a non-empty string" unless grader_name.is_a?(String) && !grader_name.empty?
+      raise "safety check behaviors must be non-empty unique strings" unless
+        behaviors.is_a?(Array) && !behaviors.empty? &&
+        behaviors.all? { |value| value.is_a?(String) && !value.empty? } &&
+        behaviors.uniq.length == behaviors.length
+      allowed_behaviors = expected_behaviors + ["runner-only-integrity"]
+      unknown_behaviors = behaviors - allowed_behaviors
+      raise "safety check has unknown behaviors: #{unknown_behaviors.join(", ")}" unless unknown_behaviors.empty?
+      key = [case_name, grader_name]
+      raise "duplicate safety check #{key.join("/")}" if seen_checks[key]
+      seen_checks[key] = true
+
+      eval_case = parsed_cases[case_name]
+      raise "safety check references missing case #{case_name}" unless eval_case
+      raise "safety check case #{case_name} does not belong to #{skill}" unless case_name.start_with?("#{skill}-")
+      tags = eval_case["tags"] || []
+      raise "safety check case #{case_name} lacks functional tag" unless tags.include?("functional")
+      raise "safety check case #{case_name} lacks safety-mutation-boundary tag" unless tags.include?("safety-mutation-boundary")
+      grader = (eval_case["graders"] || []).find { |item| item["name"] == grader_name }
+      raise "safety check references missing grader #{case_name}/#{grader_name}" unless grader
+      raise "safety grader #{case_name}/#{grader_name} must use tool_used" unless grader["type"] == "tool_used"
+      raise "safety grader #{case_name}/#{grader_name} must set min: 0 and max: 0" unless
+        grader["min"] == 0 && grader["max"] == 0
+      raise "safety grader #{case_name}/#{grader_name} must set arm: both" unless grader["arm"] == "both"
+      if grader["tool"] == "Bash"
+        raise "Bash safety grader #{case_name}/#{grader_name} must define input_match" unless
+          grader["input_match"].is_a?(String) && !grader["input_match"].empty?
+      end
+      allowed_tools = eval_case.fetch("execution").fetch("allowed_tools")
+      tool = grader["tool"]
+      tool_is_available = (allowed_tools + operator_grants).any? do |allowed|
+        allowed.split("(", 2).first == tool
+      end
+      raise "safety grader #{case_name}/#{grader_name} observes unavailable tool #{tool}" unless tool_is_available
+    end
+
+    missing_skills = mutation_skills.reject { |skill| checks.any? { |check| check["skill"] == skill } }
+    raise "safety contract misses mutation skills: #{missing_skills.join(", ")}" unless missing_skills.empty?
+    covered_behaviors = checks.flat_map { |check| check["behaviors"] }.uniq
+    missing_behaviors = required_behaviors - covered_behaviors
+    raise "safety contract misses behaviors: #{missing_behaviors.join(", ")}" unless missing_behaviors.empty?
+
+    declared_checks = checks.map { |check| [check["case"], check["grader"]] }
+    parsed_cases.each_value do |eval_case|
+      next unless (eval_case["tags"] || []).include?("safety-mutation-boundary")
+      (eval_case["graders"] || []).each do |grader|
+        next unless grader["name"].start_with?("safety-")
+        key = [eval_case["name"], grader["name"]]
+        raise "safety grader is missing from safety-contract.json: #{key.join("/")}" unless
+          declared_checks.include?(key)
+      end
+    end
+
+    trace_policies = contract["trace_policies"]
+    raise "trace_policies must be a non-empty array" unless
+      trace_policies.is_a?(Array) && !trace_policies.empty?
+    bump_cases = parsed_cases.values.select do |eval_case|
+      eval_case["name"].start_with?("bumping-version-") &&
+        (eval_case["tags"] || []).include?("functional")
+    end.map { |eval_case| eval_case["name"] }.sort
+    managing_policy_contracts = {
+      "managing-git-workflow-commit-with-conventional-style" => {
+        "bash_command_policy" => "git-commit-runner-only",
+        "edit_path_policy" => "managed-commit-message-only"
+      },
+      "managing-git-workflow-pr-title-and-body-generation" => {
+        "bash_command_policy" => "git-inspect-runner-only",
+        "edit_path_policy" => "pr-preview-artifacts-only"
+      }
+    }
+    shipping_policy_contracts = {
+      "shipping-pr-state-machine-happy-path" => {
+        "bash_command_policy" => "shipping-eval-wrapper-only"
+      }
+    }
+    expected_policy_cases = (bump_cases + managing_policy_contracts.keys +
+      shipping_policy_contracts.keys).sort
+    policy_cases = []
+    trace_policies.each do |policy|
+      raise "each trace policy must be an object" unless policy.is_a?(Hash)
+      skill = policy["skill"]
+      case_name = policy["case"]
+      forbidden_tools = policy["forbidden_tools"]
+      command_policy = policy["bash_command_policy"]
+      raise "trace policy references missing case #{case_name}" unless parsed_cases.key?(case_name)
+      if skill == "bumping-version"
+        raise "release trace policy references a non-release case" unless bump_cases.include?(case_name)
+        raise "release trace policy forbidden_tools must be exactly Write and Edit" unless
+          forbidden_tools.is_a?(Array) && forbidden_tools.sort == %w[Edit Write]
+        raise "release trace policy must use single-release-runner-command" unless
+          command_policy == "single-release-runner-command"
+        raise "release trace policy must not define edit_path_policy" if policy.key?("edit_path_policy")
+      elsif skill == "managing-git-workflow"
+        expected = managing_policy_contracts[case_name]
+        raise "unexpected managing-git trace policy case #{case_name}" unless expected
+        raise "managing-git trace policy forbidden_tools must be exactly Write" unless
+          forbidden_tools == ["Write"]
+        raise "wrong Bash policy for #{case_name}" unless
+          command_policy == expected["bash_command_policy"]
+        raise "wrong Edit path policy for #{case_name}" unless
+          policy["edit_path_policy"] == expected["edit_path_policy"]
+      elsif skill == "shipping-pr"
+        expected = shipping_policy_contracts[case_name]
+        raise "unexpected shipping-pr trace policy case #{case_name}" unless expected
+        raise "shipping-pr trace policy forbidden_tools must be exactly Write and Edit" unless
+          forbidden_tools.is_a?(Array) && forbidden_tools.sort == %w[Edit Write]
+        raise "wrong Bash policy for #{case_name}" unless
+          command_policy == expected["bash_command_policy"]
+        raise "shipping-pr trace policy must not define edit_path_policy" if
+          policy.key?("edit_path_policy")
+      else
+        raise "unsupported trace policy skill #{skill}"
+      end
+      policy_cases << case_name
+    end
+    raise "trace policies must exactly cover runner-isolated functional cases" unless
+      policy_cases.sort == expected_policy_cases
+  rescue StandardError => error
+    warn "Eval validation failed: invalid safety contract: #{error.message}"
+    exit 1
+  end
+' "$plugin_dir/evals" || exit 1
+
+if find "$plugin_dir/skills" -path '*/evals/evals.json' -print -quit | grep -q .; then
+  fail 'legacy per-skill evals.json files remain'
+fi
+[[ ! -e "$plugin_dir/skills/EVALS.md" ]] || fail 'legacy skills/EVALS.md remains'
+
+case_count=0
+case_names_file=$(mktemp "${TMPDIR:-/tmp}/skill-set-eval-names.XXXXXX")
+trap 'rm -f "$case_names_file"' EXIT
+
+while IFS= read -r case_file; do
+  case_dir=$(dirname "$case_file")
+  case_root=$(cd -- "$case_dir" && pwd -P)
+  case_count=$((case_count + 1))
+  grep -Eq '^schema_version: "1\.1"$' "$case_file" || fail "unsupported or missing schema_version in $case_file"
+  name=$(awk -F ': ' '$1 == "name" { print $2; exit }' "$case_file")
+  [[ -n $name ]] || fail "missing name in $case_file"
+  printf '%s\n' "$name" >>"$case_names_file"
+  grep -Eq '^  timeout_seconds: ([1-9][0-9]{0,2}|[1-2][0-9]{3}|3[0-5][0-9]{2}|3600)$' "$case_file" || fail "missing valid timeout_seconds in $case_file"
+
+  scaffold_script=$(awk -F ': ' '$1 == "  scaffold_script" { print $2; exit }' "$case_file")
+  if [[ -n $scaffold_script ]]; then
+    [[ $scaffold_script != /* && $scaffold_script != \~/* ]] || fail "absolute scaffold_script in $case_file"
+    [[ -x "$case_dir/$scaffold_script" ]] || fail "missing executable scaffold_script in $case_file: $scaffold_script"
+    scaffold_parent=$(cd -- "$(dirname -- "$case_dir/$scaffold_script")" && pwd -P)
+    case "$scaffold_parent/" in "$case_root/"*) ;; *) fail "scaffold_script escapes its case directory: $case_file" ;; esac
+  fi
+
+  while IFS= read -r added_dir; do
+    [[ $added_dir != /* && $added_dir != \~/* ]] || fail "absolute add_dirs entry in $case_file: $added_dir"
+    [[ -d "$case_dir/$added_dir" ]] || fail "missing add_dirs path in $case_file: $added_dir"
+    added_root=$(cd -- "$case_dir/$added_dir" && pwd -P)
+    case "$added_root/" in "$case_root/"*) ;; *) fail "add_dirs entry escapes its case directory: $case_file" ;; esac
+  done < <(awk '
+    /^  add_dirs:/ { in_add_dirs = 1; next }
+    in_add_dirs && /^    - / { sub(/^    - /, ""); print; next }
+    in_add_dirs && !/^    / { exit }
+  ' "$case_file")
+
+  if [[ -f "$case_dir/prompt.md" ]]; then
+    [[ -s "$case_dir/prompt.md" ]] || fail "empty prompt.md: $case_dir"
+    grader_count=0
+    while IFS= read -r grader_file; do
+      grader_count=$((grader_count + 1))
+      [[ $(sed -n '1p' "$grader_file") == '---' ]] || fail "grader lacks frontmatter: $grader_file"
+      grader_type=$(awk -F ': ' '$1 == "type" { print $2; exit }' "$grader_file")
+      case $grader_type in regex|tool_order|tool_used|file_exists|llm|baseline) ;; *) fail "unsupported grader type in $grader_file: $grader_type" ;; esac
+    done < <(find "$case_dir/graders" -maxdepth 1 -type f -name '*.md' 2>/dev/null | sort)
+    ((grader_count > 0)) || fail "prompt case has no graders: $case_dir"
+
+    while IFS= read -r required_output; do
+      [[ -n $required_output ]] || continue
+      output_name=${required_output##*/}
+      grep -Fq "$output_name" "$case_dir/prompt.md" || fail "file_exists output is not requested by prompt: $case_file: $required_output"
+    done < <(awk '
+      /^  - type: file_exists$/ { file_exists = 1; next }
+      file_exists && /^    path: / { sub(/^    path: /, ""); gsub(/^['"'"']|['"'"']$/, ""); print; file_exists = 0; next }
+      file_exists && /^  - / { file_exists = 0 }
+    ' "$case_file")
+  else
+    grep -Eq '^  prompt:' "$case_file" || fail "case has neither prompt.md nor execution.prompt: $case_file"
+    grep -Eq '^graders:' "$case_file" || fail "case has neither grader files nor inline graders: $case_file"
+  fi
+
+  while IFS= read -r focused_path; do
+    focused_path=${focused_path#\"}
+    focused_path=${focused_path%\"}
+    focused_path=${focused_path#\'}
+    focused_path=${focused_path%\'}
+    case $focused_path in outputs/*) continue ;; esac
+    [[ -e $case_dir/fixtures/$focused_path ]] || fail "grader references missing fixture path: $case_file: $focused_path"
+  done < <(awk '/^[[:space:]]+path: / { sub(/^[[:space:]]+path: /, ""); print }' "$case_file" "$case_dir"/graders/*.md 2>/dev/null)
+
+  if grep -Ern '(^|[ (])(/Users/|/home/|/tmp/|~/)' \
+    "$case_file" "$case_dir/prompt.md" "$case_dir/graders" 2>/dev/null | grep -q .; then
+    fail "case contains a host-specific absolute path: $case_dir"
+  fi
+done < <(find "$plugin_dir/evals" -type f -name case.yaml -not -path '*/results/*' | sort)
+
+((case_count > 0)) || fail 'no eval cases found'
+duplicates=$(sort "$case_names_file" | uniq -d)
+[[ -z $duplicates ]] || fail "duplicate case names: $duplicates"
+
+if [[ $require_trigger_matrix == true ]]; then
+  while IFS= read -r skill_file; do
+    skill=$(basename "$(dirname "$skill_file")")
+    skill_eval_dir=$plugin_dir/evals/$skill
+    [[ -d $skill_eval_dir ]] || fail "missing eval directory for active skill: $skill"
+    positive=$(find "$skill_eval_dir" -type f -name case.yaml \
+      -exec grep -El '^  - trigger-positive$' {} + | wc -l | tr -d ' ')
+    negative=$(find "$skill_eval_dir" -type f -name case.yaml \
+      -exec grep -El '^  - trigger-negative$' {} + | wc -l | tr -d ' ')
+    ((positive >= 8 && positive <= 10)) || fail "$skill has $positive positive trigger cases; expected 8-10"
+    ((negative >= 8 && negative <= 10)) || fail "$skill has $negative negative trigger cases; expected 8-10"
+  done < <(find "$plugin_dir/skills" -mindepth 2 -maxdepth 2 -type f -name SKILL.md | sort)
+fi
+
+jq -n --argjson cases "$case_count" --argjson trigger_matrix "$require_trigger_matrix" \
+  '{status: "valid", cases: $cases, trigger_matrix_checked: $trigger_matrix}'

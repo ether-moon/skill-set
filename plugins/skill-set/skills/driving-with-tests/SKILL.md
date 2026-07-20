@@ -1,170 +1,115 @@
 ---
 name: driving-with-tests
-description: Guides test strategy beyond TDD — running suites before changes (orient), exploring beyond test coverage (probe), guarding tests as specification, and designing multi-layer test architectures. Use when starting a coding session, designing test strategy, reviewing test changes, assessing test coverage, or deciding what type of test to write. Trigger phrases include "run tests first", "what's the test status", "design a test strategy", "what should I test", "review test changes".
+description: Guides implementation and verification through Orient, Red/Green/Refactor, Probe, and Guard. Use for new behavior, bug fixes, refactors, test strategy, test reviews, coverage decisions, baseline checks, or requests to work test-first or practice TDD.
 ---
 
 # Driving with Tests
 
-## Overview
+## Core Flow
 
-Tests are specification, not verification. The test harness is the defensible asset — code is replaceable, the harness is not.
+Use one integrated flow:
 
-This skill covers the strategic layer **around** the TDD cycle:
-- **Before TDD**: Orient — run the suite, establish baseline
-- **After TDD**: Probe — explore beyond test boundaries
-- **Across changes**: Guard — protect tests as specification
-- **Across tasks**: Test architecture — choose the right layer for each test
+```text
+Orient → Red/Green/Refactor → Probe → Guard
+```
 
-**REQUIRED:** `developing-test-first` for the Red/Green/Refactor discipline itself.
+Choose the applicable mode before changing code. The middle phase may be strict, characterization-led, or replaced by an explicit alternative validation; the surrounding Orient, Probe, and Guard phases remain.
 
-## When to Use
+## Select the Mode
 
-**Triggers:**
-- Starting a coding session on an unfamiliar codebase
-- Designing test strategy for a new feature
-- Reviewing diffs that modify test files
-- Assessing what's tested and what isn't
-- Deciding which test layer (unit, integration, E2E) to use
-- User says "run the tests first" or "what's the test status"
+| Work | Default |
+|---|---|
+| New behavior | Red/Green/Refactor, one vertical slice at a time |
+| Bug fix | Reproduce with a failing regression test, then Red/Green/Refactor |
+| Pure refactor | Add characterization only where coverage is missing; preserve the green baseline and do not manufacture a failing test |
+| Documentation, configuration, generated code, analysis, or test-only work | Strict TDD is excluded; state and run alternative validation appropriate to the artifact |
+| Existing implementation or user changes already present | Preserve them; add a regression or characterization test first, then close uncovered gaps without deleting or reverting the work |
 
-**Do NOT use for:**
-- The TDD cycle itself (Red/Green/Refactor) → `developing-test-first`
-- Classifying CI failure output → `autofixing-and-escalating`
-- Iterative implementation loop → `ralph`
-- Test framework API docs → `understanding-code-context`
+A project directive or the user may require strict TDD. Apply that stricter policy even where the default table would allow a lighter mode. When instructions conflict or the behavior is unclear, surface the conflict before mutation.
 
-## Orient — Before You Touch Code
+## Orient
 
-> "First run the tests." — Simon Willison
+Establish evidence before editing:
 
-Purpose: establish baseline, discover pre-existing failures, understand what's tested and what isn't.
+1. Read project directives for required commands and test policy.
+2. Detect the relevant test command from project manifests and nearby tests.
+3. Run the smallest trustworthy baseline, expanding to the full suite when feasible.
+4. Record pre-existing failures, slow tests, and coverage gaps separately from the requested change.
+5. Identify the user-visible behavior and the cheapest test layer that can prove it.
 
-**Steps:**
-1. **Detect test command** (see Framework Detection below)
-2. **Run the full suite**, record results
-3. **Note**: pre-existing failures, coverage gaps, slow tests
-4. **If pre-existing failures exist**: understand them before proceeding — are they known? Are they related to your task?
+Common commands:
 
-This tells you: there IS a test suite, how to run it, what it covers, and how healthy the project is. Skip this and you're flying blind.
-
-### Framework Detection
-
-| File Found | Test Command |
-|------------|-------------|
-| CLAUDE.md / AGENTS.md | **Check first** — explicit test commands are most reliable |
-| `package.json` (scripts.test) | `npm test` / `npx jest` / `npx vitest` |
-| `pyproject.toml` / `pytest.ini` | `pytest` |
+| Project signal | Likely command |
+|---|---|
+| `package.json` | project test script, Jest, or Vitest |
+| `pyproject.toml`, `pytest.ini` | `pytest` |
 | `Gemfile` | `bundle exec rspec` |
 | `go.mod` | `go test ./...` |
 | `Cargo.toml` | `cargo test` |
-| `build.gradle` / `pom.xml` | `./gradlew test` / `mvn test` |
+| `build.gradle`, `pom.xml` | Gradle or Maven test task |
 
-Show detected framework to your human partner. Ask to confirm or correct.
+Project instructions override this detection table.
 
-## Probe — After Tests Pass
+## Red/Green/Refactor
 
-> Tests cover what you anticipated. Probing discovers what you didn't.
+For new behavior and bug fixes, run one vertical slice:
 
-Passing tests are necessary but not sufficient. After the TDD cycle turns green, manually explore the system to find what tests missed.
+1. **RED** — write one minimal behavior test and verify it fails for the intended missing behavior.
+2. **GREEN** — make the smallest production change that passes the new test and relevant existing tests.
+3. **REFACTOR** — improve structure only while every relevant test remains green.
+4. Repeat for the next behavior learned from the previous slice.
 
-**Techniques** (details in `reference/probing.md`):
-- **CLI**: `curl` for HTTP endpoints, REPL sessions for libraries, command-line tools for CLIs
-- **Browser/UI**: manual walkthrough, edge cases in forms, error states, responsive behavior
-- **Demo scripts**: lightweight scripts that exercise the happy path end-to-end
-- **Edge cases**: boundary values, empty inputs, concurrent operations, permission variations
+Do not batch speculative tests ahead of implementation. Do not count syntax, import, or fixture errors as RED. Do not weaken an assertion to obtain GREEN.
 
-**Probe-to-Test Loop:** gap found → write a new test → back to `developing-test-first`
+For the full discipline, existing-code path, and failure handling, read `reference/tdd.md`.
 
-**Reflection:** if multiple probe cycles reveal problems, step back. Document what you've learned — what failed, why, what assumptions were wrong — and adjust strategy before the next attempt. Stored failure context prevents repeating the same mistakes.
+## Probe
 
-→ Details: `reference/probing.md`
+Automated tests cover anticipated behavior. Exercise the changed path as a user or caller would:
 
-## Guard — Tests Are Specification
+- run the CLI with valid, invalid, and boundary inputs;
+- exercise HTTP or library APIs through a realistic entry point;
+- walk UI success, error, and permission states;
+- inspect persisted state and observable side effects;
+- test boundaries, empty input, concurrency, and recovery where relevant.
 
-Modifying tests = changing the specification. Every test change deserves the same review rigor as production code.
+When probing finds a gap, add a regression test and return to the appropriate Red/Green/Refactor slice. See `reference/probing.md`.
 
-| Test Change | Type | Action |
-|-------------|------|--------|
-| Adding new test | Extension | Always OK |
-| Updating assertion to match new behavior | Spec change | Confirm with your human partner |
-| Weakening assertion to make it pass | **Red flag** | STOP — likely hiding a bug |
-| Deleting a failing test | Spec removal | Confirm with your human partner |
-| Fixing a flaky test | Maintenance | Fix root cause — never skip, delete, or retry-and-ignore |
+## Guard
 
-**Rules:**
-- Never weaken tests to get a green bar
-- Never delete a test to remove a failure without understanding why it fails
-- Treat test diffs with the same review rigor as production code diffs
-- If you're changing a test to match changed behavior, say so explicitly — "I'm changing the spec because X"
+Tests are executable specifications. Review test changes with production-code rigor:
 
-## Test Architecture
+- adding coverage extends the specification;
+- changing expected behavior changes the specification and must be intentional;
+- weakening or deleting a test to make a run green is a stop condition;
+- flaky tests require root-cause work, not skip/retry-and-ignore;
+- a targeted suite supports iteration, but the project-required broader suite gates completion.
 
-Choose the right test layer for each concern. Brief taxonomy — details in `reference/test-design.md`.
+Report the baseline, new test evidence, probe evidence, full validation, and any known pre-existing failures separately.
 
-**Layers:**
-- **Unit**: fast, isolated logic. One function or method. Milliseconds.
-- **Integration**: component wiring, real dependencies. Service boundaries.
-- **E2E**: user-visible flows. Browser or CLI.
-- **Acceptance**: spec validation. Maps to requirements (REQ-xxx, user stories).
+## Test Layer
 
-**Selection guide:**
+Choose the lowest layer that proves the behavior without hiding the risk:
 
-| What to Test | Layer | Why |
-|-------------|-------|-----|
-| Pure logic, calculations, transformations | Unit | Fast feedback, pinpoint failures |
-| Service interactions, database queries | Integration | Catches wiring bugs mocks hide |
-| User-facing workflows, critical paths | E2E | Validates what the user actually sees |
-| Spec requirements, business rules | Acceptance | Makes the spec executable |
+- **Unit** for isolated calculations and transformations.
+- **Integration** for persistence, wiring, protocols, and real dependency behavior.
+- **End-to-end** for critical user-visible flows.
+- **Acceptance/contract** for stable requirements and service boundaries.
 
-**Coverage is a compass, not a target.** 100% line coverage with bad assertions is worthless. Use coverage to find untested areas, not to declare victory.
+Coverage identifies areas to inspect; it is not a completion percentage. Read `reference/test-design.md` for layer selection, property tests, and contracts.
 
-→ Details: `reference/test-design.md`
+## Failure Handling
 
-## Language Detection
+- A RED test that errors must be repaired until it fails on the intended assertion.
+- A baseline failure must be isolated from the change before implementation proceeds.
+- If a test is impractical, explain the seam or environment constraint and choose the strongest reproducible alternative validation.
+- If existing/user code predates tests, never delete it to recreate an artificial test-first history.
+- If probing repeatedly exposes the same class of gap, pause and revise the test strategy.
 
-Detect and use your human partner's preferred language for all conversational output:
+Use the user's language for runtime reports. Keep test names, commands, paths, and repository documentation in English.
 
-1. Check message language in the current conversation
-2. Check project documentation language
-3. Check recent git commit patterns
-4. Default to English if no clear indication
+## References
 
-**Adapt**: All user-facing messages, reports, feedback
-**Keep in English**: Code, test names, file paths, commands
-
-## Red Flags
-
-| Red Flag | Fix |
-|----------|-----|
-| Skipping Orient — jumping straight to coding | Run the full suite first. You need baseline state. |
-| Green bar → ship without probing | Tests cover what you thought of. Probing finds what you didn't. |
-| Modifying tests to make them pass | You're changing the spec. Is that intentional? Confirm with your human partner. |
-| 100% coverage = done | Coverage measures lines exercised, not behavior verified. Probe. |
-| Deleting a flaky test instead of fixing it | Flakiness is a symptom. Find the root cause — timing, shared state, ordering. |
-| All tests at the same layer | Match layer to risk. Unit for logic, integration for wiring, E2E for flows. |
-| No acceptance tests for spec requirements | Spec without tests = unverified contract. |
-| Never reviewed test diffs | Test changes are spec changes. Review them. |
-
-## Composability
-
-- **Standalone**: Use for Orient/Probe/Guard/Architecture without TDD enforcement
-- **With `developing-test-first`**: Full discipline — Orient → TDD → Probe → Guard
-- **Within `ralph` iterations**: Orient before each iteration, Probe after green
-
-## Troubleshooting
-
-| Problem | Fix |
-|---------|-----|
-| No test command detected during Orient | Check `CLAUDE.md` / `AGENTS.md` first, then project manifests (`package.json`, `pyproject.toml`). Ask human partner to confirm. |
-| Suite has pre-existing failures | Isolate whether failures relate to your current task before proceeding. Document known failures. |
-| Probe finds bugs after green tests | Convert each gap into a regression test, then return to `developing-test-first` for the Red/Green cycle. |
-| Flaky tests block Orient baseline | Find root cause (timing, shared state, ordering). Never skip, delete, or retry-and-ignore. |
-| Slow test suite delays feedback | Run targeted subset during development; full suite before commit. Check for missing test isolation. |
-| Tests are being weakened to pass | STOP. You are changing the specification. Revert the test change and fix the code instead. |
-| Coverage is high but confidence is low | Add assertions around behavior and spec outcomes, not just line execution. Probe manually. |
-
-## Reference
-
-- `reference/test-design.md` — Multi-layer architecture, test bus, property-based and contract testing
-- `reference/probing.md` — Manual exploration techniques, edge case patterns, reflection
-- **REQUIRED:** `developing-test-first` — Red/Green/Refactor TDD discipline
+- `reference/tdd.md` — vertical Red/Green/Refactor and existing-code rules
+- `reference/probing.md` — manual exploration and probe-to-test loop
+- `reference/test-design.md` — test layers, property tests, and contracts

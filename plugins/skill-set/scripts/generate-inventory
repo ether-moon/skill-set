@@ -1,0 +1,209 @@
+#!/usr/bin/env bash
+# shellcheck disable=SC2016 # Markdown backticks are intentional literals.
+
+set -euo pipefail
+
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+plugin_dir=$(cd -- "$script_dir/.." && pwd)
+repo_dir=$(cd -- "$plugin_dir/../.." && pwd)
+
+usage() {
+  printf '%s\n' \
+    'Usage: generate-inventory [--check|--write]' \
+    '' \
+    'Generate the skill, legacy command, and PR-agent inventories in README.md' \
+    'and AGENTS.md. --check exits non-zero when either generated block drifts.'
+}
+
+mode='write'
+case ${1:-} in
+  '') ;;
+  --check) mode='check' ;;
+  --write) mode='write' ;;
+  --help|-h) usage; exit 0 ;;
+  *) printf 'Unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
+esac
+
+expected_inventory=$plugin_dir/tests/expected-inventory.json
+[[ -f $expected_inventory ]] || { printf 'Missing expected inventory: %s\n' "$expected_inventory" >&2; exit 1; }
+
+frontmatter_field() {
+  local file=$1
+  local key=$2
+  local value
+  value=$(awk -v key="$key" '
+    NR == 1 && $0 == "---" { in_frontmatter = 1; next }
+    in_frontmatter && $0 == "---" { exit }
+    in_frontmatter && index($0, key ":") == 1 {
+      sub("^" key ":[[:space:]]*", "")
+      print
+      exit
+    }
+  ' "$file")
+  value=${value#\"}
+  value=${value%\"}
+  value=${value//|/\\|}
+  printf '%s' "$value"
+}
+
+frontmatter_summary() {
+  local value
+  value=$(frontmatter_field "$1" "$2")
+  awk -v value="$value" 'BEGIN {
+    separator = index(value, ". ")
+    if (separator > 0) print substr(value, 1, separator)
+    else print value
+  }'
+}
+
+component_counts() {
+  local skill_count agent_count command_count hook_count mcp_count manifest_hooks manifest_mcp
+  skill_count=$(find "$plugin_dir/skills" -mindepth 2 -maxdepth 2 -type f -name SKILL.md | wc -l | tr -d ' ')
+  agent_count=$(find "$plugin_dir/agents" -maxdepth 1 -type f -name '*.md' | wc -l | tr -d ' ')
+  command_count=$(find "$plugin_dir/commands" -type f -name '*.md' | wc -l | tr -d ' ')
+  hook_count=0
+  [[ -d "$plugin_dir/hooks" ]] && hook_count=$(find "$plugin_dir/hooks" -type f | wc -l | tr -d ' ')
+  manifest_hooks=$(jq 'if .hooks == null then 0 elif (.hooks | type) == "array" then (.hooks | length) else 1 end' "$plugin_dir/.claude-plugin/plugin.json")
+  hook_count=$((hook_count + manifest_hooks))
+  mcp_count=0
+  [[ -f "$plugin_dir/.mcp.json" ]] && mcp_count=$(jq '.mcpServers // {} | length' "$plugin_dir/.mcp.json")
+  manifest_mcp=$(jq '.mcpServers // {} | if type == "object" then length elif type == "array" then length else 1 end' "$plugin_dir/.claude-plugin/plugin.json")
+  mcp_count=$((mcp_count + manifest_mcp))
+  printf '%s %s %s %s %s\n' "$skill_count" "$command_count" "$agent_count" "$hook_count" "$mcp_count"
+}
+
+validate_components() {
+  local skill_file agent_file command_file name description expected_name duplicates
+  local skill_count command_count agent_count hook_count mcp_count
+
+  while IFS= read -r skill_file; do
+    name=$(frontmatter_field "$skill_file" name)
+    description=$(frontmatter_field "$skill_file" description)
+    expected_name=$(basename "$(dirname "$skill_file")")
+    [[ -n $name && -n $description ]] || { printf 'Missing skill name/description: %s\n' "$skill_file" >&2; exit 1; }
+    [[ $name == "$expected_name" ]] || { printf 'Skill name mismatch: %s declares %s\n' "$skill_file" "$name" >&2; exit 1; }
+  done < <(find "$plugin_dir/skills" -mindepth 2 -maxdepth 2 -type f -name SKILL.md | sort)
+
+  duplicates=$(while IFS= read -r skill_file; do frontmatter_field "$skill_file" name; printf '\n'; done < <(find "$plugin_dir/skills" -mindepth 2 -maxdepth 2 -type f -name SKILL.md | sort) | sort | uniq -d)
+  [[ -z $duplicates ]] || { printf 'Duplicate skill names: %s\n' "$duplicates" >&2; exit 1; }
+
+  while IFS= read -r command_file; do
+    [[ -n $(frontmatter_field "$command_file" description) ]] || { printf 'Missing command description: %s\n' "$command_file" >&2; exit 1; }
+  done < <(find "$plugin_dir/commands" -type f -name '*.md' | sort)
+
+  while IFS= read -r agent_file; do
+    [[ -n $(frontmatter_field "$agent_file" name) && -n $(frontmatter_field "$agent_file" description) ]] || {
+      printf 'Missing agent name/description: %s\n' "$agent_file" >&2
+      exit 1
+    }
+  done < <(find "$plugin_dir/agents" -maxdepth 1 -type f -name '*.md' | sort)
+  duplicates=$(while IFS= read -r agent_file; do frontmatter_field "$agent_file" name; printf '\n'; done < <(find "$plugin_dir/agents" -maxdepth 1 -type f -name '*.md' | sort) | sort | uniq -d)
+  [[ -z $duplicates ]] || { printf 'Duplicate agent names: %s\n' "$duplicates" >&2; exit 1; }
+
+  read -r skill_count command_count agent_count hook_count mcp_count < <(component_counts)
+  [[ $skill_count == $(jq -r '.skills' "$expected_inventory") ]] || { printf 'Unexpected skill count: %s\n' "$skill_count" >&2; exit 1; }
+  [[ $command_count == $(jq -r '.commands' "$expected_inventory") ]] || { printf 'Unexpected command count: %s\n' "$command_count" >&2; exit 1; }
+  [[ $agent_count == $(jq -r '.agents' "$expected_inventory") ]] || { printf 'Unexpected agent count: %s\n' "$agent_count" >&2; exit 1; }
+  [[ $hook_count == $(jq -r '.hooks' "$expected_inventory") ]] || { printf 'Unexpected hook count: %s\n' "$hook_count" >&2; exit 1; }
+  [[ $mcp_count == $(jq -r '.mcp_servers' "$expected_inventory") ]] || { printf 'Unexpected MCP server count: %s\n' "$mcp_count" >&2; exit 1; }
+}
+
+render_block() {
+  local heading=$1
+  local skill_count agent_count command_count hook_count mcp_count index prefix
+  local -a layout_paths layout_comments
+  read -r skill_count command_count agent_count hook_count mcp_count < <(component_counts)
+
+  printf '<!-- skill-set-inventory:start -->\n'
+  printf '%s Component Inventory\n\n' "$heading"
+  printf '_Generated by `plugins/skill-set/scripts/generate-inventory`; do not edit this block manually._\n\n'
+  printf 'Runtime totals: **%s skills, %s legacy commands, %s PR agents, %s hooks, %s MCP servers**.\n\n' \
+    "$skill_count" "$command_count" "$agent_count" "$hook_count" "$mcp_count"
+
+  printf '%s# Skills\n\n' "$heading"
+  printf '| Skill | Description |\n|---|---|\n'
+  while IFS= read -r skill_file; do
+    printf '| `%s` | %s |\n' \
+      "$(frontmatter_field "$skill_file" name)" \
+      "$(frontmatter_summary "$skill_file" description)"
+  done < <(find "$plugin_dir/skills" -mindepth 2 -maxdepth 2 -type f -name SKILL.md | sort)
+
+  printf '\n%s# Legacy Commands\n\n' "$heading"
+  printf '| Invocation | Description |\n|---|---|\n'
+  while IFS= read -r command_file; do
+    local relative invocation
+    relative=${command_file#"$plugin_dir/commands/"}
+    relative=${relative%.md}
+    invocation=/skill-set:${relative//\//:}
+    printf '| `%s` | %s |\n' "$invocation" "$(frontmatter_summary "$command_file" description)"
+  done < <(find "$plugin_dir/commands" -type f -name '*.md' | sort)
+
+  printf '\n%s# PR Agents\n\n' "$heading"
+  printf '| Agent | Description |\n|---|---|\n'
+  while IFS= read -r agent_file; do
+    printf '| `%s` | %s |\n' \
+      "$(frontmatter_field "$agent_file" name)" \
+      "$(frontmatter_summary "$agent_file" description)"
+  done < <(find "$plugin_dir/agents" -maxdepth 1 -type f -name '*.md' | sort)
+  printf '\n%s# Standard Layout\n\n' "$heading"
+  layout_paths=('.claude-plugin/plugin.json' 'agents/')
+  layout_comments=('' 'generated table above')
+  if [[ -d $plugin_dir/bin ]]; then
+    layout_paths+=('bin/')
+    layout_comments+=('deterministic mutation executors')
+  fi
+  layout_paths+=('commands/' 'evals/' 'scripts/' 'skills/' 'tests/')
+  layout_comments+=('nested legacy command names' 'official plugin eval cases' 'inventory and eval tooling' 'generated table above' 'deterministic validation')
+
+  printf '%s\n' '```text' 'plugins/skill-set/'
+  for ((index = 0; index < ${#layout_paths[@]}; index++)); do
+    prefix='├──'
+    if ((index == ${#layout_paths[@]} - 1)); then prefix='└──'; fi
+    if [[ -n ${layout_comments[index]} ]]; then
+      printf '%s %-27s # %s\n' "$prefix" "${layout_paths[index]}" "${layout_comments[index]}"
+    else
+      printf '%s %s\n' "$prefix" "${layout_paths[index]}"
+    fi
+  done
+  printf '%s\n' '```'
+  printf '<!-- skill-set-inventory:end -->\n'
+}
+
+replace_block() {
+  local document=$1
+  local block=$2
+  local output=$3
+  awk -v start='<!-- skill-set-inventory:start -->' -v finish='<!-- skill-set-inventory:end -->' '
+    NR == FNR { generated = generated $0 ORS; next }
+    $0 == start { printf "%s", generated; replacing = 1; found = 1; next }
+    $0 == finish { replacing = 0; next }
+    !replacing { print }
+    END { if (!found) exit 3 }
+  ' "$block" "$document" >"$output"
+}
+
+temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/skill-set-inventory.XXXXXX")
+trap 'rm -rf "$temp_dir"' EXIT
+
+validate_components
+
+render_block '##' >"$temp_dir/readme-block"
+render_block '###' >"$temp_dir/agents-block"
+replace_block "$repo_dir/README.md" "$temp_dir/readme-block" "$temp_dir/README.md"
+replace_block "$repo_dir/AGENTS.md" "$temp_dir/agents-block" "$temp_dir/AGENTS.md"
+
+if [[ $mode == check ]]; then
+  status=0
+  for document in README.md AGENTS.md; do
+    if ! cmp -s "$repo_dir/$document" "$temp_dir/$document"; then
+      printf '%s inventory is stale. Run: %s --write\n' "$document" "$0" >&2
+      diff -u "$repo_dir/$document" "$temp_dir/$document" >&2 || true
+      status=1
+    fi
+  done
+  exit "$status"
+fi
+
+mv "$temp_dir/README.md" "$repo_dir/README.md"
+mv "$temp_dir/AGENTS.md" "$repo_dir/AGENTS.md"
+printf 'Updated README.md and AGENTS.md inventories.\n'

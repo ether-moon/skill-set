@@ -2,11 +2,20 @@
 
 Use this checklist to validate your skill before and after upload.
 
+## Table of Contents
+
+- [Before You Start](#before-you-start)
+- [During Development](#during-development)
+- [Before Handoff](#before-handoff)
+- [After Release](#after-release)
+- [Quick Validation Commands](#quick-validation-commands)
+- [Common Issues Checklist](#common-issues-checklist)
+
 ## Before You Start
 
 - [ ] Identified 2-3 concrete use cases
 - [ ] Tools identified (built-in or MCP)
-- [ ] Reviewed example skills
+- [ ] Baseline behavior recorded without the new skill or with the current version
 - [ ] Planned folder structure
 
 ## During Development
@@ -34,33 +43,40 @@ Use this checklist to validate your skill before and after upload.
 - [ ] No time-sensitive information (or in "old patterns" collapsed section)
 - [ ] Default tool/approach provided (not a list of options without recommendation)
 
-## Before Upload
+## Before Handoff
 
 ### Triggering Tests
-- [ ] Tested triggering on obvious tasks
-- [ ] Tested triggering on paraphrased requests
-- [ ] Verified doesn't trigger on unrelated topics
+- [ ] Added 8-10 representative should-trigger cases
+- [ ] Added 8-10 near-miss should-not-trigger cases
+- [ ] Measured precision and recall overall and for this skill
 
 ### Functional Tests
 - [ ] Functional tests pass
 - [ ] Tool integration works (if applicable)
-- [ ] Error cases handled
+- [ ] Error and recovery cases pass
+- [ ] Mutation and publication boundaries have negative tests
 
 ### Cross-Model Testing
 - [ ] Tested with Haiku (enough guidance for smaller model?)
 - [ ] Tested with Sonnet (clear and efficient?)
 - [ ] Tested with Opus (not over-explaining?)
+- [ ] LLM judge is independent and Sonnet-tier or larger
 
-### Evaluation (see [evaluation.md](evaluation.md))
-- [ ] Baseline comparison done (with-skill vs without-skill)
-- [ ] Assertions defined for verifiable expectations
+### Evaluation
+- [ ] Baseline comparison done (no-skill for new work, prior version for existing work)
+- [ ] Objective deterministic graders precede qualitative rubrics
+- [ ] Official `evals/<skill>/<case>/` layout validates
+- [ ] Nondeterministic cases run at least three times
 - [ ] At least one iteration of eval → feedback → improve completed
-- [ ] Description tested with should-trigger and should-not-trigger queries
+- [ ] Per-case deltas, safety evidence, time, tool, token, and cost availability recorded
 
 ### Packaging
-- [ ] Compressed as .zip file (if uploading to Claude.ai)
+- [ ] Host plugin or skill validator passes
+- [ ] Every local link, fixture, and executable path resolves
+- [ ] Generated inventories or catalogs show no drift
+- [ ] Distribution archive created only when the target surface requires one
 
-## After Upload
+## After Release
 
 - [ ] Test in real conversations
 - [ ] Monitor for under/over-triggering
@@ -95,6 +111,17 @@ wc -l your-skill-name/SKILL.md
 # Should be under 200 for main instructions
 ```
 
+**Validate a Claude Code plugin and its eval layout:**
+
+```bash
+claude plugin validate --strict ./plugin
+claude plugin eval ./plugin --ablation with-without \
+  --model haiku --judge-model sonnet --runs 3 \
+  --output-dir eval-results --json eval-results.json
+```
+
+If model evaluation is feature-gated, preserve the diagnostic and run every deterministic validator; never report fabricated scores.
+
 ---
 
 ## Common Issues Checklist
@@ -108,3 +135,5 @@ If skill isn't working, check these first:
 - [ ] No XML tags in frontmatter
 - [ ] MCP server connected (if using MCP)
 - [ ] Tool names are correct (case-sensitive)
+- [ ] Eval case and grader YAML parses and all fixture paths stay inside the case
+- [ ] Agent model and LLM judge model are independent

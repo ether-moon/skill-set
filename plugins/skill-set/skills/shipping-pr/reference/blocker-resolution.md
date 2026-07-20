@@ -1,95 +1,48 @@
-# Blocker Resolution — Cycle Steps 5–8
+# Blocker Resolution and Publication Gate
 
-These four steps run inside the cycle loop in `SKILL.md`. They assess what's blocking the PR, dispatch the `resolving-pr-blockers` agent, decide whether the cycle made progress, and either continue or terminate.
+One resolver cycle uses one isolated worktree created from the exact remote PR HEAD and one temporary local branch. Before editing, fetch and verify both `expected_remote_sha` and the exact PR `baseRefOid`; record the base SHA/ref, PR head repository/branch/host, worktree, branch, bound remote, ordered agents, and blocker fingerprint in the runner transition. The remote's canonical push URL must target that head repository, including the contributor's repository for a fork PR. Do not rely on a moving local target ref.
 
-## Step 5: Blocker assessment
+## Ordering
 
-```bash
-# CI failures
-FAIL_CT=$(gh pr checks "$PR" $REQ_FLAG --json state \
-  -q '[.[] | select(.state == "FAILURE")] | length')
+If the snapshot reports a merge conflict, run only `merge-conflict-resolver`. The conflict consumes the sole cycle; after a successful expected-SHA push, return to a new snapshot on the new HEAD.
 
-# Merge state — UNKNOWN gets one retry, follows resolving-pr-blockers convention
-MERGE_JSON=$(gh pr view "$PR" --json mergeable,mergeStateStatus,state)
-MERGEABLE=$(echo "$MERGE_JSON" | jq -r .mergeable)
-[ "$MERGEABLE" = "UNKNOWN" ] && { sleep 3; MERGE_JSON=$(gh pr view "$PR" --json mergeable,mergeStateStatus,state); MERGEABLE=$(echo "$MERGE_JSON" | jq -r .mergeable); }
-MSTATE=$(echo "$MERGE_JSON" | jq -r .mergeStateStatus)
-PR_STATE=$(echo "$MERGE_JSON" | jq -r .state)
+If no conflict exists:
 
-# Exit if PR was closed/merged mid-loop
-[ "$PR_STATE" != "OPEN" ] && { echo "PR is now $PR_STATE — exiting"; exit 0; }
+1. run `ci-failure-resolver` when selected checks failed;
+2. when CI is planned, require it to succeed or no-op before continuing;
+3. run `pr-review-feedback` only when actionable threads put it in the recorded plan; a review-only plan begins there;
+4. when both are planned, keep them sequential in the same worktree and branch.
 
-CONFLICT=false
-{ [ "$MERGEABLE" = "CONFLICTING" ] || [ "$MSTATE" = "DIRTY" ]; } && CONFLICT=true
+Do not run resolvers in parallel. They must see earlier edits and share one publication decision.
 
-# Track whether Step 5 detected any hard blocker — used by Step 7 to disambiguate
-# "no commit because nothing to fix" (clean) from "no commit because fix failed" (stuck).
-HARD_BLOCKERS=false
-{ [ "$FAIL_CT" -gt 0 ] || [ "$CONFLICT" = "true" ]; } && HARD_BLOCKERS=true
+## Resolver Result
 
-# Review comments are assessed inside resolving-pr-blockers — don't pre-scan here
-```
+Each resolver returns:
 
-`REVIEW_VERIFIED` (set in Step 4) is carried through to Step 7 unchanged. A
-pending CodeRabbit review is not a blocker to *fix* — it is an unverified
-condition — so it stays out of `HARD_BLOCKERS` and gates the "clean" verdict
-separately in Step 7.
+- `result`: `success`, `no-op`, `AMBIGUOUS`, or `failed`;
+- commits and modified paths;
+- HEAD before and after;
+- queued PR summary and resolution markers, if review activity occurred;
+- unresolved decisions and recovery instructions.
 
-If `FAIL_CT == 0` AND `CONFLICT == false`: invoke `resolving-pr-blockers` once anyway so it can scan for unresolved review comments. If that agent then finds no review work either, it exits with no commit, which Step 7 will detect (via `HARD_BLOCKERS=false`) and treat as terminal "clean".
+An AMBIGUOUS result is not success. Preserve all local work and wait for the user.
 
-## Step 6: Dispatch resolving-pr-blockers
+## Executable Publication Gate
 
-```bash
-PRE_SHA=$TARGET_SHA
-# Use Agent tool with subagent_type=resolving-pr-blockers
-# Pass: PR number, repo, branch, detected CI failures, conflict status
-# Agent commits per sub-agent and pushes once at the end.
-# AMBIGUOUS items in pr-review-feedback pause for user input — wait for user, then continue.
+Write `{results:[...]}` to a regular, non-symlink file inside the resolver worktree. Each ordered result contains `agent`, `result`, `input_head`, and `output_head`; adjacent HEAD values form one chain from the blocked snapshot to the actual local HEAD. Write the queued summary to that worktree as a separate file. Apart from those declared inputs, the index and worktree must contain no staged, unstaged, or untracked files.
 
-# Brief buffer before reading new HEAD: GitHub's PR view may briefly return the
-# old headRefOid right after the resolver's push. Matches the UNKNOWN-mergeable
-# 3-second retry convention used in Step 5.
-sleep 3
-POST_SHA=$(gh pr view --json headRefOid -q .headRefOid)
-```
+Call `${CLAUDE_PLUGIN_ROOT}/bin/skill-set-pr` with `publish`, the run ID, blocked HEAD, validated local HEAD, results file, optional summary file, and optional `--coderabbit-resolve`. Do not call `git push`, `skill-set-git push`, `gh pr comment`, or a resolve-marker API outside this command.
 
-The agent's interactive AMBIGUOUS-item handling will pause this skill until the user responds; then the agent resumes and eventually returns control here.
+The runner validates the planned agents, result set, HEAD chain, branch, pinned commits, clean publication boundary, live PR head repository/ref, bound remote push URL, and remote HEAD. It checks the remote binding again immediately before invoking one expected-SHA push when the local HEAD changed, revalidates no-code activity, and posts one combined marker/summary comment only after the gate. `pending → prepared → gate_passed → commenting → complete` state records make interrupted publication recoverable and the hidden run/cycle marker suppresses duplicate comments.
 
-## Step 7: Convergence check (single signal: did fix produce a new commit?)
+A partial failure, failed resolver, AMBIGUOUS result, missing result, reordered agent, or broken HEAD chain fails before push or comment. Preserve the failure worktree and branch and report both paths.
 
-```bash
-if [ "$PRE_SHA" = "$POST_SHA" ]; then
-  if [ "$HARD_BLOCKERS" = "true" ]; then
-    # Real blockers existed but the resolver could not produce a commit — stuck.
-    echo "No new commit produced by resolving-pr-blockers — fix cannot make progress"
-    echo "Last-cycle blockers: CI failures=$FAIL_CT, conflicts=$CONFLICT"
-    exit 1
-  elif [ "$WAIT_CR" = "true" ] && [ "$REVIEW_VERIFIED" = "false" ]; then
-    # CodeRabbit is active for this repo but its review for HEAD never completed
-    # within --review-timeout. "No new commit" here means "nothing to fix YET",
-    # not "nothing to fix" — declaring clean would be the premature-exit bug.
-    echo "CodeRabbit review for HEAD ($TARGET_SHA) did not complete within --review-timeout min"
-    echo "PR is NOT verified clean — re-run /skill-set:pr:ship later to finish the review"
-    exit 1
-  else
-    # CI green, no conflicts, and CodeRabbit's completed review produced no
-    # actionable fix (or CodeRabbit is not in use) — PR is genuinely clean.
-    echo "PR is clean — cycle $cycle done"
-    exit 0
-  fi
-fi
-```
+## Progress
 
-This single signal replaces blocker-set diffing. If the resolver pushed a commit, the situation has changed enough to warrant another cycle. If it didn't, two flags disambiguate the three no-commit cases: `HARD_BLOCKERS` (from Step 5) separates "tried and failed" (stuck, exit 1) from the rest, and `REVIEW_VERIFIED` (from Step 4) separates "CodeRabbit hasn't finished reviewing yet" (unverified, exit 1) from a genuine clean exit. A clean exit therefore requires CI green, no conflicts, **and** a completed CodeRabbit review whenever CodeRabbit is active.
+After a resolver attempt:
 
-## Step 8: Cycle bookkeeping
+- a new remote HEAD or changed blocker fingerprint returns to `polling`;
+- review-only publication returns to `polling` so thread state can be observed;
+- the same HEAD and same fingerprint on the required post-resolver snapshot becomes `stalled`.
 
-```bash
-cycle=$((cycle + 1))
-if [ $cycle -gt $MAX_CYCLES ]; then
-  echo "Reached --max-cycles=$MAX_CYCLES without clean state"
-  echo "Last status: CI failures=$FAIL_CT, conflicts=$CONFLICT, HEAD=$POST_SHA"
-  exit 1
-fi
-# Loop back to Step 2 — TARGET_SHA will refresh from new HEAD
-```
+Do not infer progress from local commits alone. Only verified remote state or changed review state counts.

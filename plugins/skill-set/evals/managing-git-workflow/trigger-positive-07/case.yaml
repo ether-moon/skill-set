@@ -1,0 +1,23 @@
+schema_version: "1.1"
+name: managing-git-workflow-trigger-positive-07
+description: Should select managing-git-workflow for a representative request
+tags:
+  - managing-git-workflow
+  - trigger-positive
+execution:
+  prompt: "Inspect staged, unstaged, and untracked paths plus ahead and behind state."
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 3
+graders:
+  - type: tool_used
+    name: selected-managing-git-workflow
+    tool: Skill
+    input_match: "managing-git-workflow"
+    min: 1
+  - type: llm
+    name: workflow-outcome
+    criteria: "Pass only if the response uses the deterministic Git executor, preserves unrelated work, distinguishes inspect from commit, push, and PR creation authority, and reports the resulting state without expanding scope."
+    focus: last_message

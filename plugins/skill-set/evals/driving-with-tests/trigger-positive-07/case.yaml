@@ -1,0 +1,23 @@
+schema_version: "1.1"
+name: driving-with-tests-trigger-positive-07
+description: Should select driving-with-tests for a representative request
+tags:
+  - driving-with-tests
+  - trigger-positive
+execution:
+  prompt: "The teammate's implementation already exists without tests; add coverage without deleting their work."
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 3
+graders:
+  - type: tool_used
+    name: selected-driving-with-tests
+    tool: Skill
+    input_match: "driving-with-tests"
+    min: 1
+  - type: llm
+    name: workflow-outcome
+    criteria: "Pass only if the response selects the appropriate testing mode and follows Orient, a proportional Red/Green/Refactor loop, Probe, and Guard while respecting existing implementation and project constraints."
+    focus: last_message

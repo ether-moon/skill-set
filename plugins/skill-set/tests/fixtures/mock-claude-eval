@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+if [[ ${1:-} == --version ]]; then
+  printf '2.1.215 (mock)\n'
+  exit 0
+fi
+
+[[ ${1:-} == plugin && ${2:-} == eval ]] || {
+  printf 'unsupported mock Claude invocation: %s\n' "$*" >&2
+  exit 2
+}
+
+ablation=
+json_output=
+output_dir=
+while (($#)); do
+  case $1 in
+    --ablation) ablation=${2:-}; shift 2 ;;
+    --json) json_output=${2:-}; shift 2 ;;
+    --output-dir) output_dir=${2:-}; shift 2 ;;
+    *) shift ;;
+  esac
+done
+
+[[ -n $ablation && -n $json_output && -n $output_dir ]] || {
+  printf 'mock eval requires --ablation, --json, and --output-dir\n' >&2
+  exit 2
+}
+
+make_trace() {
+  local label=$1
+  local sandbox
+  sandbox=$(mktemp -d "${TMPDIR:-/tmp}/claude-eval-mock.XXXXXX")
+  mkdir -p -- "$sandbox/out"
+  jq -nc --arg label "$label" '{type:"assistant", message:{content:[
+    {type:"tool_use", id:("toolu-" + $label), name:"Skill", input:{skill:"sample-skill"}}
+  ]}}' >"$sandbox/out/trace.jsonl"
+  jq -nc '{type:"result", num_turns:1, total_cost_usd:0.01,
+    usage:{input_tokens:17, output_tokens:5}}' >>"$sandbox/out/trace.jsonl"
+  if [[ -n ${FAKE_CLAUDE_ROOT_LOG:-} ]]; then printf '%s\n' "$sandbox" >>"$FAKE_CLAUDE_ROOT_LOG"; fi
+  printf '%s\n' "$sandbox/out/trace.jsonl"
+}
+
+with_trace=$(make_trace with)
+without_trace=
+if [[ $ablation == with-without ]]; then without_trace=$(make_trace without); fi
+mkdir -p -- "$output_dir" "$(dirname -- "$json_output")"
+
+jq -n \
+  --arg ablation "$ablation" \
+  --arg with_trace "$with_trace" \
+  --arg without_trace "$without_trace" '
+  def run($trace): {
+    score:1, passed:true, turns:1, costUsd:0.01, judgeCostUsd:0,
+    durationSeconds:1, startedAt:"2026-07-20T00:00:00Z", error:null,
+    tracePath:$trace, skippedPaidGraders:false,
+    graders:[{name:"sample-tool", passed:true, weight:1,
+      explanation:"observed", withOnly:false}]
+  };
+  {
+    schemaVersion:1, claudeVersion:"2.1.215", startedAt:"2026-07-20T00:00:00Z",
+    durationSeconds:1, costUsd:0.01, partial:false,
+    suite:{root:"/mock", ablation:$ablation, modelOverride:"haiku",
+      judgeModel:"sonnet", threshold:0, plugins:[{name:"skill-set",path:"/mock"}]},
+    cases:[{
+      name:"sample-functional", dir:"sample-functional", source:"case_yaml",
+      promptMarkdown:"prompt", runsPerCase:1, timeoutSeconds:60, maxTurns:2,
+      graders:[{name:"sample-tool",type:"tool_used",weight:1,
+        config:{tool:"Skill",min:1}}],
+      arms:(if $ablation == "with-without" then
+        {with:[run($with_trace)],without:[run($without_trace)]}
+      else {with:[run($with_trace)]} end),
+      aggregates:(if $ablation == "with-without" then
+        {score:1,passRate:1,scoreWithout:1,passRateWithout:1,delta:0}
+      else {score:1,passRate:1} end)
+    }],
+    aggregates:{casesTotal:1,casesPassed:1,overallScore:1,overallPassRate:1,
+      meanDelta:(if $ablation == "with-without" then 0 else null end)}
+  }
+' >"$json_output"
+cp -- "$json_output" "$output_dir/aggregate-result.json"
+
+if [[ $ablation == with-without && -n ${FAKE_CLAUDE_MUTATE_FILE:-} ]]; then
+  [[ -f $FAKE_CLAUDE_MUTATE_FILE ]] || {
+    printf 'mock mutation target is missing: %s\n' "$FAKE_CLAUDE_MUTATE_FILE" >&2
+    exit 2
+  }
+  printf '%s\n' "${FAKE_CLAUDE_MUTATION_TEXT:-eval-input-drift}" >>"$FAKE_CLAUDE_MUTATE_FILE"
+fi
