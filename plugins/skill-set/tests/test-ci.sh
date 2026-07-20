@@ -38,7 +38,9 @@ grep -Eq 'schedule:' "$eval_workflow"
 grep -Eq 'workflow_dispatch:' "$eval_workflow"
 grep -Eq 'fetch-depth: 0' "$eval_workflow"
 grep -Eq 'scripts/run-evals' "$eval_workflow"
+# shellcheck disable=SC2016 # EVAL_MODEL is literal workflow syntax.
 grep -Eq -- '--model "\$EVAL_MODEL"' "$eval_workflow"
+# shellcheck disable=SC2016 # JUDGE_MODEL is literal workflow syntax.
 grep -Eq -- '--judge-model "\$JUDGE_MODEL"' "$eval_workflow"
 grep -Eq 'acceptance-summary.json' "$eval_workflow"
 grep -Eq "REQUESTED_RUNS:.*'3'" "$eval_workflow"

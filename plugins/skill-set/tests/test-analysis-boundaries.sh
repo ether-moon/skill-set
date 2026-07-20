@@ -48,6 +48,7 @@ active_paths=(
   "$plugin_dir/commands/code/zoom-out.md"
   "$plugin_dir/commands/plan/grill.md"
 )
+# shellcheck disable=SC2016 # Backticks are literal search text.
 if grep -Ern 'superpowers:|`simplify`|handoff to|hand off to|auto(matically)? (invoke|run|write)' "${active_paths[@]}"; then
   fail 'analysis/directive skills retain an unbundled dependency or automatic handoff'
 fi
