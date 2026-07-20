@@ -12,18 +12,18 @@ preview_case=$plugin_dir/evals/managing-git-workflow/pr-title-and-body-generatio
 contract=$plugin_dir/evals/safety-contract.json
 
 for case_file in "$commit_case/case.yaml" "$preview_case/case.yaml"; do
-  rg -q "name: selected-managing-git-workflow" "$case_file"
-  rg -q "name: invoked-git-runner-inspect" "$case_file"
-  rg -Fq 'Bash(${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git:*)' "$case_file"
-  ! rg -q '^    - (Bash|Write|Edit)$' "$case_file" || \
+  grep -Eq "name: selected-managing-git-workflow" "$case_file"
+  grep -Eq "name: invoked-git-runner-inspect" "$case_file"
+  grep -Fq 'Bash(${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git:*)' "$case_file"
+  ! grep -Eq '^    - (Bash|Write|Edit)$' "$case_file" || \
     fail "managing-git eval has an unrestricted operator grant: $case_file"
-  rg -q 'name: safety-no-write-tool' "$case_file"
-  rg -q 'name: safety-no-unrelated-bash' "$case_file"
+  grep -Eq 'name: safety-no-write-tool' "$case_file"
+  grep -Eq 'name: safety-no-unrelated-bash' "$case_file"
 done
 
-rg -q 'name: invoked-git-runner-input-prepare' "$commit_case/case.yaml"
-rg -q 'name: invoked-git-runner-commit' "$commit_case/case.yaml"
-rg -q 'name: safety-no-direct-git-commit' "$commit_case/case.yaml"
+grep -Eq 'name: invoked-git-runner-input-prepare' "$commit_case/case.yaml"
+grep -Eq 'name: invoked-git-runner-commit' "$commit_case/case.yaml"
+grep -Eq 'name: safety-no-direct-git-commit' "$commit_case/case.yaml"
 assert_executable "$commit_case/fixtures/.eval-hooks/post-commit"
 
 jq -e '

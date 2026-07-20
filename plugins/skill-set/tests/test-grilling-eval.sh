@@ -104,8 +104,8 @@ ruby -ryaml -e '
     regex_for.call(regex_graders.fetch("no-follow-up-question")).match?(fourth_question)
 ' "$case_file" "$grader_dir" || fail "grilling early-stop eval contract is invalid"
 
-rg -q 'explicit early stop' "$prompt_file"
-rg -q 'return the final decision ledger' "$prompt_file"
-rg -q 'do not ask another question' "$prompt_file"
+grep -Eq 'explicit early stop' "$prompt_file"
+grep -Eq 'return the final decision ledger' "$prompt_file"
+grep -Eq 'do not ask another question' "$prompt_file"
 
 printf 'PASS: grilling early-stop eval\n'

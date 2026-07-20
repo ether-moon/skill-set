@@ -123,7 +123,7 @@ publish_single_result() {
 
 count_log() {
   local pattern=$1
-  { rg "$pattern" "$MOCK_GH_LOG" || true; } | wc -l | tr -d ' '
+  { grep -E "$pattern" "$MOCK_GH_LOG" || true; } | wc -l | tr -d ' '
 }
 
 make_fixture delayed
@@ -552,11 +552,11 @@ jq -e --arg sha "$local_head" '
 assert_equals 1 "$(count_log '^push --remote origin --remote-branch feature --expected-remote-sha ')" \
   "single expected-SHA push"
 assert_equals 1 "$(count_log '^pr comment ')" "single post-push comment"
-push_line=$(rg -n '^push ' "$MOCK_GH_LOG" | cut -d: -f1)
-comment_line=$(rg -n '^pr comment ' "$MOCK_GH_LOG" | cut -d: -f1)
+push_line=$(grep -En '^push ' "$MOCK_GH_LOG" | cut -d: -f1)
+comment_line=$(grep -En '^pr comment ' "$MOCK_GH_LOG" | cut -d: -f1)
 [[ $push_line -lt $comment_line ]] || fail "comment was published before the expected-SHA push"
-rg -q '^<!-- skill-set-pr:' "$MOCK_GH_DIR/comment.body"
-rg -q '^@coderabbitai resolve$' "$MOCK_GH_DIR/comment.body"
+grep -Eq '^<!-- skill-set-pr:' "$MOCK_GH_DIR/comment.body"
+grep -Eq '^@coderabbitai resolve$' "$MOCK_GH_DIR/comment.body"
 log_lines=$(wc -l <"$MOCK_GH_LOG" | tr -d ' ')
 publish_single_result "$run_id" "$head_sha" "$local_head" "$results_file" \
   --summary-file "$summary_file" --coderabbit-resolve >/dev/null
@@ -597,8 +597,8 @@ publish_single_result "$run_id" "$head_sha" "$head_sha" "$results_file" \
   --summary-file "$summary_file" >/dev/null
 assert_equals 0 "$(count_log '^push ')" "no-code push count"
 assert_equals 1 "$(count_log '^pr comment ')" "no-code comment count"
-last_view_line=$(rg -n '^pr view ' "$MOCK_GH_LOG" | tail -1 | cut -d: -f1)
-comment_line=$(rg -n '^pr comment ' "$MOCK_GH_LOG" | cut -d: -f1)
+last_view_line=$(grep -En '^pr view ' "$MOCK_GH_LOG" | tail -1 | cut -d: -f1)
+comment_line=$(grep -En '^pr comment ' "$MOCK_GH_LOG" | cut -d: -f1)
 [[ $last_view_line -lt $comment_line ]] || fail "no-code comment did not follow a fresh remote HEAD check"
 
 make_fixture publication-push-failure
@@ -741,36 +741,36 @@ assert_equals invalid_github_response "$(jq -r .error.code <<<"$malformed_cr")" 
 # The command-log cases above exercise publication safety. Keep agent and command
 # contracts wired to that executable gate rather than a second mutation path.
 resolver=$plugin_dir/agents/resolving-pr-blockers.md
-rg -q 'isolated worktree' "$resolver"
-rg -q 'conflict.*sole cycle|sole cycle.*conflict' "$resolver"
-rg -q 'CI.*then.*review|CI.*review.*sequential' "$resolver"
-rg -q 'expected-SHA push' "$resolver"
-rg -q 'skill-set-pr.*publish' "$resolver"
-rg -q 'partial failure.*must not invoke publication|must not invoke publication.*partial failure' "$resolver"
-rg -q 'exact base SHA|base SHA.*exact' "$resolver"
-rg -q 'preserve.*worktree.*branch|worktree.*branch.*preserve' "$resolver"
-if rg -q 'parallel with' "$resolver"; then
+grep -Eq 'isolated worktree' "$resolver"
+grep -Eq 'conflict.*sole cycle|sole cycle.*conflict' "$resolver"
+grep -Eq 'CI.*then.*review|CI.*review.*sequential' "$resolver"
+grep -Eq 'expected-SHA push' "$resolver"
+grep -Eq 'skill-set-pr.*publish' "$resolver"
+grep -Eq 'partial failure.*must not invoke publication|must not invoke publication.*partial failure' "$resolver"
+grep -Eq 'exact base SHA|base SHA.*exact' "$resolver"
+grep -Eq 'preserve.*worktree.*branch|worktree.*branch.*preserve' "$resolver"
+if grep -Eq 'parallel with' "$resolver"; then
   fail "resolver dispatch must not be parallel"
 fi
 fix_command=$plugin_dir/commands/pr/fix.md
-rg -q 'headRefOid.*baseRefOid|baseRefOid.*headRefOid' "$fix_command"
-rg -q 'headRepository' "$fix_command"
-rg -q 'Re-read.*metadata|re-read.*metadata' "$fix_command"
-rg -q 'Require the HEAD still equals the snapshot' "$fix_command"
-rg -q 'canonical.*push URL|canonical host' "$plugin_dir/skills/shipping-pr/SKILL.md" \
+grep -Eq 'headRefOid.*baseRefOid|baseRefOid.*headRefOid' "$fix_command"
+grep -Eq 'headRepository' "$fix_command"
+grep -Eq 'Re-read.*metadata|re-read.*metadata' "$fix_command"
+grep -Eq 'Require the HEAD still equals the snapshot' "$fix_command"
+grep -Eq 'canonical.*push URL|canonical host' "$plugin_dir/skills/shipping-pr/SKILL.md" \
   "$plugin_dir/skills/shipping-pr/reference/blocker-resolution.md"
-rg -q 'praise phrase followed by any request remains actionable' \
+grep -Eq 'praise phrase followed by any request remains actionable' \
   "$plugin_dir/skills/shipping-pr/reference/polling.md"
 
 for file in "$plugin_dir"/agents/*.md "$plugin_dir"/skills/shipping-pr/*.md \
   "$plugin_dir"/skills/shipping-pr/reference/*.md; do
-  if rg -q 'gh pr view[^\n]*--json[^\n]*reviewThreads|IssueComment\.replies' "$file"; then
+  if grep -Eq 'gh pr view.*--json.*reviewThreads|IssueComment\.replies' "$file"; then
     fail "unsupported review API in $file"
   fi
 done
 
-rg -Fq 'Bash(sleep:*)' "$plugin_dir/skills/shipping-pr/SKILL.md"
-rg -q '30-second|30 seconds' "$plugin_dir/skills/shipping-pr/SKILL.md" \
+grep -Fq 'Bash(sleep:*)' "$plugin_dir/skills/shipping-pr/SKILL.md"
+grep -Eq '30-second|30 seconds' "$plugin_dir/skills/shipping-pr/SKILL.md" \
   "$plugin_dir/skills/shipping-pr/reference/polling.md"
 
 printf 'PASS: PR state runner\n'

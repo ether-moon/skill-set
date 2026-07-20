@@ -312,11 +312,11 @@ while IFS= read -r case_file; do
   case_dir=$(dirname "$case_file")
   case_root=$(cd -- "$case_dir" && pwd -P)
   case_count=$((case_count + 1))
-  rg -q '^schema_version: "1\.1"$' "$case_file" || fail "unsupported or missing schema_version in $case_file"
+  grep -Eq '^schema_version: "1\.1"$' "$case_file" || fail "unsupported or missing schema_version in $case_file"
   name=$(awk -F ': ' '$1 == "name" { print $2; exit }' "$case_file")
   [[ -n $name ]] || fail "missing name in $case_file"
   printf '%s\n' "$name" >>"$case_names_file"
-  rg -q '^  timeout_seconds: ([1-9][0-9]{0,2}|[1-2][0-9]{3}|3[0-5][0-9]{2}|3600)$' "$case_file" || fail "missing valid timeout_seconds in $case_file"
+  grep -Eq '^  timeout_seconds: ([1-9][0-9]{0,2}|[1-2][0-9]{3}|3[0-5][0-9]{2}|3600)$' "$case_file" || fail "missing valid timeout_seconds in $case_file"
 
   scaffold_script=$(awk -F ': ' '$1 == "  scaffold_script" { print $2; exit }' "$case_file")
   if [[ -n $scaffold_script ]]; then
@@ -351,15 +351,15 @@ while IFS= read -r case_file; do
     while IFS= read -r required_output; do
       [[ -n $required_output ]] || continue
       output_name=${required_output##*/}
-      rg -Fq "$output_name" "$case_dir/prompt.md" || fail "file_exists output is not requested by prompt: $case_file: $required_output"
+      grep -Fq "$output_name" "$case_dir/prompt.md" || fail "file_exists output is not requested by prompt: $case_file: $required_output"
     done < <(awk '
       /^  - type: file_exists$/ { file_exists = 1; next }
       file_exists && /^    path: / { sub(/^    path: /, ""); gsub(/^['"'"']|['"'"']$/, ""); print; file_exists = 0; next }
       file_exists && /^  - / { file_exists = 0 }
     ' "$case_file")
   else
-    rg -q '^  prompt:' "$case_file" || fail "case has neither prompt.md nor execution.prompt: $case_file"
-    rg -q '^graders:' "$case_file" || fail "case has neither grader files nor inline graders: $case_file"
+    grep -Eq '^  prompt:' "$case_file" || fail "case has neither prompt.md nor execution.prompt: $case_file"
+    grep -Eq '^graders:' "$case_file" || fail "case has neither grader files nor inline graders: $case_file"
   fi
 
   while IFS= read -r focused_path; do
@@ -371,7 +371,8 @@ while IFS= read -r case_file; do
     [[ -e $case_dir/fixtures/$focused_path ]] || fail "grader references missing fixture path: $case_file: $focused_path"
   done < <(awk '/^[[:space:]]+path: / { sub(/^[[:space:]]+path: /, ""); print }' "$case_file" "$case_dir"/graders/*.md 2>/dev/null)
 
-  if rg -n '(^|[ (])(/Users/|/home/|/tmp/|~/)' "$case_file" "$case_dir/prompt.md" "$case_dir/graders" 2>/dev/null | grep -q .; then
+  if grep -Ern '(^|[ (])(/Users/|/home/|/tmp/|~/)' \
+    "$case_file" "$case_dir/prompt.md" "$case_dir/graders" 2>/dev/null | grep -q .; then
     fail "case contains a host-specific absolute path: $case_dir"
   fi
 done < <(find "$plugin_dir/evals" -type f -name case.yaml -not -path '*/results/*' | sort)
@@ -385,8 +386,10 @@ if [[ $require_trigger_matrix == true ]]; then
     skill=$(basename "$(dirname "$skill_file")")
     skill_eval_dir=$plugin_dir/evals/$skill
     [[ -d $skill_eval_dir ]] || fail "missing eval directory for active skill: $skill"
-    positive=$(rg -l '^  - trigger-positive$' "$skill_eval_dir" -g case.yaml | wc -l | tr -d ' ')
-    negative=$(rg -l '^  - trigger-negative$' "$skill_eval_dir" -g case.yaml | wc -l | tr -d ' ')
+    positive=$(find "$skill_eval_dir" -type f -name case.yaml \
+      -exec grep -El '^  - trigger-positive$' {} + | wc -l | tr -d ' ')
+    negative=$(find "$skill_eval_dir" -type f -name case.yaml \
+      -exec grep -El '^  - trigger-negative$' {} + | wc -l | tr -d ' ')
     ((positive >= 8 && positive <= 10)) || fail "$skill has $positive positive trigger cases; expected 8-10"
     ((negative >= 8 && negative <= 10)) || fail "$skill has $negative negative trigger cases; expected 8-10"
   done < <(find "$plugin_dir/skills" -mindepth 2 -maxdepth 2 -type f -name SKILL.md | sort)

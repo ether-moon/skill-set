@@ -35,10 +35,10 @@ skill_file=$skill_dir/SKILL.md
 eval_root=outputs/evals/deploying-safely
 
 [[ -f $skill_file ]] || { printf 'missing %s\n' "$skill_file" >&2; exit 1; }
-rg -q '^name: deploying-safely$' "$skill_file"
-rg -qi '^description:.*rollback' "$skill_file"
-rg -qi '^description:.*Do not use.*general release' "$skill_file"
-if rg -qi '^description:.*deployment status' "$skill_file"; then
+grep -Eq '^name: deploying-safely$' "$skill_file"
+grep -Eqi '^description:.*rollback' "$skill_file"
+grep -Eqi '^description:.*Do not use.*general release' "$skill_file"
+if grep -Eqi '^description:.*deployment status' "$skill_file"; then
   printf 'description still includes the broad deployment-status near miss\n' >&2
   exit 1
 fi
@@ -46,11 +46,11 @@ for case_file in \
   "$eval_root/trigger-positive-rollback/case.yaml" \
   "$eval_root/trigger-negative-general-release/case.yaml"; do
   [[ -f $case_file ]] || { printf 'missing %s\n' "$case_file" >&2; exit 1; }
-  rg -q '^schema_version: "1\.1"$' "$case_file"
-  rg -q '^graders:$' "$case_file"
+  grep -Eq '^schema_version: "1\.1"$' "$case_file"
+  grep -Eq '^graders:$' "$case_file"
 done
-rg -q 'selected-deploying-safely' "$eval_root/trigger-positive-rollback/case.yaml"
-rg -q 'did-not-select-deploying-safely' "$eval_root/trigger-negative-general-release/case.yaml"
+grep -Eq 'selected-deploying-safely' "$eval_root/trigger-positive-rollback/case.yaml"
+grep -Eq 'did-not-select-deploying-safely' "$eval_root/trigger-negative-general-release/case.yaml"
 printf 'valid deploying-safely revision\n'
 VALIDATOR
 

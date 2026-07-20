@@ -17,7 +17,7 @@ case_count=$(find "$plugin_dir/evals" -type f \( -name case.yaml -o -name prompt
 
 while IFS= read -r case_dir; do
   if [[ -f "$case_dir/case.yaml" ]]; then
-    rg -q '^schema_version: "1\.[01]"$' "$case_dir/case.yaml" || fail "missing supported schema_version: $case_dir/case.yaml"
+    grep -Eq '^schema_version: "1\.[01]"$' "$case_dir/case.yaml" || fail "missing supported schema_version: $case_dir/case.yaml"
     scaffold_script=$(awk -F ': ' '$1 == "  scaffold_script" { print $2; exit }' "$case_dir/case.yaml")
     if [[ -n $scaffold_script ]]; then
       sandbox=$(mktemp -d "${TMPDIR:-/tmp}/skill-set-scaffold-test.XXXXXX")
@@ -53,7 +53,7 @@ for release_case in \
   "$plugin_dir/evals/bumping-version/patch-bump-package-json" \
   "$plugin_dir/evals/bumping-version/minor-bump-plugin-json"; do
   case_file=$release_case/case.yaml
-  rg -q '^  - safety-mutation-boundary$' "$case_file"
+  grep -Eq '^  - safety-mutation-boundary$' "$case_file"
   actual_allowed_tools=$(awk '
     /^  allowed_tools:$/ { tools = 1; next }
     tools && /^runs:/ { exit }
@@ -77,7 +77,7 @@ for release_case in \
     safety-no-direct-git-push \
     safety-no-force \
     safety-no-release-publish; do
-    rg -q "^    name: $grader$" "$case_file"
+    grep -Eq "^    name: $grader$" "$case_file"
   done
   ruby -ryaml -e '
     parsed = YAML.safe_load(File.read(ARGV.fetch(0)), aliases: false)
@@ -192,13 +192,13 @@ ruby -ryaml -e '
 
 runner=$plugin_dir/scripts/run-evals
 assert_executable "$runner"
-rg -q 'summarize-evals' "$runner"
-"$runner" --help | rg -q '95c1b2a'
+grep -Eq 'summarize-evals' "$runner"
+"$runner" --help | grep -Eq '95c1b2a'
 eval_plan=$(/bin/bash "$runner" --plan --runs 1 --model test-model --judge-model test-judge --max-cost-usd 1 --tag trigger-positive)
-printf '%s\n' "$eval_plan" | rg -q -- '--allow-tools Bash Write Edit'
-printf '%s\n' "$eval_plan" | rg -q -- '--keep-temp'
-printf '%s\n' "$eval_plan" | rg -q -- '--output-dir [^ ]+/candidate'
-if printf '%s\n' "$eval_plan" | rg -q -- '--output-dir --'; then
+printf '%s\n' "$eval_plan" | grep -Eq -- '--allow-tools Bash Write Edit'
+printf '%s\n' "$eval_plan" | grep -Eq -- '--keep-temp'
+printf '%s\n' "$eval_plan" | grep -Eq -- '--output-dir [^ ]+/candidate'
+if printf '%s\n' "$eval_plan" | grep -Eq -- '--output-dir --'; then
   fail 'run-evals left --output-dir without its value'
 fi
 if /bin/bash "$runner" --plan --model same-model --judge-model same-model >/dev/null 2>&1; then
@@ -216,14 +216,14 @@ fi
 if /bin/bash "$runner" --plan --baseline-ref HEAD >/dev/null 2>&1; then
   fail 'run-evals must reject any baseline other than pinned 95c1b2a'
 fi
-rg -q '95c1b2a56b7b972f25bb9b5ae4c3cc942734b674' "$runner"
-rg -q 'retain-eval-traces' "$runner"
+grep -Eq '95c1b2a56b7b972f25bb9b5ae4c3cc942734b674' "$runner"
+grep -Eq 'retain-eval-traces' "$runner"
 [[ -s $plugin_dir/evals/safety-contract.json ]] || fail 'missing explicit safety contract'
-rg -q 'baseline_normalization: \[\]' "$runner"
+grep -Eq 'baseline_normalization: \[\]' "$runner"
 
 validator=$plugin_dir/scripts/validate-evals
 assert_executable "$validator"
-rg -q 'YAML.safe_load' "$validator"
-rg -q 'runs must be an integer of at least 3' "$validator"
+grep -Eq 'YAML.safe_load' "$validator"
+grep -Eq 'runs must be an integer of at least 3' "$validator"
 "$validator"
 printf 'PASS: eval layout\n'

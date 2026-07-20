@@ -19,9 +19,9 @@ for file in \
   [[ -f $file ]] || fail "missing shipping happy-path eval file: $file"
 done
 
-rg -q 'terminal.*clean|clean.*terminal' "$case_dir/graders/final-report.md"
-rg -q 'cycle 1|cycle.*one' "$case_dir/graders/final-report.md"
-rg -q 'did not push|no code push' "$case_dir/graders/final-report.md"
+grep -Eq 'terminal.*clean|clean.*terminal' "$case_dir/graders/final-report.md"
+grep -Eq 'cycle 1|cycle.*one' "$case_dir/graders/final-report.md"
+grep -Eq 'did not push|no code push' "$case_dir/graders/final-report.md"
 
 ruby -ryaml -e '
   parsed = YAML.safe_load(File.read(ARGV.fetch(0)), aliases: false)
@@ -168,13 +168,13 @@ expected_sequence=$(printf '%s\n' init snapshot-blocked transition-resolving pub
 actual_sequence=$(cut -f1 "$test_root/outputs/runner-invocations.log")
 assert_equals "$expected_sequence" "$actual_sequence" "shipping eval runner order"
 
-push_count=$({ rg '^skill-set-git ' "$test_root/outputs/mock-gh.log" || true; } | wc -l | tr -d ' ')
-comment_count=$({ rg '^pr comment ' "$test_root/outputs/mock-gh.log" || true; } | wc -l | tr -d ' ')
+push_count=$({ grep -E '^skill-set-git ' "$test_root/outputs/mock-gh.log" || true; } | wc -l | tr -d ' ')
+comment_count=$({ grep -E '^pr comment ' "$test_root/outputs/mock-gh.log" || true; } | wc -l | tr -d ' ')
 assert_equals 0 "$push_count" \
   "shipping eval push count"
 assert_equals 1 "$comment_count" \
   "shipping eval comment count"
-rg -q '^<!-- skill-set-pr:' "$test_root/.eval-state/comment.body"
+grep -Eq '^<!-- skill-set-pr:' "$test_root/.eval-state/comment.body"
 jq -e '.status == "clean" and .resolution.publication.phase == "complete"' \
   "$test_root/.git/skill-set/shipping-pr/17.json" >/dev/null
 

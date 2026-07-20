@@ -12,36 +12,36 @@ prose_dir=$plugin_dir/skills/writing-clear-prose
 creating=$creating_dir/SKILL.md
 prose=$prose_dir/SKILL.md
 
-if rg -qi 'writing-clear-prose|writing clear prose' "$creating_dir" "$plugin_dir/evals/creating-skills" 2>/dev/null; then
+if grep -Erqi 'writing-clear-prose|writing clear prose' "$creating_dir" "$plugin_dir/evals/creating-skills" 2>/dev/null; then
   fail 'creating-skills must be independent from writing-clear-prose'
 fi
-if rg -qi 'creating-skills|creating skills' "$prose_dir" "$plugin_dir/evals/writing-clear-prose" 2>/dev/null; then
+if grep -Erqi 'creating-skills|creating skills' "$prose_dir" "$plugin_dir/evals/writing-clear-prose" 2>/dev/null; then
   fail 'writing-clear-prose must be independent from creating-skills'
 fi
 
 for lifecycle_term in 'use cases' triggers structure scripts evaluation benchmark iterate; do
-  rg -qi "$lifecycle_term" "$creating" || fail "creating-skills misses lifecycle term: $lifecycle_term"
+  grep -Eqi "$lifecycle_term" "$creating" || fail "creating-skills misses lifecycle term: $lifecycle_term"
 done
-rg -qi 'new skill.*existing skill|existing skill.*new skill' "$creating"
-rg -qi 'optional.*skill-creator|skill-creator.*optional' "$creating"
-rg -qi 'unavailable|not installed|absent' "$creating"
-rg -q 'case.yaml' "$creating_dir/reference/evaluation.md"
-rg -q -- '--ablation with-without' "$creating_dir/reference/evaluation.md"
-rg -qi 'independent.*(judge|grader)|(judge|grader).*independent' "$creating_dir/reference/evaluation.md"
-if rg -q 'evals\.json|without_skill|with_skill/outputs' "$creating_dir"; then
+grep -Eqi 'new skill.*existing skill|existing skill.*new skill' "$creating"
+grep -Eqi 'optional.*skill-creator|skill-creator.*optional' "$creating"
+grep -Eqi 'unavailable|not installed|absent' "$creating"
+grep -Eq 'case.yaml' "$creating_dir/reference/evaluation.md"
+grep -Eq -- '--ablation with-without' "$creating_dir/reference/evaluation.md"
+grep -Eqi 'independent.*(judge|grader)|(judge|grader).*independent' "$creating_dir/reference/evaluation.md"
+if grep -Erq 'evals\.json|without_skill|with_skill/outputs' "$creating_dir"; then
   fail 'creating-skills retains a legacy custom eval layout'
 fi
 
 for near_miss in 'skill authoring' 'commit and PR messages' 'code comments' 'creative writing' 'everyday conversation'; do
-  rg -qi "$near_miss" "$prose" || fail "prose misses negative trigger: $near_miss"
+  grep -Eqi "$near_miss" "$prose" || fail "prose misses negative trigger: $near_miss"
 done
 for criterion in clarity structure specificity concision 'facts and requirements'; do
-  rg -qi "$criterion" "$prose" || fail "prose misses rubric criterion: $criterion"
+  grep -Eqi "$criterion" "$prose" || fail "prose misses rubric criterion: $criterion"
 done
-rg -qi 'hard fail.*(invented|unsupported).*(number|claim)|(?:invented|unsupported).*(number|claim).*hard fail' "$prose"
-rg -qi 'hard fail.*technical meaning|technical meaning.*hard fail' "$prose"
-assert_equals '4' "$(rg -l '^  - functional$' "$plugin_dir/evals/creating-skills" -g case.yaml | wc -l | tr -d ' ')" 'creating-skills functional eval count'
-assert_equals '3' "$(rg -l '^  - functional$' "$plugin_dir/evals/writing-clear-prose" -g case.yaml | wc -l | tr -d ' ')" 'writing-clear-prose functional eval count'
+grep -Eqi 'hard fail.*(invented|unsupported).*(number|claim)|(invented|unsupported).*(number|claim).*hard fail' "$prose"
+grep -Eqi 'hard fail.*technical meaning|technical meaning.*hard fail' "$prose"
+assert_equals '4' "$(find "$plugin_dir/evals/creating-skills" -type f -name case.yaml -exec grep -El '^  - functional$' {} + | wc -l | tr -d ' ')" 'creating-skills functional eval count'
+assert_equals '3' "$(find "$plugin_dir/evals/writing-clear-prose" -type f -name case.yaml -exec grep -El '^  - functional$' {} + | wc -l | tr -d ' ')" 'writing-clear-prose functional eval count'
 
 for case_dir in \
   "$plugin_dir/evals/creating-skills/new-with-creator" \
@@ -49,11 +49,11 @@ for case_dir in \
   "$plugin_dir/evals/creating-skills/existing-with-creator" \
   "$plugin_dir/evals/creating-skills/existing-without-creator"; do
   assert_executable "$case_dir/fixtures/scaffold.sh"
-  rg -q '^  scaffold_script: fixtures/scaffold\.sh$' "$case_dir/case.yaml"
-  rg -q '^  - type: file_exists$' "$case_dir/case.yaml"
-  rg -q '^  - type: tool_order$' "$case_dir/case.yaml"
-  rg -q 'validate-skill\.sh' "$case_dir/prompt.md" "$case_dir/case.yaml" "$case_dir/graders"
-  if rg -qi 'Do not (create|edit) files' "$case_dir"; then
+  grep -Eq '^  scaffold_script: fixtures/scaffold\.sh$' "$case_dir/case.yaml"
+  grep -Eq '^  - type: file_exists$' "$case_dir/case.yaml"
+  grep -Eq '^  - type: tool_order$' "$case_dir/case.yaml"
+  grep -Erq 'validate-skill\.sh' "$case_dir/prompt.md" "$case_dir/case.yaml" "$case_dir/graders"
+  if grep -Erqi 'Do not (create|edit) files' "$case_dir"; then
     fail "creating-skills functional eval is explanation-only: $case_dir"
   fi
 done

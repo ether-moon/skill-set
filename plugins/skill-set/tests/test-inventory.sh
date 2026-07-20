@@ -22,9 +22,9 @@ assert_equals "$(jq -r '.skills' "$expected_inventory")" "$skill_count" "skill c
 assert_equals "$(jq -r '.agents' "$expected_inventory")" "$agent_count" "agent count"
 assert_equals "$(jq -r '.commands' "$expected_inventory")" "$command_count" "legacy command count"
 
-rg -q '<!-- skill-set-inventory:start -->' "$repo_dir/README.md"
-rg -q '<!-- skill-set-inventory:start -->' "$repo_dir/AGENTS.md"
-if rg -q '^## Project Structure$|^### Project Structure$' "$repo_dir/README.md" "$repo_dir/AGENTS.md"; then
+grep -Eq '<!-- skill-set-inventory:start -->' "$repo_dir/README.md"
+grep -Eq '<!-- skill-set-inventory:start -->' "$repo_dir/AGENTS.md"
+if grep -Eq '^## Project Structure$|^### Project Structure$' "$repo_dir/README.md" "$repo_dir/AGENTS.md"; then
   fail "manual component trees must not duplicate the generated inventory"
 fi
 while IFS= read -r layout_path; do

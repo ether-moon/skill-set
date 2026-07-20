@@ -9,14 +9,14 @@ source "$test_dir/test-helper.sh"
 
 validator=$plugin_dir/scripts/validate-references
 assert_executable "$validator"
-rg -q 'nested reference chain' "$validator"
+grep -Eq 'nested reference chain' "$validator"
 
 while IFS= read -r reference_file; do
   line_count=$(wc -l <"$reference_file" | tr -d ' ')
   if ((line_count > 100)); then
-    sed -n '1,50p' "$reference_file" | rg -q '^## (Table of )?Contents$' ||
+    sed -n '1,50p' "$reference_file" | grep -Eq '^## (Table of )?Contents$' ||
       fail "reference over 100 lines lacks a top-level contents section: $reference_file"
-    sed -n '1,50p' "$reference_file" | rg -q '^- \[[^]]+\]\(#[^)]+\)' ||
+    sed -n '1,50p' "$reference_file" | grep -Eq '^- \[[^]]+\]\(#[^)]+\)' ||
       fail "reference over 100 lines lacks linked contents entries: $reference_file"
   fi
 

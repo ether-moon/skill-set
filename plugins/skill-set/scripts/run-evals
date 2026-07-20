@@ -87,7 +87,7 @@ while (($#)); do
   esac
 done
 
-for dependency in bash git jq claude rg tar; do
+for dependency in bash git jq claude tar; do
   require_command "$dependency"
 done
 [[ -n $model ]] || { printf 'The evaluated model identifier cannot be empty.\n' >&2; exit 2; }
@@ -271,7 +271,7 @@ fi
 baseline_sha=$deletion_baseline_sha
 claude_version=$(claude --version)
 partial_budget=false
-if rg -q $'\tpartial-budget$' "$output_dir/arm-status.tsv"; then partial_budget=true; fi
+if grep -Eq $'\tpartial-budget$' "$output_dir/arm-status.tsv"; then partial_budget=true; fi
 jq -n \
   --arg candidate_sha "$candidate_sha" \
   --argjson candidate_dirty "$candidate_dirty" \
