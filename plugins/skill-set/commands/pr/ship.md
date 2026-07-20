@@ -9,9 +9,8 @@ Supported flags and defaults:
 
 - `--max-cycles N` — resolver attempts, default 3
 - `--ci-timeout MIN` — current-HEAD CI deadline, default 30
-- `--review-timeout MIN` — current-HEAD CodeRabbit deadline, default 10
-- `--no-coderabbit` — disable CodeRabbit completion checks
+- `--review-timeout MIN` — current-HEAD automated-review deadline, default 10
 - `--no-create` — fail when the current branch has no PR
 - `--required-only=BOOL` — select required checks only, default true
 
-The workflow keeps state in the repository's Git common directory and rejects concurrent active runs. It binds publication to the live PR head repository/ref and the selected remote's canonical push URL, including fork remotes. Resume existing state instead of starting a second loop. Never include dirty files, publish partial resolver work, force-push, merge, pull, or rebase.
+Reviewer detection is always automatic for CodeRabbit, Claude, and `chatgpt-codex-connector`; no adapter flag is accepted. The workflow keeps state in the repository's Git common directory and rejects concurrent active runs. It binds publication to the live PR head repository/ref and the selected remote's canonical push URL, including fork remotes. Resume existing state instead of starting a second loop. Never include dirty files, publish partial resolver work, force-push, merge, pull, or rebase.

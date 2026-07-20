@@ -29,8 +29,7 @@ Do not use for:
 |---|---:|---|
 | `--max-cycles` | 3 | Maximum resolver attempts |
 | `--ci-timeout` | 30 minutes | Current-HEAD check deadline |
-| `--review-timeout` | 10 minutes | Current-HEAD CodeRabbit deadline; preserves the legacy command default |
-| `--no-coderabbit` | off | Disable CodeRabbit completion requirement |
+| `--review-timeout` | 10 minutes | Current-HEAD automated-review deadline |
 | `--no-create` | off | Refuse to create a missing PR |
 | `--required-only` | true | Select required checks only |
 
@@ -38,7 +37,7 @@ Do not use for:
 
 - “Ship this PR and keep fixing blockers” runs the full resumable loop with the default limits.
 - “Resume PR 42” loads the active run and branches on its persisted status/publication phase without starting a duplicate resolver.
-- “Is this PR truly clean?” snapshots the same HEAD across checks, paginated threads, mergeability, and CodeRabbit; pending evidence is reported rather than resolved.
+- “Is this PR truly clean?” snapshots the same HEAD across checks, paginated threads, mergeability, and auto-detected reviewers; pending evidence is reported rather than resolved.
 
 ## Workflow
 
@@ -58,9 +57,10 @@ ${CLAUDE_PLUGIN_ROOT}/bin/skill-set-pr init \
   --max-cycles "$MAX_CYCLES" \
   --ci-timeout-seconds "$CI_TIMEOUT_SECONDS" \
   --review-timeout-seconds "$REVIEW_TIMEOUT_SECONDS" \
-  --required-only "$REQUIRED_ONLY" \
-  --coderabbit-required "$CODERABBIT_MODE"
+  --required-only "$REQUIRED_ONLY"
 ```
+
+Reviewer selection is always automatic. The runner detects CodeRabbit, Claude, and `chatgpt-codex-connector` from recent merged-PR activity, then incorporates current-PR evidence on every snapshot. Do not ask the user to select an adapter or pass reviewer-specific flags.
 
 Use `--resume` only when the runner reports an active run. State lives under the repository's Git common directory, so linked worktrees share one lock and one run. Branch on the returned status: snapshot only `polling`; handle `blocked`, `awaiting_user`, and `resolving` before polling again. A resumed `resolving` run must use its recorded `resolution` metadata and must never dispatch a duplicate resolver. Resume a journaled `prepared`, `gate_passed`, or `commenting` publication by calling `publish` with the unchanged files; the runner reconciles the remote HEAD and hidden comment marker. If its phase is `pending`, report the recorded worktree/branch and treat the interrupted attempt as `partial-failure`. A resumed `awaiting_user` run remains paused with its saved result and recovery paths until the user explicitly decides.
 
@@ -102,16 +102,17 @@ Follow [blocker-resolution.md](reference/blocker-resolution.md). A conflict cons
 
 ### 5. Publish and record the resolver outcome
 
-Each attempted agent writes one ordered entry to a results file inside the resolver worktree with `agent`, `result`, `input_head`, and `output_head`. Queue one summary file there; request `--coderabbit-resolve` when its marker is needed. Only the runner may push or comment:
+Each attempted agent writes one ordered entry to a results file inside the resolver worktree with `agent`, `result`, `input_head`, and `output_head`. When review feedback was processed, also queue one summary file and one thread-feedback JSON file there. Only the runner may push, reply, resolve, or comment:
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/bin/skill-set-pr publish \
   --pr "$PR" --expected-run-id "$RUN_ID" \
   --expected-head-sha "$HEAD_SHA" --expected-local-head-sha "$LOCAL_HEAD_SHA" \
-  --results-file "$RESULTS_FILE" --summary-file "$SUMMARY_FILE"
+  --results-file "$RESULTS_FILE" --summary-file "$SUMMARY_FILE" \
+  --thread-feedback-file "$THREAD_FEEDBACK_FILE"
 ```
 
-`publish` rejects missing, reordered, ambiguous, failed, or partial results before mutation. Except for the declared results/summary inputs, the resolver worktree must have no staged, unstaged, or untracked changes; this prevents publishing a committed subset while leaving partial edits behind. It revalidates the live PR head repository/ref and the remote push URL, including once immediately before a code push. For code changes it invokes exactly one expected-SHA `skill-set-git push`; for no-code activity it revalidates the unchanged remote HEAD. It combines the summary and optional CodeRabbit marker into one hidden-ID comment after that gate. Its publication journal makes the same intent safe to resume without a second successful push or duplicate comment.
+`publish` rejects missing, reordered, ambiguous, failed, or partial results before mutation. Except for the declared results/summary/thread-feedback inputs, the resolver worktree must have no staged, unstaged, or untracked changes; this prevents publishing a committed subset while leaving partial edits behind. It revalidates the live PR head repository/ref and the remote push URL, including once immediately before a code push. For code changes it invokes exactly one expected-SHA `skill-set-git push`; for no-code activity it revalidates the unchanged remote HEAD. After that gate it posts each queued resolution reply once and resolves only threads whose outcome is `fixed` or `accepted_as_is`. If every queued CodeRabbit item is resolved, it derives the exact `@coderabbitai resolve` command and places it in the identified summary comment. It never emits `@codex review`, `@claude review`, edit-delegation commands, or free-form bot mentions. Its publication journal makes the same intent safe to resume without a second successful push or duplicate feedback.
 
 - Successful `publish`: transition `resolving -> polling` with `--resolver-attempt` and `--resolver-result success` or `no-op`, then snapshot again. The transition is rejected unless the publication journal is `complete`.
 - AMBIGUOUS decision: transition `resolving -> awaiting_user` with `--resolver-attempt --resolver-result ambiguous`; do not push.
@@ -128,7 +129,7 @@ Declare clean only when one snapshot confirms all of the following for the same 
 - every selected check is `pass` or `skipping`;
 - no fail, cancel, pending, or timeout result;
 - no unresolved actionable review thread;
-- when CodeRabbit is active, its current-HEAD commit status or check-run completed successfully.
+- every currently required auto-detected reviewer has a successful current-HEAD completion signal.
 
 If HEAD changes, discard the old results. The runner resets the check deadline, review deadline, and check-registration grace before snapshotting the new HEAD.
 
@@ -141,7 +142,8 @@ Use the user's language for progress and the final report. Include PR URL/number
 - Never force-push, pull, or rebase.
 - Never run two active shipping loops for the same PR.
 - Never push if any attempted resolver failed or returned AMBIGUOUS.
-- Publish summary comments and resolution markers only after the publication gate succeeds.
+- Publish summaries, thread replies, resolutions, and the derived CodeRabbit resolve command only after the publication gate succeeds.
+- Never trigger a new automated review or delegate edits while reporting that feedback was addressed.
 - Preserve the failure worktree and branch; report how to inspect them.
 
 See [troubleshooting.md](reference/troubleshooting.md) for recovery.

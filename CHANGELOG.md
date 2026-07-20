@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Improved
+
+- **shipping-pr**: Always auto-detect CodeRabbit, Claude, and Codex reviewers, track their current-HEAD completion signals without reviewer-specific flags, and publish idempotent per-thread resolution feedback after the publication gate. Resolved CodeRabbit feedback emits the official `@coderabbitai resolve` command; Claude and Codex feedback never triggers a new review or delegates edits.
+
 ### Removed
 
 - Removed the `applying-coding-baseline`, `building-shared-vocabulary`, `consulting-peer-llms`, `ralph`, `understanding-code-context`, and `using-skill-set` skills.

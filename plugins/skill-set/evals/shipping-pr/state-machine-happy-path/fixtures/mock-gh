@@ -11,6 +11,11 @@ fi
 printf '%s\n' "$*" >>"$MOCK_GH_LOG"
 head_sha=$(<"$MOCK_GH_HEAD_FILE")
 
+if [[ ${1:-} == pr && ${2:-} == list ]]; then
+  printf '%s\n' '[]'
+  exit 0
+fi
+
 if [[ ${1:-} == pr && ${2:-} == view ]]; then
   jq -cn --arg head "$head_sha" --arg base "$MOCK_GH_BASE_SHA" '
     {number:17,headRefOid:$head,headRefName:"feature",
@@ -27,7 +32,30 @@ if [[ ${1:-} == pr && ${2:-} == checks ]]; then
 fi
 
 if [[ ${1:-} == api && ${2:-} == graphql ]]; then
-  if [[ -f $MOCK_GH_DIR/publication-complete ]]; then
+  graphql_id=
+  graphql_body=
+  for argument in "$@"; do
+    case "$argument" in
+      id=*) graphql_id=${argument#id=} ;;
+      body=*) graphql_body=${argument#body=} ;;
+    esac
+  done
+  if [[ "$*" == *addPullRequestReviewThreadReply* ]]; then
+    printf '%s\n' "$graphql_body" >"$MOCK_GH_DIR/$graphql_id.reply"
+    printf '%s\n' '{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"reply-1"}}}}'
+  elif [[ "$*" == *resolveReviewThread* ]]; then
+    : >"$MOCK_GH_DIR/$graphql_id.resolved"
+    jq -cn --arg id "$graphql_id" '{data:{resolveReviewThread:{thread:{id:$id,isResolved:true}}}}'
+  elif [[ "$*" == *'node(id:$id)'* ]]; then
+    resolved=false
+    [[ ! -f $MOCK_GH_DIR/$graphql_id.resolved ]] || resolved=true
+    reply_nodes='[]'
+    if [[ -f $MOCK_GH_DIR/$graphql_id.reply ]]; then
+      reply_nodes=$(jq -Rs '[{body:.}]' <"$MOCK_GH_DIR/$graphql_id.reply")
+    fi
+    jq -cn --arg id "$graphql_id" --argjson resolved "$resolved" --argjson replies "$reply_nodes" \
+      '{data:{node:{id:$id,isResolved:$resolved,comments:{nodes:$replies}}}}'
+  elif [[ -f $MOCK_GH_DIR/publication-complete ]]; then
     printf '%s\n' '{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}'
   else
     printf '%s\n' '{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[{"id":"thread-1","isResolved":false,"isOutdated":false,"comments":{"nodes":[{"id":"comment-1","author":{"login":"reviewer"},"body":"Please verify this request","path":"fixture.txt","line":1}]}}],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}'
@@ -41,6 +69,21 @@ if [[ ${1:-} == api && ${2:-} == repos/*/issues/*/comments* ]]; then
   else
     printf '%s\n' '[]'
   fi
+  exit 0
+fi
+
+if [[ ${1:-} == api && ${2:-} == repos/*/issues/*/reactions* ]]; then
+  printf '%s\n' '[]'
+  exit 0
+fi
+
+if [[ ${1:-} == api && ${2:-} == repos/*/commits/*/check-runs* ]]; then
+  printf '%s\n' '{"check_runs":[]}'
+  exit 0
+fi
+
+if [[ ${1:-} == api && ${2:-} == repos/*/commits/*/status ]]; then
+  printf '%s\n' '{"statuses":[]}'
   exit 0
 fi
 
