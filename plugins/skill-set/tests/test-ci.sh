@@ -12,6 +12,7 @@ workflow=$repo_dir/.github/workflows/validate-skill-set.yml
 assert_file "$workflow"
 grep -Eq 'claude plugin validate --strict plugins/skill-set' "$workflow"
 grep -Eq 'plugins/skill-set/tests/run.sh' "$workflow"
+grep -Eq 'fetch-depth: 0' "$workflow"
 grep -Eq 'shellcheck' "$workflow"
 grep -Eq 'shellcheck ruby' "$workflow"
 grep -Eq 'generate-inventory --check' "$workflow"
