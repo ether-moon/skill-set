@@ -79,9 +79,9 @@ Safety tests should exercise absent or narrower authority, stale compare-and-swa
 
 Test every capability tier the active host supports:
 
-- **Small/fast model** exposes missing sequence details and weak guardrails.
-- **Balanced model** is the primary functional target.
-- **Strongest supported model** exposes unnecessary instruction volume and overconstraint.
+- **Small/fast model** (e.g., Claude Haiku) exposes missing sequence details and weak guardrails.
+- **Balanced model** (e.g., Claude Sonnet) is the primary functional target.
+- **Strongest supported model** (e.g., Claude Opus) exposes unnecessary instruction volume and overconstraint.
 
 Use a different, sufficiently capable model for LLM grading than for the agent run. Hold cases, fixtures, tool grants, and run count constant when comparing models. Run nondeterministic cases at least three times. Record the host adapter and exact model identifiers instead of assuming vendor-specific names.
 

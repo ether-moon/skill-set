@@ -57,9 +57,9 @@ Use this checklist to validate your skill before and after upload.
 - [ ] Mutation and publication boundaries have negative tests
 
 ### Cross-Model Testing
-- [ ] Tested with the smallest supported model (enough guidance?)
-- [ ] Tested with the primary balanced model (clear and efficient?)
-- [ ] Tested with the strongest supported model (not over-explaining?)
+- [ ] Tested with the smallest supported model (e.g., Claude Haiku; enough guidance?)
+- [ ] Tested with the primary balanced model (e.g., Claude Sonnet; clear and efficient?)
+- [ ] Tested with the strongest supported model (e.g., Claude Opus; not over-explaining?)
 - [ ] LLM judge is independent and capable of applying the complete rubric
 
 ### Evaluation

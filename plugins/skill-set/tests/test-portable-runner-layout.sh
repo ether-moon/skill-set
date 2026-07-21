@@ -40,18 +40,18 @@ git init --quiet -b main "$repo"
   cd "$repo"
   prepared=$(/bin/bash "$installed_git_runner" input-prepare --kind commit-message)
   input_path=$(jq -r .path <<<"$prepared")
-  jq -e '.ok == true and .operation == "input-prepare"' <<<"$prepared" >/dev/null
+  jq -e '.ok == true and .operation == "input-prepare"' <<<"$prepared" >/dev/null || fail 'git runner did not return ok for input-prepare'
   /bin/bash "$installed_git_runner" input-discard --input-file "$input_path" >/dev/null
 
   if /bin/bash "$installed_pr_runner" >stdout.json 2>stderr.json; then
     fail 'skill-set-pr without a subcommand must fail with usage information'
   fi
-  jq -e '.ok == false and .error.code == "usage"' stderr.json >/dev/null
+  jq -e '.ok == false and .error.code == "usage"' stderr.json >/dev/null || fail 'skill-set-pr did not return usage error'
 
   if /bin/bash "$installed_release_runner" >release-stdout.json 2>release-stderr.json; then
     fail 'skill-set-release without a subcommand must fail with usage information'
   fi
-  jq -e '.ok == false and .error.code == "SUBCOMMAND_REQUIRED"' release-stderr.json >/dev/null
+  jq -e '.ok == false and .error.code == "SUBCOMMAND_REQUIRED"' release-stderr.json >/dev/null || fail 'skill-set-release did not return SUBCOMMAND_REQUIRED error'
 )
 
 printf 'PASS: portable runner layout\n'
