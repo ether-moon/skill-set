@@ -22,6 +22,7 @@ printf '%s\n' \
   'run-shipping-eval' \
   'resolver-results.json' \
   'summary.md' \
+  'thread-feedback.json' \
   >"$workspace/.gitignore"
 printf 'shipping eval fixture\n' >"$workspace/fixture.txt"
 
@@ -43,3 +44,5 @@ jq -cn --arg head "$head_sha" \
   '{results:[{agent:"pr-review-feedback",result:"no-op",input_head:$head,output_head:$head}]}' \
   >"$workspace/resolver-results.json"
 printf 'Resolved the review request without a code change.\n' >"$workspace/summary.md"
+jq -cn '{threads:[{id:"thread-1",outcome:"accepted_as_is",body:"Reviewed and accepted as-is."}]}' \
+  >"$workspace/thread-feedback.json"

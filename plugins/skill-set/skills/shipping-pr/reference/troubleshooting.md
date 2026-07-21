@@ -20,9 +20,9 @@ A resumed `resolving` state must use `.resolution.worktree`, `.resolution.branch
 
 Pending, cancelled, unknown, and timed-out checks are never clean. Report their buckets and deadline. Do not dispatch a code resolver for a merely pending check.
 
-## CodeRabbit absent
+## Automated reviewer absent
 
-When CodeRabbit is required, an absent current-HEAD status is treated as not yet registered until the review deadline. If auto-detection was wrong, start a new run with an explicit `--coderabbit-required false`; do not mutate active state.
+Reviewer detection cannot be overridden. Report the detected provider, its current state, and the review deadline. An active CodeRabbit reviewer without current-HEAD status/check evidence remains pending until that deadline. On later cycles, absent Claude or Codex evidence becomes `not_expected`; do not post a review command to manufacture a completion signal.
 
 ## Resolver failure
 
@@ -34,7 +34,7 @@ The recorded PR head repository, branch, and host are compare-and-swap inputs, n
 
 ## Publication failure
 
-Keep the worktree, results file, summary file, and publication journal. Never bypass `skill-set-pr publish`. A `prepared` state may safely reconcile whether the expected-SHA push took effect; `gate_passed` and `commenting` never push again. If the remote is neither the pinned old HEAD nor recorded local HEAD, stop for user inspection.
+Keep the worktree, results file, summary file, thread-feedback file, and publication journal. Never bypass `skill-set-pr publish`. A `prepared` state may safely reconcile whether the expected-SHA push took effect; `gate_passed` and `commenting` never push again. If the remote is neither the pinned old HEAD nor recorded local HEAD, stop for user inspection.
 
 ## Structured runner error
 

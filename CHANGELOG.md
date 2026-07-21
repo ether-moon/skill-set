@@ -13,6 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **shipping-pr**: Restore unattended initial commits and pushes. Invoking the shipping workflow now authorizes committing the complete inspected working-tree scope, publishing the branch, and publishing successful resolver commits without a redundant confirmation prompt.
+- **shipping-pr**: Honor `--required-only=false` when snapshotting checks so failed advisory workflows are included instead of being silently treated as clean.
+
+### Improved
+
+- **shipping-pr**: Always auto-detect CodeRabbit, Claude, and Codex reviewers, track their current-HEAD completion signals without reviewer-specific flags, and publish idempotent per-thread resolution feedback after the publication gate. Resolved CodeRabbit feedback emits the official `@coderabbitai resolve` command; Claude and Codex feedback never triggers a new review or delegates edits.
+
 ### Removed
 
 - Removed the `applying-coding-baseline`, `building-shared-vocabulary`, `consulting-peer-llms`, `ralph`, `understanding-code-context`, and `using-skill-set` skills.

@@ -4,7 +4,7 @@
 
 ## Stable-HEAD Read
 
-Each snapshot reads the PR HEAD SHA, repository, branch, and host before and after checks, review threads, and CodeRabbit status. If that binding differs, the runner:
+Each snapshot reads the PR HEAD SHA, repository, branch, and host before and after checks, review threads, and automated-review evidence. If that binding differs, the runner:
 
 1. discards every intermediate result;
 2. stores the new HEAD;
@@ -33,11 +33,13 @@ Praise and summary-only acknowledgements are filtered by one deliberately narrow
 
 Any unresolved actionable thread makes the snapshot `blocked`.
 
-## CodeRabbit
+## Automated Reviewers
 
-Initialization accepts `--coderabbit-required auto|true|false`. Auto mode detects recent repository use. When required, snapshots query both commit statuses and check-runs for the current HEAD and match CodeRabbit by context, name, or app.
+Reviewer selection is always `auto`; there is no adapter-selection flag. Initialization detects CodeRabbit, Claude, and `chatgpt-codex-connector` from authors and apps found in the ten most recent merged PRs. Every snapshot unions that history with current-PR commit statuses, check-runs, reviews, comments, and reactions, so a newly introduced reviewer is discovered without restarting the run.
 
-Successful or neutral completion satisfies the completion signal; actionable comments are still evaluated through review threads. Failure, error, cancellation, timeout, or action-required is blocked. Pending or absent remains `polling` until the review deadline, then becomes `timed_out`.
+CodeRabbit completion comes from its current-HEAD commit status or check-run. Claude completion comes from its current-HEAD check-run, status, or review. Codex completion comes from a current-HEAD review or, before any resolver push, the connector's `+1` reaction. Successful or neutral completion satisfies the signal; failure, error, cancellation, timeout, or action-required is blocked. A required pending or absent signal remains `polling` until the review deadline and then becomes `timed_out`.
+
+CodeRabbit remains required whenever active because it normally re-reviews a pushed HEAD. Claude and Codex are required for the initial cycle and whenever the current HEAD has their evidence. After a resolver push, their absence is `not_expected` rather than a reason to trigger a new review. Actionable comments from every provider are still governed by review-thread state.
 
 ## Mergeability
 
@@ -45,4 +47,4 @@ Successful or neutral completion satisfies the completion signal; actionable com
 
 ## Fingerprint
 
-The blocker fingerprint covers the observed HEAD; normalized check identities, states, and buckets; conflict state; unresolved thread IDs and latest-comment content; and CodeRabbit state. After a resolver returns to polling, only a fresh snapshot can declare `stalled`, and only when both HEAD and fingerprint remain unchanged.
+The blocker fingerprint covers the observed HEAD; normalized check identities, states, and buckets; conflict state; unresolved thread IDs and latest-comment content; and all active reviewer states. After a resolver returns to polling, only a fresh snapshot can declare `stalled`, and only when both HEAD and fingerprint remain unchanged.

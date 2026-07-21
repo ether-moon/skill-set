@@ -18,7 +18,7 @@ Use GraphQL `reviewThreads(first:100, after:$cursor)` with `pageInfo.hasNextPage
 
 Do not infer resolution from words such as "fixed" in an unrelated comment. Do not truncate at 100 threads. PR-level discussion may provide context, but only an actionable unresolved review thread is a code blocker.
 
-Detect CodeRabbit from the actual reviewer/thread author set before filtering. This affects only the queued resolve marker; it never changes classification.
+Preserve each thread's actual author/app identity. Do not select or return a provider adapter; the publication runner derives CodeRabbit, Claude/Anthropic, `chatgpt-codex-connector`/Codex, or `other` from that saved evidence. Provider identity never changes classification.
 
 ## Classify and Resolve
 
@@ -31,12 +31,14 @@ Detect CodeRabbit from the actual reviewer/thread author set before filtering. T
 
 ## Queue, Do Not Publish
 
-Return a summary body whenever review activity was processed, including auto-applied, user-approved, skipped, and no-op items. When CodeRabbit participated, request the resolve marker separately. Do not post either one; the orchestrator writes the summary file and lets `skill-set-pr publish` combine both into one identified comment.
+Return a summary body whenever review activity was processed, including auto-applied, user-approved, skipped, and no-op items. Also return one resolution-feedback entry for every blocked-snapshot thread: its exact thread ID, outcome (`fixed`, `accepted_as_is`, or `unresolved`), and a concise body explaining what was done or why it remains open. Do not include a provider/adapter field; the runner derives it from the saved thread author. Do not include `@codex`, `@claude`, `@coderabbitai`, review triggers, or edit-delegation commands in either payload.
+
+Do not post or resolve anything. The orchestrator writes the summary and `{threads:[...]}` feedback files, then lets `skill-set-pr publish` reply and resolve only after the publication gate. The runner derives CodeRabbit's exact resolve command only when every queued CodeRabbit item is resolved; Codex and Claude receive resolution feedback, never a new-review command.
 
 The orchestrator may publish this payload only after every attempted resolver succeeds/no-ops and the expected-SHA push succeeds. For a review-only no-op, it must re-verify the unchanged remote HEAD first.
 
 ## Result Contract
 
-Return `success`, `no-op`, `AMBIGUOUS`, or `failed`, `input_head`, `output_head`, commits, modified paths, validation results, processed thread IDs, queued summary/markers, and unresolved decisions. Never push, comment, resolve a thread, pull, rebase, force-push, or clean the shared worktree.
+Return `success`, `no-op`, `AMBIGUOUS`, or `failed`, `input_head`, `output_head`, commits, modified paths, validation results, processed thread IDs, queued summary, per-thread feedback, and unresolved decisions. Never push, comment, resolve a thread, pull, rebase, force-push, or clean the shared worktree.
 
 Use the invoking user's language for rationale and queued summaries; keep commands, paths, status values, and result identifiers in English.

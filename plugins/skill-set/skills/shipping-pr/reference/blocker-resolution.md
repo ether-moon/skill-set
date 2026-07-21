@@ -22,18 +22,18 @@ Each resolver returns:
 - `result`: `success`, `no-op`, `AMBIGUOUS`, or `failed`;
 - commits and modified paths;
 - HEAD before and after;
-- queued PR summary and resolution markers, if review activity occurred;
+- queued PR summary and per-thread resolution feedback, if review activity occurred;
 - unresolved decisions and recovery instructions.
 
 An AMBIGUOUS result is not success. Preserve all local work and wait for the user.
 
 ## Executable Publication Gate
 
-Write `{results:[...]}` to a regular, non-symlink file inside the resolver worktree. Each ordered result contains `agent`, `result`, `input_head`, and `output_head`; adjacent HEAD values form one chain from the blocked snapshot to the actual local HEAD. Write the queued summary to that worktree as a separate file. Apart from those declared inputs, the index and worktree must contain no staged, unstaged, or untracked files.
+Write `{results:[...]}` to a regular, non-symlink file inside the resolver worktree. Each ordered result contains `agent`, `result`, `input_head`, and `output_head`; adjacent HEAD values form one chain from the blocked snapshot to the actual local HEAD. Write the queued summary and thread feedback to separate files in that worktree. The thread-feedback shape is `{threads:[{id,outcome,body}]}` with one exact blocked-snapshot thread ID per entry and an outcome of `fixed`, `accepted_as_is`, or `unresolved`. Do not supply a reviewer/provider adapter: the runner derives `claude`, `coderabbit`, `codex`, or `other` from the snapshot thread author. Bodies explain the resolution and contain no bot mentions or commands. Apart from those declared inputs, the index and worktree must contain no staged, unstaged, or untracked files.
 
-Call `${CLAUDE_PLUGIN_ROOT}/bin/skill-set-pr` with `publish`, the run ID, blocked HEAD, validated local HEAD, results file, optional summary file, and optional `--coderabbit-resolve`. Do not call `git push`, `skill-set-git push`, `gh pr comment`, or a resolve-marker API outside this command.
+Call `${CLAUDE_PLUGIN_ROOT}/bin/skill-set-pr` with `publish`, the run ID, blocked HEAD, validated local HEAD, results file, summary file, and `--thread-feedback-file`. Do not call `git push`, `skill-set-git push`, `gh pr comment`, a thread-reply API, or a resolve API outside this command.
 
-The runner validates the planned agents, result set, HEAD chain, branch, pinned commits, clean publication boundary, live PR head repository/ref, bound remote push URL, and remote HEAD. It checks the remote binding again immediately before invoking one expected-SHA push when the local HEAD changed, revalidates no-code activity, and posts one combined marker/summary comment only after the gate. `pending → prepared → gate_passed → commenting → complete` state records make interrupted publication recoverable and the hidden run/cycle marker suppresses duplicate comments.
+The runner validates the planned agents, result set, HEAD chain, branch, pinned commits, clean publication boundary, exact thread coverage, live PR head repository/ref, bound remote push URL, and remote HEAD. It checks the remote binding again immediately before invoking one expected-SHA push when the local HEAD changed and revalidates no-code activity. Only after that gate does it post idempotently marked thread replies, resolve `fixed` and `accepted_as_is` threads, and post the summary. When all queued CodeRabbit feedback is resolved, the runner itself prepends the exact `@coderabbitai resolve` command; this is never inferred from free-form text or supplied as an adapter flag. It never asks Codex or Claude to review again or to edit the PR. `pending → prepared → gate_passed → commenting → complete` state records make interrupted publication recoverable and hidden markers suppress duplicate feedback.
 
 A partial failure, failed resolver, AMBIGUOUS result, missing result, reordered agent, or broken HEAD chain fails before push or comment. Preserve the failure worktree and branch and report both paths.
 

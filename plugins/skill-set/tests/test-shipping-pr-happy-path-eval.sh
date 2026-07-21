@@ -106,7 +106,7 @@ run_stage() {
 }
 
 initialized=$(run_stage init --pr 17 --repo owner/repo --ci-timeout-seconds 30 \
-  --review-timeout-seconds 30 --coderabbit-required false --now 100)
+  --review-timeout-seconds 30 --now 100)
 run_id=$(jq -r .run_id <<<"$initialized")
 head_sha=$(jq -r .head_sha <<<"$initialized")
 jq -e '.status == "polling" and .cycle == 0' <<<"$initialized" >/dev/null
@@ -127,7 +127,8 @@ jq -e '.status == "resolving" and .cycle == 1 and
 published=$(run_stage publish --pr 17 --expected-run-id "$run_id" \
   --expected-head-sha "$head_sha" --expected-local-head-sha "$head_sha" \
   --results-file "$test_root/resolver-results.json" \
-  --summary-file "$test_root/summary.md" --now 101)
+  --summary-file "$test_root/summary.md" \
+  --thread-feedback-file "$test_root/thread-feedback.json" --now 101)
 jq -e '.status == "resolving" and .resolution.publication.phase == "complete" and
   .resolution.publication.pushed == false and
   .resolution.publication.comments_published == 1' <<<"$published" >/dev/null
