@@ -1,0 +1,24 @@
+## Decisions Made
+- Invalid runner validation status: Reserved exit status 2 is kept available for evaluation skip semantics, while invalid `SKILL_SET_PR_RUNNER` now returns status 1.
+- Regression coverage: The fixture diagnostic and absolute executable checks remain unchanged, and the test asserts both the new status and diagnostic.
+
+## Problems Encountered
+- Installed runner path mismatch: The installed `shipping-pr` copy still points at a legacy Claude-specific root; shipping continued through the repository's portable skill-local runners.
+- Sandbox remote lookup: The initial read-only inspection could not query the remote inside the sandbox, so it was repeated with scoped approval.
+
+## Constraints Identified
+- Reserved evaluation status: Exit status 2 has control-flow meaning and must not represent ordinary validation failure.
+- Minimal review scope: Only the two verified test fixture files were included in this commit.
+- Shipping publication: Git mutations must use the constrained runners, and every commit must receive a note on `refs/notes/commits`.
+
+## Open Questions
+- Existing merge conflict: PR #28 may still require an ancestry-only merge path if integrating `main` produces no staged tree changes.
+
+## Context
+PR #28 review feedback identified that the mock evaluation fixture used reserved exit status 2 for an invalid PR runner. The fixture now returns 1, and the regression test verifies the status and preserved diagnostic; focused and full validation passed before committing.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
