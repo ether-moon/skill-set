@@ -5,7 +5,7 @@ tags:
   - creating-skills
   - trigger-positive
 execution:
-  prompt: "Create a new Claude skill for incident triage, including trigger cases and functional evals."
+  prompt: "Create a new agent skill for incident triage, including trigger cases and functional evals."
   max_turns: 4
   timeout_seconds: 180
   allowed_tools:

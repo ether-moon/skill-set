@@ -26,7 +26,7 @@ Preserve each thread's actual author/app identity. Do not select or return a pro
 2. Apply the runner's narrow whole-message acknowledgement rule before classification: normalize ASCII case/punctuation/whitespace and skip only exact praise/summary labels (`lgtm`, `looks good`, `looks good to me`, `great work`, `great job`, `nice work`, `well done`, `thanks`, `thank you`, `approved`, `all good`, `ship it`, `summary`, `review summary`, `code review summary`, `walkthrough`) or a body consisting only of `👍`, `✅`, or `🎉`. A praise phrase plus a request remains actionable. Also skip requests made obsolete by the current diff.
 3. Classify each actionable request. Public API, data/schema, dependency, security-policy, destructive, architectural, and multiple-solution requests are always AMBIGUOUS.
 4. Apply only OBVIOUS items in the shared resolver worktree, preserving prior CI edits.
-5. Run focused validation, inspect the index, and commit only explicit modified paths through `${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git` with `commit --path <path> --expected-index <fingerprint> --message-file <file>`.
+5. Resolve `skills/managing-git-workflow/scripts/skill-set-git` from the installed skill collection, run focused validation, inspect the index, and commit only explicit modified paths through that absolute runner path with `commit --path <path> --expected-index <fingerprint> --message-file <file>`.
 6. On AMBIGUOUS, return the decision with rationale and recommendation. Do not publish partial work.
 
 ## Queue, Do Not Publish

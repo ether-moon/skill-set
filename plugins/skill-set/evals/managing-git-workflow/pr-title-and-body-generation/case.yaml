@@ -12,7 +12,7 @@ execution:
   timeout_seconds: 900
   allowed_tools:
     - Skill
-    - 'Bash(${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git:*)'
+    - 'Bash(*skill-set-git:*)'
     - 'Edit(//**/outputs/pr-title.txt)'
     - 'Edit(//**/outputs/pr-body.md)'
 runs: 3

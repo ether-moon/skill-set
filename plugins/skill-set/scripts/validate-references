@@ -58,13 +58,22 @@ check_backtick_paths() {
     # Match the documentation marker literally.
     # shellcheck disable=SC2016
     case $target in
-      '${CLAUDE_PLUGIN_ROOT}/'*) resolved=$plugin_dir/${target#'${CLAUDE_PLUGIN_ROOT}/'} ;;
       reference/*)
         skill_root=${file#"$plugin_dir/skills/"}
         skill_root=${skill_root%%/*}
         resolved=$plugin_dir/skills/$skill_root/$target
         ;;
-      agents/*|commands/*|scripts/*|bin/*|evals/*|skills/*) resolved=$plugin_dir/$target ;;
+      scripts/*)
+        if [[ $file == "$plugin_dir"/skills/*/SKILL.md ]]; then
+          skill_root=${file#"$plugin_dir/skills/"}
+          skill_root=${skill_root%%/*}
+          resolved=$plugin_dir/skills/$skill_root/$target
+          [[ -e $resolved ]] || resolved=$plugin_dir/$target
+        else
+          resolved=$plugin_dir/$target
+        fi
+        ;;
+      agents/*|commands/*|bin/*|evals/*|skills/*) resolved=$plugin_dir/$target ;;
       */reference/*) resolved=$plugin_dir/skills/$target ;;
       *) continue ;;
     esac

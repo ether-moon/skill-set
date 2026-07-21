@@ -1,18 +1,17 @@
 ---
 name: bumping-version
 description: Inspects, previews, prepares, and direct-pushes approved semantic-version Git commits with consistent manifests and policy-driven changelog updates. Use when the user asks to bump a version, choose patch/minor/major, prepare a release commit, reconcile a release operation, or push an approved version commit to a base branch. Do not use for package-registry publishing, deployment, or tagging an already-versioned commit.
-allowed-tools: "Bash(${CLAUDE_PLUGIN_ROOT}/bin/skill-set-release:*)"
 ---
 
 # Bumping Version
 
-Use the bundled release runner for all inspection and mutation. It reads one immutable base snapshot, isolates preparation from the user's checkout, binds preparation to an accepted preview, and requires separate approval before publication.
+Resolve `scripts/skill-set-release` relative to the directory containing this `SKILL.md` and invoke that absolute path directly for all inspection and mutation. Do not depend on a host-specific plugin-root environment variable or a shell variable persisting across tool calls. The examples use `<release-runner>` as a non-executable placeholder; replace it with the resolved absolute path in every invocation. The runner reads one immutable base snapshot, isolates preparation from the user's checkout, binds preparation to an accepted preview, and requires separate approval before publication.
 
 ## Dependencies and policy
 
 The runner preflights Bash 3.2 or newer, `git`, `gh`, and `jq`. Report `MISSING_DEPENDENCY` and stop.
 
-It reads the committed `## Versioning` policy from the base snapshot:
+It reads the committed `## Versioning` policy from `AGENTS.md` in the base snapshot:
 
 - `Base branch`
 - `Commit message`, with a `{version}` placeholder
@@ -28,7 +27,7 @@ Supported manifests include Claude plugin and package JSON, `pyproject.toml`, `C
 Run:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-release" inspect --repo .
+<release-runner> inspect --repo .
 ```
 
 Pass `--base BRANCH` only when the user selected a base. With `origin`, the runner resolves and fetches its latest exact base SHA. Without `origin`, it uses the committed local base. Dirty files and other local branches never supply release input.
@@ -42,7 +41,7 @@ Recommend a semantic-version level from the inspected commits and ask the user t
 Run the selected dry preview:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-release" prepare --repo . --level patch --dry-run
+<release-runner> prepare --repo . --level patch --dry-run
 ```
 
 Preserve an explicit `--base`. For a user-provided changelog entry or commit message, add `--changelog-file PATH` or `--message-file PATH` to both preview and prepare. Relative paths are resolved from the caller directory; the runner owns immutable copies during preparation.
@@ -54,7 +53,7 @@ Show `base_sha`, `version`, `changed_paths`, `changelog_entry`, `changelog_categ
 After the user accepts the preview, run the same arguments without `--dry-run` and add both preview values:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-release" prepare --repo . --level patch \
+<release-runner> prepare --repo . --level patch \
   --expected-base-sha BASE_SHA \
   --expected-input-digest INPUT_DIGEST
 ```
@@ -74,7 +73,7 @@ Push prepared commit COMMIT_SHA directly to origin/BASE now?
 If declined, keep the commit and branch but remove the worktree:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-release" cleanup --state-file STATE_FILE --mode declined
+<release-runner> cleanup --state-file STATE_FILE --mode declined
 ```
 
 ### 5. Publish and clean up
@@ -82,7 +81,7 @@ If declined, keep the commit and branch but remove the worktree:
 Only after an affirmative answer, run:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-release" publish --state-file STATE_FILE \
+<release-runner> publish --state-file STATE_FILE \
   --expected-commit COMMIT_SHA --approve
 ```
 
@@ -91,13 +90,13 @@ The runner verifies state, origin identity, and remote base SHA before a normal 
 On success:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-release" cleanup --state-file STATE_FILE --mode success
+<release-runner> cleanup --state-file STATE_FILE --mode success
 ```
 
 On authentication, protection, or base-race failure, preserve both recovery artifacts:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-release" cleanup --state-file STATE_FILE --mode failure
+<release-runner> cleanup --state-file STATE_FILE --mode failure
 ```
 
 If publication or cleanup completed externally but state persistence failed, retry the same command. The runner reconciles an exact remote commit and already-removed exact worktree or branch idempotently.

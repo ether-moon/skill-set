@@ -1,14 +1,14 @@
 ---
 name: managing-git-workflow
 description: Safely inspects repository state and executes explicitly authorized commits, pushes, and pull-request creation through a constrained runner. Use when the user asks to commit selected work, push existing commits, create or inspect a pull request, save changes in Git, or publish a branch to GitHub.
-allowed-tools: "Bash(${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git:*) Edit(//**/.git/skill-set/inputs/commit-message.*/content) Edit(//**/.git/worktrees/*/skill-set/inputs/commit-message.*/content) Edit(//**/.git/skill-set/inputs/pr-body.*/content) Edit(//**/.git/worktrees/*/skill-set/inputs/pr-body.*/content)"
+allowed-tools: "Edit(//**/.git/skill-set/inputs/commit-message.*/content) Edit(//**/.git/worktrees/*/skill-set/inputs/commit-message.*/content) Edit(//**/.git/skill-set/inputs/pr-body.*/content) Edit(//**/.git/worktrees/*/skill-set/inputs/pr-body.*/content)"
 ---
 
 # Managing Git Workflow
 
 ## Overview
 
-Turn an explicit Git or pull-request request into one bounded operation. Use only `${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git` for Git and GitHub activity. The runner returns JSON, preserves shell metacharacters through file arguments, and applies index and remote compare-and-swap checks before mutation.
+Turn an explicit Git or pull-request request into one bounded operation. Resolve `scripts/skill-set-git` relative to the directory containing this `SKILL.md`, then invoke that absolute path directly for all Git and GitHub activity. Do not depend on a host-specific plugin-root environment variable or a shell variable persisting across tool calls. References use `<git-runner>` as a non-executable placeholder; replace it with the resolved absolute path in every invocation. The runner returns JSON, preserves shell metacharacters through file arguments, and applies index and remote compare-and-swap checks before mutation.
 
 ## Authorization Boundary
 

@@ -324,14 +324,19 @@ jq -n \
        explanation: .explanation}
   ];
   def standalone_runner_command($command; $runner; $operations):
+    (if $runner == "skill-set-release" then "bumping-version"
+     elif $runner == "skill-set-git" then "managing-git-workflow"
+     elif $runner == "skill-set-pr" then "shipping-pr"
+     else "" end) as $skill
+    |
     ($command | type) == "string" and
     ($command | test("(;|&|\\||[<>]|`|\\$\\(|\\r|\\n|(^|[ \\t])(eval|(ba|z|k|c)?sh[ \\t]+-c)([ \\t]|$))") | not) and
-    ($command | test("^[ \\t]*\"?\\$\\{CLAUDE_PLUGIN_ROOT\\}/bin/" + $runner +
+    ($command | test("^[ \\t]*\"?[^\"\\r\\n]*/skills/" + $skill + "/scripts/" + $runner +
       "\"?[ \\t]+(?:" + $operations + ")(?:[ \\t].*)?$"));
   def shipping_eval_command_valid($command):
     ($command | type) == "string" and
     ($command | test("(;|&|\\||[<>]|`|\\$\\(|\\r|\\n|(^|[ \\t])(eval|(ba|z|k|c)?sh[ \\t]+-c)([ \\t]|$))") | not) and
-    ($command | test("^[ \\t]*\"?\\./run-shipping-eval\"?[ \\t]+\"?\\$\\{CLAUDE_PLUGIN_ROOT\\}/bin/skill-set-pr\"?[ \\t]+(?:init|snapshot|transition|publish|finish)(?:[ \\t].*)?$"));
+    ($command | test("^[ \\t]*\"?\\./run-shipping-eval\"?[ \\t]+\"?\\$\\{?SKILL_SET_PR_RUNNER\\}?\"?[ \\t]+(?:init|snapshot|transition|publish|finish)(?:[ \\t].*)?$"));
   def bash_command_valid($command; $policy):
     if $policy == "single-release-runner-command" then
       standalone_runner_command($command; "skill-set-release"; "inspect|prepare|cleanup")

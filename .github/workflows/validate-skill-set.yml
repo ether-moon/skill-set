@@ -57,7 +57,7 @@ jobs:
 
       - name: Shellcheck plugin scripts
         run: |
-          shellcheck_dirs=(plugins/skill-set/scripts plugins/skill-set/tests plugins/skill-set/evals)
+          shellcheck_dirs=(plugins/skill-set/scripts plugins/skill-set/tests plugins/skill-set/evals plugins/skill-set/skills)
           if [ -d plugins/skill-set/bin ]; then shellcheck_dirs+=(plugins/skill-set/bin); fi
           mapfile -d '' shellcheck_files < <(
             find "${shellcheck_dirs[@]}" -type f \

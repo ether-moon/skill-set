@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-mkdir -p outputs/skills/deploying-safely .claude/skills/mock-skill-creator
+mkdir -p outputs/skills/deploying-safely optional-creator
 
 cat >outputs/skills/deploying-safely/SKILL.md <<'SKILL'
 ---
@@ -15,7 +15,7 @@ description: Manages deployments. Use when the user asks about releases, deploym
 Inspect the current release, prepare a reversible rollout, verify health checks, and stop on ambiguous production state.
 SKILL
 
-cat >.claude/skills/mock-skill-creator/SKILL.md <<'CREATOR'
+cat >optional-creator/SKILL.md <<'CREATOR'
 ---
 name: mock-skill-creator
 description: Offers optional second-opinion advice for a skill artifact. Use only when explicitly told this helper is available while authoring a skill.

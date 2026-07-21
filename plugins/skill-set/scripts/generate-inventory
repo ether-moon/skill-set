@@ -150,10 +150,10 @@ render_block() {
   layout_comments=('' 'generated table above')
   if [[ -d $plugin_dir/bin ]]; then
     layout_paths+=('bin/')
-    layout_comments+=('deterministic mutation executors')
+    layout_comments+=('legacy compatibility wrappers')
   fi
   layout_paths+=('commands/' 'evals/' 'scripts/' 'skills/' 'tests/')
-  layout_comments+=('nested legacy command names' 'official plugin eval cases' 'inventory and eval tooling' 'generated table above' 'deterministic validation')
+  layout_comments+=('nested legacy command names' 'official plugin eval cases' 'inventory and eval tooling' 'skills and portable bundled runners' 'deterministic validation')
 
   printf '%s\n' '```text' 'plugins/skill-set/'
   for ((index = 0; index < ${#layout_paths[@]}; index++)); do

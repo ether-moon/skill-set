@@ -3,7 +3,7 @@
 ## Table of Contents
 
 - [Core Loop](#core-loop)
-- [Official Eval Layout](#official-eval-layout)
+- [Portable Eval Layout](#portable-eval-layout)
 - [Trigger Cases](#trigger-cases)
 - [Functional Cases](#functional-cases)
 - [Baselines and Ablation](#baselines-and-ablation)
@@ -24,9 +24,9 @@ Evaluate behavior before adding extensive instructions:
 
 Do not build instructions around imagined failures. A baseline establishes whether the skill improves the task at all.
 
-## Official Eval Layout
+## Portable Eval Layout
 
-For a Claude Code plugin, keep evaluations outside the skill directory:
+For a packaged skill collection, keep evaluations outside the skill directory so the same cases can be driven by different host adapters:
 
 ```text
 plugin/
@@ -49,7 +49,7 @@ plugin/
                 └── scaffold.sh
 ```
 
-Use `case.yaml` for deterministic configuration and inline trigger prompts. Use `prompt.md` for longer functional prompts and `graders/*.md` for qualitative rubrics. Keep every fixture within its case directory.
+Use `case.yaml` for deterministic configuration and inline trigger prompts. Use `prompt.md` for longer functional prompts and `graders/*.md` for qualitative rubrics. Keep every fixture within its case directory. If the target host requires another schema, keep this behavioral content and translate it at the adapter boundary rather than embedding host commands in the skill.
 
 ## Trigger Cases
 
@@ -115,7 +115,7 @@ graders:
     focus: last_message
 ```
 
-For a trusted outcome grade, use an LLM judge independent from the evaluated model and use Sonnet-tier or larger. Never let the same model generate and judge its own output.
+For a trusted outcome grade, use an LLM judge independent from the evaluated model and capable enough to apply the complete rubric reliably. Never let the same model generate and judge its own output.
 
 ## Functional Cases
 
@@ -145,17 +145,17 @@ Run nondeterministic cases at least three times. A single lucky completion is no
 - **Description change:** hold prompts and functional instructions constant so the comparison isolates triggering.
 - **Instruction change:** retain trigger cases and compare functional and safety outcomes.
 
-With the official CLI, a candidate/no-plugin comparison uses:
+Use a repository-provided or active-host evaluation adapter for candidate/no-skill comparison. The adapter must accept the same cases for each arm, expose traces, and support an equivalent command contract such as:
 
 ```bash
-claude plugin eval ./plugin --ablation with-without \
-  --model haiku --judge-model sonnet --runs 3 \
+<eval-adapter> run ./plugin --ablation with-without \
+  --model fast-agent --judge-model independent-judge --runs 3 \
   --output-dir eval-results/candidate --json eval-results/candidate.json
 ```
 
-Run the baseline materialization separately with `--ablation none`, using the same cases, model, judge, run count, and tool grants.
+`<eval-adapter>` is a non-executable placeholder; replace it with the resolved project or host adapter path. Model identifiers are adapter inputs, so use identifiers supported by that adapter. Run the baseline materialization separately with `--ablation none`, using the same cases, model, judge, run count, and tool grants.
 
-The command may be feature-gated by the installed Claude Code version or account. When unavailable, keep fixtures and deterministic validators green, preserve the exact blocked diagnostic, and do not invent model scores.
+When no evaluation adapter is available, keep fixtures and deterministic validators green, preserve the exact unavailable diagnostic, and do not invent model scores or require installation of a different host.
 
 ## Benchmark and Acceptance
 
@@ -163,7 +163,7 @@ Record provenance and evidence, not only an aggregate score:
 
 - candidate commit and dirty-tree fingerprint;
 - baseline ref and exact SHA;
-- Claude Code version and requested agent/judge models;
+- active host and evaluation-adapter version plus requested agent/judge models;
 - score and baseline delta for each case;
 - trigger precision and recall overall and by skill;
 - tool-call evidence and safety violations;

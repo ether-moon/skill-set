@@ -1,14 +1,14 @@
 ---
 name: shipping-pr
 description: Drives an existing or newly requested pull request through deterministic CI, review, and blocker-resolution cycles until it is verified clean or reaches a terminal stop. Use when the user asks to ship a PR, wait for CI and fix it, run PR autopilot, or keep resolving blockers until the PR is ready.
-allowed-tools: "Bash(${CLAUDE_PLUGIN_ROOT}/bin/skill-set-pr:*) Bash(${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git:*) Bash(gh pr view:*) Bash(git fetch:*) Bash(git cat-file:*) Bash(git worktree:*) Bash(mktemp:*) Bash(sleep:*) Edit(//**/.git/skill-set/inputs/commit-message.*/content) Edit(//**/.git/worktrees/*/skill-set/inputs/commit-message.*/content) Edit(//**/.git/skill-set/inputs/pr-body.*/content) Edit(//**/.git/worktrees/*/skill-set/inputs/pr-body.*/content) Agent"
+allowed-tools: "Bash(gh pr view:*) Bash(git fetch:*) Bash(git cat-file:*) Bash(git worktree:*) Bash(mktemp:*) Bash(sleep:*) Edit(//**/.git/skill-set/inputs/commit-message.*/content) Edit(//**/.git/worktrees/*/skill-set/inputs/commit-message.*/content) Edit(//**/.git/skill-set/inputs/pr-body.*/content) Edit(//**/.git/worktrees/*/skill-set/inputs/pr-body.*/content) Agent"
 ---
 
 # Shipping PR
 
 ## Purpose
 
-Orchestrate a resumable PR loop without embedding GitHub polling logic in a prompt. `${CLAUDE_PLUGIN_ROOT}/bin/skill-set-pr` owns snapshots, deadlines, concurrency, and state transitions. The resolver agents own edits in an isolated worktree.
+Orchestrate a resumable PR loop without embedding GitHub polling logic in a prompt. Resolve `scripts/skill-set-pr` relative to the directory containing this `SKILL.md`; resolve the Git runner from the sibling `managing-git-workflow/scripts/skill-set-git` path. Invoke both through their resolved absolute paths without depending on a host-specific plugin-root environment variable or shell variables persisting across tool calls. The examples use `<git-runner>` and `<pr-runner>` as non-executable placeholders; replace them with the resolved absolute paths in every invocation. The PR runner owns snapshots, deadlines, concurrency, and state transitions. The resolver agents own edits in an isolated worktree.
 
 A shipping request authorizes the initial branch commit and push plus `resolve-authorized` with `edit=true`, `commit=true`, `push=true`, and `comment=true` for this PR only. Do not ask for separate confirmation before committing or pushing. This does not authorize force-push, merging, unrelated post-inspection changes, or publishing partial resolver work.
 
@@ -43,19 +43,19 @@ Do not use for:
 
 ### 1. Prepare and publish the branch
 
-Use `${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git` with `inspect --base <base>`. Stop on a detached HEAD, a checked-out base branch, or behind/diverged history. Treat every staged, unstaged, and untracked path reported by this initial inspection as the shipping scope. The shipping request itself authorizes committing that complete scope; do not delegate back to `managing-git-workflow` for another confirmation.
+Use the resolved Git runner with `inspect --base <base>`. Stop on a detached HEAD, a checked-out base branch, or behind/diverged history. Treat every staged, unstaged, and untracked path reported by this initial inspection as the shipping scope. The shipping request itself authorizes committing that complete scope; do not delegate back to `managing-git-workflow` for another confirmation.
 
 When the shipping scope is dirty, preview it with `commit --dry-run --all`, generate one commit message from that exact preview and the repository's recent subject style, allocate a managed `commit-message`, replace its sentinel with the Edit tool, and run:
 
 ```bash
-${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git commit --all \
+<git-runner> commit --all \
   --expected-index "$INDEX_FINGERPRINT" --message-file "$MESSAGE_FILE"
 ```
 
 Inspect again after the commit. If an open PR already exists and the branch has unpublished commits, publish them without another prompt using the inspected remote, branch, and remote SHA (`absent` when no remote ref exists):
 
 ```bash
-${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git push --expected-remote-sha "$REMOTE_SHA" \
+<git-runner> push --expected-remote-sha "$REMOTE_SHA" \
   --remote "$REMOTE" --remote-branch "$REMOTE_BRANCH"
 ```
 
@@ -66,7 +66,7 @@ If no PR exists and `--no-create` is off, generate its title/body only from the 
 Convert minute flags to seconds, then run:
 
 ```bash
-${CLAUDE_PLUGIN_ROOT}/bin/skill-set-pr init \
+<pr-runner> init \
   --pr "$PR" --repo "$REPO" \
   --max-cycles "$MAX_CYCLES" \
   --ci-timeout-seconds "$CI_TIMEOUT_SECONDS" \
@@ -95,7 +95,7 @@ Read `headRefOid`, `headRefName`, `headRepository.nameWithOwner`, `baseRefOid`, 
 Transition from `blocked` to `resolving` with the returned `run_id`, `--increment-cycle`, one `--resolver-agent` per planned agent, and all recovery fields:
 
 ```bash
-${CLAUDE_PLUGIN_ROOT}/bin/skill-set-pr transition \
+<pr-runner> transition \
   --pr "$PR" --from blocked --to resolving --expected-run-id "$RUN_ID" \
   --increment-cycle --worktree "$WORKTREE" --resolver-branch "$RESOLVER_BRANCH" \
   --remote "$REMOTE" --remote-branch "$HEAD_BRANCH" \
@@ -119,7 +119,7 @@ Follow [blocker-resolution.md](reference/blocker-resolution.md). A conflict cons
 Each attempted agent writes one ordered entry to a results file inside the resolver worktree with `agent`, `result`, `input_head`, and `output_head`. When review feedback was processed, also queue one summary file and one thread-feedback JSON file there. Only the runner may push, reply, resolve, or comment:
 
 ```bash
-${CLAUDE_PLUGIN_ROOT}/bin/skill-set-pr publish \
+<pr-runner> publish \
   --pr "$PR" --expected-run-id "$RUN_ID" \
   --expected-head-sha "$HEAD_SHA" --expected-local-head-sha "$LOCAL_HEAD_SHA" \
   --results-file "$RESULTS_FILE" --summary-file "$SUMMARY_FILE" \
