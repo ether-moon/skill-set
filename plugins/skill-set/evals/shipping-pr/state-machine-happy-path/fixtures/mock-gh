@@ -40,13 +40,13 @@ if [[ ${1:-} == api && ${2:-} == graphql ]]; then
       body=*) graphql_body=${argument#body=} ;;
     esac
   done
+  # shellcheck disable=SC2016 # Match the literal GraphQL query fragment below.
   if [[ "$*" == *addPullRequestReviewThreadReply* ]]; then
     printf '%s\n' "$graphql_body" >"$MOCK_GH_DIR/$graphql_id.reply"
     printf '%s\n' '{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"reply-1"}}}}'
   elif [[ "$*" == *resolveReviewThread* ]]; then
     : >"$MOCK_GH_DIR/$graphql_id.resolved"
     jq -cn --arg id "$graphql_id" '{data:{resolveReviewThread:{thread:{id:$id,isResolved:true}}}}'
-  # shellcheck disable=SC2016 # Match the literal GraphQL query fragment.
   elif [[ "$*" == *'node(id:$id)'* ]]; then
     resolved=false
     [[ ! -f $MOCK_GH_DIR/$graphql_id.resolved ]] || resolved=true
