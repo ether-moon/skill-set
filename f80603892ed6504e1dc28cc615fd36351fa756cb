@@ -1,0 +1,25 @@
+## Decisions Made
+- Tree-identical merge mode: The user approved extending the constrained Git runner instead of bypassing it with a raw merge commit.
+- Explicit safety gate: `--allow-tree-identical-merge` is accepted only for one active `MERGE_HEAD`, no unresolved conflicts, an index tree equal to `HEAD`, and no unstaged or untracked files.
+- Compatibility path: Tree-changing merges continue to use the existing indexed commit flow; the new option cannot create general empty commits.
+
+## Problems Encountered
+- Ancestry-only conflict resolution: Resolving PR #28 against `main` produced the same tree as the PR HEAD, so the previous runner returned `nothing_to_commit` and could not record the second parent.
+- Preserved shipping attempt: The blocked resolver worktree remains intact while the runner capability is added and published on the PR branch.
+
+## Constraints Identified
+- Constrained publication: Merge resolvers must never bypass `skill-set-git` with raw commit or push commands.
+- Merge state integrity: The runner must reject missing, multi-parent, unresolved, dirty, or tree-changing states on the ancestry-only path.
+- Validation requirement: Focused runner tests, authorization contracts, syntax checks, diff checks, and the full 208-case plugin suite must pass before publication.
+
+## Open Questions
+- PR review findings: Three existing CodeRabbit threads remain to be classified after the merge conflict is resolved on the new HEAD.
+
+## Context
+Shipping PR #28 was blocked because the conflict resolution required a merge commit with no tree change. The runner now provides a narrowly validated ancestry-only merge path, its resolver documentation uses that path, and regression tests cover successful two-parent creation plus unsafe-state rejection. All repository validation passed before committing.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
