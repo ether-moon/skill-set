@@ -654,6 +654,40 @@ test_pr_create_pushes_commits_and_uses_body_file() {
   )
 }
 
+test_pr_create_reports_github_error() {
+  local repo status
+  local stdout_file=$test_root/pr-create-error-stdout.json
+  local stderr_file=$test_root/pr-create-error-stderr.json
+  repo=$(make_repo pr-create-error)
+
+  (
+    cd "$repo"
+    git switch --quiet -c feature
+    printf 'feature\n' > feature.txt
+    git add -- feature.txt
+    git commit --quiet -m "feat: rejected PR"
+    printf '## Summary\n- Rejected PR\n' > "$test_root/pr-create-error-body.md"
+
+    set +e
+    PATH="$mock_bin:$PATH" \
+      MOCK_GH_CREATE_ERROR='GraphQL: simulated pull request rejection' \
+      /bin/bash "$runner" pr-create \
+        --base main \
+        --title "Rejected PR" \
+        --body-file "$test_root/pr-create-error-body.md" \
+        >"$stdout_file" 2>"$stderr_file"
+    status=$?
+    set -e
+
+    [[ $status -ne 0 ]] || fail "PR creation must propagate GitHub rejection"
+    jq -e '
+      .code == "pr_create_failed" and
+      (.message | contains("GraphQL: simulated pull request rejection")) and
+      .recoverable == true
+    ' "$stderr_file" >/dev/null
+  )
+}
+
 test_runner_omits_forbidden_publication_shortcuts
 test_managed_input_prepare_and_discard
 test_commit_consumes_managed_message_after_success
@@ -673,5 +707,6 @@ test_push_allows_validated_remote_branch_override
 test_pr_create_returns_existing_pr_without_mutation
 test_pr_create_requires_dirty_exclusion_confirmation_and_supports_dry_run
 test_pr_create_pushes_commits_and_uses_body_file
+test_pr_create_reports_github_error
 
 printf 'PASS: git runner\n'

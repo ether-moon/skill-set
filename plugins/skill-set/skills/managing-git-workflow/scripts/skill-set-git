@@ -809,8 +809,10 @@ pr_create_operation() {
 
   gh_error=$(mktemp "${TMPDIR:-/tmp}/skill-set-git-gh.XXXXXX") || die 70 "temporary_file_failed" "Could not create a temporary error file"
   if ! created_url=$(gh pr create --title "$title" --body-file "$body_file" --base "$base" --head "$branch" 2>"$gh_error"); then
+    gh_failure=$(<"$gh_error")
     rm -f -- "$gh_error"
-    die 69 "pr_create_failed" "GitHub CLI could not create the pull request; any reported branch push remains available"
+    [[ -n $gh_failure ]] || gh_failure="GitHub CLI returned no error details"
+    die 69 "pr_create_failed" "GitHub CLI could not create the pull request: $gh_failure; any reported branch push remains available"
   fi
   rm -f -- "$gh_error"
   [[ -n $created_url ]] || die 70 "missing_pr_url" "GitHub CLI created no discoverable pull request URL"
