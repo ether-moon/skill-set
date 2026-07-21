@@ -1,0 +1,23 @@
+## Decisions Made
+- ShellCheck 리터럴 처리: Git revision 전체를 인용하고 의도된 문서 backtick에는 해당 줄 범위의 SC2016 예외만 적용했다.
+- 최소 수정 범위: CI가 보고한 세 파일만 변경하고 기능 동작은 유지했다.
+
+## Problems Encountered
+- CI ShellCheck 실패: 새로 확장된 검사 범위에서 SC1083과 SC2016 네 건이 발견되어 인용과 좁은 directive로 해결했다.
+- 로컬 도구 부재: 기본 Bash에 mapfile이 없고 shellcheck가 설치되지 않아 공식 ShellCheck 0.9.0 컨테이너로 CI 명령을 재현했다.
+
+## Constraints Identified
+- PR 최신 HEAD 고정: ae6290f에서 격리 worktree를 만들고 원격 브랜치 CAS를 유지해야 한다.
+- Git mutation 제한: 커밋과 코드 푸시는 skill-local constrained runner를 사용해야 한다.
+
+## Open Questions
+- None
+
+## Context
+PR #28의 늦게 등록된 deterministic-validation 실패를 수정했다. plugins/skill-set/tests/test-authoring-skills.sh, test-git-runner.sh, managing-git-workflow의 skill-set-git에서 ShellCheck 파싱 경고만 최소 수정했다. 동일 ShellCheck 0.9.0 명령, 관련 테스트, 전체 통합 테스트가 모두 통과했다.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
