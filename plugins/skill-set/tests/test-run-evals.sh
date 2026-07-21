@@ -20,6 +20,19 @@ ln -s -- "$mock_claude" "$test_root/bin/claude"
 root_log=$test_root/mock-roots.log
 : >"$root_log"
 
+set +e
+FAKE_CLAUDE_REQUIRE_PR_RUNNER=true SKILL_SET_PR_RUNNER=relative-runner \
+  "$mock_claude" plugin eval "$plugin_dir" \
+    --ablation none \
+    --output-dir "$test_root/invalid-runner-output" \
+    --json "$test_root/invalid-runner.json" \
+    >"$test_root/invalid-runner.stdout" 2>"$test_root/invalid-runner.stderr"
+invalid_runner_status=$?
+set -e
+assert_equals 1 "$invalid_runner_status" "invalid PR runner exit status"
+grep -Fq 'mock eval requires an executable absolute SKILL_SET_PR_RUNNER' \
+  "$test_root/invalid-runner.stderr" || fail "invalid PR runner diagnostic is missing"
+
 PATH="$test_root/bin:$PATH" FAKE_CLAUDE_ROOT_LOG="$root_log" \
   FAKE_CLAUDE_REQUIRE_PR_RUNNER=true \
   "$runner" \

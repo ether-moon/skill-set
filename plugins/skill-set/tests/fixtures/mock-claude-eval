@@ -32,7 +32,7 @@ done
 if [[ ${FAKE_CLAUDE_REQUIRE_PR_RUNNER:-false} == true ]]; then
   [[ ${SKILL_SET_PR_RUNNER:-} == /* && -x $SKILL_SET_PR_RUNNER ]] || {
     printf 'mock eval requires an executable absolute SKILL_SET_PR_RUNNER\n' >&2
-    exit 2
+    exit 1
   }
 fi
 
