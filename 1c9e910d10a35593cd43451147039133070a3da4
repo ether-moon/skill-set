@@ -1,0 +1,25 @@
+## Decisions Made
+- `--required-only=false`는 GitHub의 모든 check를 반드시 조회한다: false 값을 jq fallback으로 덮어쓰는 기존 동작이 실패한 advisory check를 clean으로 오판했기 때문이다.
+- intentional literal GraphQL match에는 해당 줄에만 SC2016 suppression을 둔다: 표현식을 변경하지 않으면서 ShellCheck 의도를 문서화한다.
+- 수정은 원격 HEAD 기반 격리 worktree에서 게시한다: 주 checkout의 동시 portable-layout 작업을 커밋 범위에서 제외하기 위해서다.
+
+## Problems Encountered
+- required-only 기본 shipping run이 실패한 deterministic-validation을 누락했다: 직접 check rollup과 runner 코드를 비교해 jq `// true`의 false 처리 오류를 확인했다.
+- 주 checkout에서 같은 fixture와 runner 파일이 동시에 수정되었다: 로컬 comment를 제거하고 별도 resolver worktree에서 다시 적용했다.
+- 로컬 PR runner 테스트가 동시 portable wrapper 변경 때문에 실패했다: 원격 HEAD 기반 worktree에서는 회귀 테스트가 통과했다.
+
+## Constraints Identified
+- resolver publication은 기록된 remote HEAD와 정확히 일치해야 한다: 동시 원격 변경이 있으면 push를 중단해야 한다.
+- 주 checkout의 staged, unstaged, untracked 사용자 변경은 resolver 커밋에 포함하지 않는다: 작업 소유권과 복구 가능성을 보존해야 한다.
+
+## Open Questions
+- None
+
+## Context
+PR #27 shipping 중 GitHub의 deterministic-validation 실패가 required-only 처리 오류로 누락되는 문제를 발견했다. all-check 모드 회귀 테스트를 RED에서 GREEN으로 만들고 두 mock fixture의 intentional SC2016을 좁게 suppress했다. 격리 worktree에서 PR runner와 shipping happy-path 검증을 통과했다.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
