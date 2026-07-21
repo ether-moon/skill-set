@@ -1,0 +1,14 @@
+## Decisions Made
+- Patch-level bump (1.8.0 → 1.8.1): Only bug fixes since last bump — codex CLI bypass fix and docs sync. Knowledge Distillery init was a separate plugin feature, not a skill-set version change.
+
+## Problems Encountered
+- Cannot checkout main branch directly due to worktree conflict: Created bump-version branch from origin/main as workaround.
+
+## Constraints Identified
+- None
+
+## Open Questions
+- None
+
+## Context
+Patch version bump from 1.8.0 to 1.8.1 after merging PR #12 (codex CLI bypass fix). Updated plugin.json version and CHANGELOG.md with the fix entries.

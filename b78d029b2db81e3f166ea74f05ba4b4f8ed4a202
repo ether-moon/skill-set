@@ -1,0 +1,22 @@
+## Decisions Made
+- Minor bump (1.9.1 → 1.10.0) instead of patch. Rationale: PR #18 added a wholly new user-facing skill (`shipping-pr`) and slash command (`/skill-set:pr:ship`) — that is feature-add territory under semver, not a bugfix.
+- Skip the two locally-rebased commits (e228780, b2f6e2a) and the catalog-entry commit (6acd368). Rationale: all three were already squash-merged into `origin/main` as 14a2f67, so `git rebase --skip` (and git's auto-drop for already-upstream patches) was the right resolution rather than re-resolving the synthetic conflicts.
+
+## Problems Encountered
+- `git rebase origin/main` produced conflicts on AGENTS.md / shipping-pr SKILL.md / blocker-resolution.md / commands/pr/ship.md because origin/main had the squash-merged version of PR #18. Resolved by `git rebase --skip` — git then auto-dropped the remaining two commits as "patch contents already upstream."
+
+## Constraints Identified
+- Squash-merge on GitHub creates a single new commit on main whose tree matches the PR's combined diff but whose history doesn't share the PR's individual commit SHAs. Local branches still containing those individual commits MUST skip them during rebase rather than try to re-apply.
+- `plugin.json` is the single source of truth for plugin version — `marketplace.json` does not carry a version field in this repo, so the bump is one-line.
+
+## Open Questions
+None
+
+## Context
+Branch `pr-ship-skill` post PR #18 merge. Goal: rebase onto origin/main and bump the plugin version to reflect the new shipping-pr feature. Single file modified (`plugins/skill-set/.claude-plugin/plugin.json`, 1.9.1 → 1.10.0). Outcome: completed.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None

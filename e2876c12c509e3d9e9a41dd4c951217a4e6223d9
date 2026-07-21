@@ -1,0 +1,26 @@
+## Decisions Made
+- Files-as-output, status-only stdout: each CLI response goes to $PEER_REVIEW_DIR/<cli>.txt; bash stdout reduced to a bounded status block. Streaming bodies through stdout was the truncation vector; files eliminate it entirely.
+- Truncate output/err files at execute_cli entry instead of forcing unique per-run subdirectories. Defends both shell-redirect and {OUT}-template CLIs (codex) with one mechanism and minimal code change.
+- Add explicit cleanup step (SKILL.md Step 6 + slash command Step 5) rather than a script-level auto-cleanup trap. Symmetric with the file-based contract: the script owns response persistence, the caller owns lifecycle.
+
+## Problems Encountered
+- Previous skill design streamed bodies via stdout and `rm -f`d temp files immediately after; head/tail/grep piping caused permanent data loss. Resolved by removing the cat-and-delete and routing reads through the per-CLI files.
+- Peer review (codex) surfaced a stale-file race when PEER_REVIEW_DIR is reused and a {OUT}-mode CLI fails before writing. Resolved with `: > "$output_file"` at execute_cli entry plus a regression test using a failing codex fake.
+
+## Constraints Identified
+- Bash 3.2+ compatibility (macOS default): no associative arrays, no `${var^^}`. Preserved.
+- allowed-tools is restricted to `Bash(command:bash *peer-review.sh*)`; direct gemini/codex/claude invocations remain intentionally excluded so the skill workflow cannot bypass the script.
+- The cached/installed plugin (v1.11.0) and the workspace can diverge during development — running the workspace path explicitly is required to validate fixes before publishing.
+
+## Open Questions
+- EMPTY/FAILED status branches in test-peer-review.sh remain uncovered. User deferred per option 1; consider as a follow-up.
+- Status column width is hard-coded (`%-7s`); fits today's three CLI ids but a longer id (e.g. `claude-haiku`) would push columns. Cosmetic — deferred until adding such an id.
+
+## Context
+User reported response truncation when running the consult skill. Root cause: peer-review.sh streamed unbounded bodies through stdout while deleting temp files immediately, so any consumer piping the bash output lost data. Fix moved bodies to per-CLI files in $PEER_REVIEW_DIR, bounded stdout to a status block, added a fake-CLI regression test, and updated SKILL/command/reference docs. A peer-LLM review on the branch surfaced a stale-file race for codex; that fix and a cleanup step were folded into the same commit. Branch `fix-consult-truncation`, 5 files (4 modified, 1 new test).
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None

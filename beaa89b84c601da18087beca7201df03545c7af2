@@ -1,0 +1,24 @@
+## Decisions Made
+- Codex 호환 범위를 skills/MCP로 한정: hooks/agents까지 포팅하면 중복 코드와 관리 포인트가 늘어나 유지보수 부담 증가. Claude Code가 메인 플랫폼이므로 이를 기준으로 관리.
+- Approach A 선택 (.codex-plugin/plugin.json 1개 추가): marketplace.json은 Codex가 아직 "coming soon" 상태이므로 나중에 추가.
+- 버전 1.8.1 유지: 기존 버전에 Codex 지원 추가, 별도 버전 범프 불필요.
+
+## Problems Encountered
+- None
+
+## Constraints Identified
+- Codex와 Claude Code의 hooks 이벤트 모델이 다름 (Notification vs UserPromptSubmit): 양쪽 동시 지원 시 별도 hooks.json 관리 필요
+- Codex agents는 TOML 형식, Claude Code는 마크다운: 동일 에이전트를 두 포맷으로 유지해야 하는 부담
+- Codex commands 개념 부재: Claude Code의 namespaced slash commands에 대응하는 Codex 메커니즘 없음
+
+## Open Questions
+- Codex marketplace가 정식 출시되면 marketplace.json 추가 필요 여부 재검토
+
+## Context
+OpenAI Codex에서도 skill-set 플러그인을 사용할 수 있도록 호환성을 추가하는 작업. Codex 플러그인 문서를 조사한 결과 skills/와 .mcp.json은 이미 양쪽 호환 포맷이므로, .codex-plugin/plugin.json 1개만 추가하여 최소한의 변경으로 구현. CHANGELOG.md에 기록하고 결정사항을 .knowledge/decisions/에 저장.
+
+## Recorded Decisions
+- `codex-skills-mcp-only` (이 커밋에 포함): Codex 호환은 skills/MCP만 지원, hooks/agents/commands는 Claude Code 전용 유지
+
+## Vault Entries Referenced
+- None

@@ -1,0 +1,25 @@
+## Decisions Made
+- Apply A1 trim plan (in-place tightening) instead of extracting a new reference file: keeps SKILL.md under 200 lines while preserving the progressive-disclosure style already established by the existing reference/ links. Decided by user after the agent escalated the choice as AMBIGUOUS.
+- Reject CodeRabbit's `ServerName:tool_name` suggestion for the built-in Read tool: AGENTS.md scopes the rule to MCP-provided tools, and the repo already uses bare `Bash tool`/`Read tool` in shipping-pr/SKILL.md for built-ins. No code change; rationale will be posted in the PR-summary comment.
+- Trim Troubleshooting "Response is truncated" entry to a single bullet to land under 200 lines after the first two trims left the file at exactly 200.
+
+## Problems Encountered
+- After Trim 1 (Step 6) + Trim 2 (Step 2 prose), SKILL.md was at 200 lines — still on the boundary, not strictly under. Resolved by also collapsing the two-bullet "Response is truncated" entry to one line, landing at 199.
+- CodeRabbit misapplied the MCP `ServerName:tool_name` rule to a built-in tool, escalated as AMBIGUOUS rather than auto-fixed; user confirmed rejection.
+
+## Constraints Identified
+- SKILL.md files in this repo are capped at <200 lines (AGENTS.md / creating-skills); enforcement is strict, "exactly 200" is not "under 200".
+- Repo distinguishes built-in Claude Code tools (bare `Read tool`/`Bash tool`) from MCP server tools (`ServerName:tool_name`). The MCP convention does not apply to built-ins.
+- Direct `git commit` is blocked by the project's pre-commit hook; commits must go through the memento-commit workflow which attaches a session note to refs/notes/commits.
+
+## Open Questions
+- None
+
+## Context
+Resolved CodeRabbit's COMMENTED review on PR #20 (fix-consult-truncation). The pr-review-feedback workflow classified 7 items: 2 OBVIOUS markdown-lint lang tags were auto-applied; the MAJOR 200-line-cap refactor was escalated and the user chose A1 (in-place trim, not file extraction); the MINOR `Read tool` rename group was rejected as a CodeRabbit misapplication of the MCP rule. SKILL.md went from 209 to 199 lines in three locations: Step 2 Output contract prose (merged two paragraphs), Step 6 Clean Up (9 lines to 3), and Troubleshooting "Response is truncated" (2 bullets to 1). Files: plugins/skill-set/skills/consulting-peer-llms/SKILL.md and plugins/skill-set/skills/consulting-peer-llms/reference/cli-commands.md. Outcome: completed, ready to push and post the PR-summary comment with the Group B rejection rationale for the parent shipping-pr cycle.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
