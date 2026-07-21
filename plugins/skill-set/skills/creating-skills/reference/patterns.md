@@ -54,7 +54,7 @@ python scripts/migrate.py --verify --backup
 Do not modify the command or add additional flags.
 ````
 
-**Analogy:** Think of Claude as a robot exploring a path:
+**Analogy:** Think of the active agent as a robot exploring a path:
 - **Narrow bridge with cliffs**: One safe way forward. Provide exact instructions and guardrails. Example: database migrations that must run in exact sequence.
 - **Open field with no hazards**: Many paths lead to success. Give general direction. Example: code reviews where context determines approach.
 
@@ -104,13 +104,13 @@ The strict/flexible choice is itself a degree of freedom decision — match it t
 
 ## Plan-Validate-Execute Pattern
 
-For complex operations where mistakes are costly, have Claude create a verifiable intermediate plan before executing.
+For complex operations where mistakes are costly, have the active agent create a verifiable intermediate plan before executing.
 
 ```
 analyze input → create plan file → validate plan → execute → verify output
 ```
 
-**Example:** Updating 50 form fields in a PDF based on a spreadsheet. Without validation, Claude might reference non-existent fields, create conflicting values, or miss required fields.
+**Example:** Updating 50 form fields in a PDF based on a spreadsheet. Without validation, an agent might reference non-existent fields, create conflicting values, or miss required fields.
 
 **Solution:** Create an intermediate `changes.json` that gets validated before applying:
 
@@ -126,7 +126,7 @@ analyze input → create plan file → validate plan → execute → verify outp
 
 **When to use:** Batch operations, destructive changes, complex validation rules, high-stakes operations.
 
-**Tip:** Make validation scripts verbose with specific error messages like `"Field 'signature_date' not found. Available fields: customer_name, order_total, signature_date_signed"` to help Claude fix issues.
+**Tip:** Make validation scripts verbose with specific error messages like `"Field 'signature_date' not found. Available fields: customer_name, order_total, signature_date_signed"` to help the active agent fix issues.
 
 ---
 
@@ -134,7 +134,7 @@ analyze input → create plan file → validate plan → execute → verify outp
 
 **Problem-first**: "I need to set up a project workspace" → Skill orchestrates the right calls in the right sequence. Users describe outcomes; skill handles tools.
 
-**Tool-first**: "I have Notion MCP connected" → Skill teaches Claude optimal workflows and best practices. Users have access; skill provides expertise.
+**Tool-first**: "I have Notion MCP connected" → Skill teaches the active agent optimal workflows and best practices. Users have access; skill provides expertise.
 
 ---
 
@@ -356,7 +356,7 @@ Research $ARGUMENTS thoroughly:
 - Embedded style guides and brand standards
 - Template structures for consistent output
 - Quality checklists before finalizing
-- No external tools required - uses Claude's built-in capabilities
+- No external tools required - uses the active agent's built-in capabilities
 
 ### Category 2: Workflow Automation
 

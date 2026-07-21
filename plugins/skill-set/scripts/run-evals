@@ -115,6 +115,7 @@ case $normalized_judge in
 esac
 [[ -d "$candidate/evals" ]] || { printf 'Candidate has no evals directory: %s\n' "$candidate" >&2; exit 2; }
 candidate=$(cd -- "$candidate" && pwd -P)
+candidate_pr_runner=$candidate/skills/shipping-pr/scripts/skill-set-pr
 [[ $baseline_ref == "$deletion_baseline_ref" ]] || {
   printf 'The deletion baseline is pinned to %s; refusing ref %s.\n' \
     "$deletion_baseline_ref" "$baseline_ref" >&2
@@ -158,6 +159,9 @@ if [[ -n $max_cost_usd ]]; then
 fi
 
 candidate_command=(claude plugin eval "$candidate" --ablation with-without "${candidate_args[@]}" --output-dir "$output_dir/candidate" --json "$output_dir/candidate.json")
+if [[ -x $candidate_pr_runner ]]; then
+  candidate_command=(env SKILL_SET_PR_RUNNER="$candidate_pr_runner" "${candidate_command[@]}")
+fi
 
 if [[ $plan_only == true ]]; then
   printf 'Candidate/no-plugin: '
@@ -197,7 +201,11 @@ snapshot_safety_contract=$candidate_snapshot/evals/safety-contract.json
 safety_contract_hash=$(git hash-object --no-filters "$snapshot_safety_contract")
 cp -- "$snapshot_safety_contract" "$output_dir/safety-contract.json"
 
+candidate_snapshot_pr_runner=$candidate_snapshot/skills/shipping-pr/scripts/skill-set-pr
 candidate_command=(claude plugin eval "$candidate_snapshot" --ablation with-without "${candidate_args[@]}" --output-dir "$output_dir/candidate" --json "$output_dir/candidate.json")
+if [[ -x $candidate_snapshot_pr_runner ]]; then
+  candidate_command=(env SKILL_SET_PR_RUNNER="$candidate_snapshot_pr_runner" "${candidate_command[@]}")
+fi
 
 git -C "$repo_dir" archive "$deletion_baseline_sha" plugins/skill-set | tar -x -C "$temporary_dir"
 baseline_plugin=$temporary_dir/plugins/skill-set
@@ -205,7 +213,23 @@ rm -rf "$baseline_plugin/evals"
 cp -R "$candidate_snapshot/evals" "$baseline_plugin/evals"
 rm -rf "$baseline_plugin/evals/results"
 
+baseline_pr_runner=$baseline_plugin/skills/shipping-pr/scripts/skill-set-pr
+if [[ ! -x $baseline_pr_runner ]]; then
+  baseline_pr_runner=$baseline_plugin/bin/skill-set-pr
+fi
+if [[ ! -x $baseline_pr_runner ]]; then
+  baseline_pr_runner=$candidate_snapshot_pr_runner
+fi
+if [[ ! -x $baseline_pr_runner ]]; then
+  baseline_pr_runner=$plugin_dir/skills/shipping-pr/scripts/skill-set-pr
+fi
+[[ -x $baseline_pr_runner ]] || {
+  printf 'No executable PR runner is available for the deletion baseline.\n' >&2
+  exit 1
+}
+
 baseline_command=(claude plugin eval "$baseline_plugin" --ablation none "${baseline_args[@]}" --output-dir "$output_dir/baseline" --json "$output_dir/baseline.json")
+baseline_command=(env SKILL_SET_PR_RUNNER="$baseline_pr_runner" "${baseline_command[@]}")
 
 run_eval_arm() {
   local arm=$1

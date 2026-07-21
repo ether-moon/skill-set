@@ -92,17 +92,17 @@ printf '%s\n' '#!/bin/sh' \
   "printf '%s\\n' '{\"ok\":true,\"status\":\"polling\",\"cycle\":0}'" \
   >"$evil_runner"
 chmod +x "$evil_runner"
-if (cd -- "$test_root" && CLAUDE_PLUGIN_ROOT="$plugin_dir" \
+if (cd -- "$test_root" && SKILL_SET_PR_RUNNER="$runner" \
   "$eval_runner" "$evil_runner" init --pr 17 --repo owner/repo --now 100) >/dev/null 2>&1; then
   fail "shipping eval wrapper accepted an evil path ending in bin/skill-set-pr"
 fi
-if (cd -- "$test_root" && CLAUDE_PLUGIN_ROOT="$plugin_dir" "$eval_runner" "$runner" snapshot \
+if (cd -- "$test_root" && SKILL_SET_PR_RUNNER="$runner" "$eval_runner" "$runner" snapshot \
   --pr 17 --expected-run-id premature --now 101) >/dev/null 2>&1; then
   fail "shipping eval wrapper accepted an out-of-order snapshot"
 fi
 
 run_stage() {
-  (cd -- "$test_root" && CLAUDE_PLUGIN_ROOT="$plugin_dir" "$eval_runner" "$runner" "$@")
+  (cd -- "$test_root" && SKILL_SET_PR_RUNNER="$runner" "$eval_runner" "$runner" "$@")
 }
 
 initialized=$(run_stage init --pr 17 --repo owner/repo --ci-timeout-seconds 30 \

@@ -4,7 +4,7 @@
 
 - [File Structure](#file-structure)
 - [Naming Rules](#naming-rules)
-- [YAML Frontmatter](#yaml-frontmatter) (required fields, optional fields, Claude Code extensions, string substitutions, dynamic context injection)
+- [YAML Frontmatter](#yaml-frontmatter) (required fields, optional fields, host-specific extensions)
 - [Description Examples](#description-examples)
 - [Security Restrictions](#security-restrictions)
 - [Progressive Disclosure](#progressive-disclosure) (reference depth limit)
@@ -74,7 +74,7 @@ description: What it does and when to use it.
   - Good: "Analyzes Figma files and generates handoff docs"
   - Avoid: "I can help you analyze Figma files"
   - Avoid: "You can use this to analyze Figma files"
-- Make descriptions slightly **"pushy"** — Claude tends to undertrigger. Include broad contexts where the skill applies, even if the user doesn't explicitly name it
+- Make descriptions slightly **"pushy"** — agents tend to undertrigger. Include broad contexts where the skill applies, even if the user doesn't explicitly name it
 - Under 1024 characters
 - No XML tags (`<` or `>`)
 - Include specific tasks users might say
@@ -82,7 +82,7 @@ description: What it does and when to use it.
 
 ### How Skill Triggering Works
 
-Skills appear in Claude's `available_skills` with name + description. Claude decides whether to consult a skill based on that description. Key insight: **Claude only consults skills for tasks it can't handle on its own** — simple one-step queries may not trigger even with a perfect description match. Design descriptions for substantive, multi-step tasks.
+Skills appear in the active host's skill catalog with name + description. The active agent decides whether to consult a skill based on that description. Simple one-step queries may not trigger even with a perfect description match, so design descriptions for substantive workflows and test selection behavior on every supported host.
 
 ### Trigger Testing
 
@@ -109,7 +109,7 @@ The top-level lifecycle should route description evaluation directly from `SKILL
 name: skill-name
 description: [required description]
 license: MIT                    # License for open-source
-compatibility: Claude Code      # Environment requirements (1-500 chars)
+compatibility: Agent Skills host # Environment requirements (1-500 chars)
 metadata:                       # Custom key-value pairs
   author: Company Name
   version: 1.0.0
@@ -119,9 +119,11 @@ metadata:                       # Custom key-value pairs
 ---
 ```
 
-### Claude Code Extension Fields
+### Host-Specific Extension Fields
 
-Claude Code extends the Agent Skills standard with additional frontmatter fields. These are tool-specific and not part of the base standard.
+Some hosts extend the Agent Skills standard with additional frontmatter fields. They are not part of the portable base standard. Use them only when the user explicitly targets that host, and never make the base workflow depend on them.
+
+For example, a Claude Code target may support:
 
 ```yaml
 ---
@@ -158,9 +160,9 @@ hooks: {}
 | `disable-model-invocation: true` | Yes | No |
 | `user-invocable: false` | No | Yes |
 
-### String Substitutions (Claude Code)
+### Target-Specific String Substitutions
 
-Skills support dynamic value injection in content:
+Claude Code targets may support dynamic value injection in content. Do not use these variables for a portable execution path:
 
 | Variable | Description |
 |----------|-------------|
@@ -171,9 +173,9 @@ Skills support dynamic value injection in content:
 
 Example: `Migrate the $0 component from $1 to $2.`
 
-### Dynamic Context Injection (Claude Code)
+### Target-Specific Dynamic Context Injection
 
-The `` !`command` `` syntax runs shell commands before content is sent to Claude. Output replaces the placeholder:
+For an explicitly selected Claude Code target, the `` !`command` `` syntax runs shell commands before content is sent to the agent. Output replaces the placeholder:
 
 ```yaml
 ---
@@ -188,7 +190,7 @@ agent: Explore
 Summarize this pull request...
 ```
 
-This is preprocessing — Claude only sees the rendered result, not the commands.
+This is target-specific preprocessing—the agent sees the rendered result, not the commands. Provide a portable alternative whenever the skill must run on another host.
 
 ## Description Examples
 
@@ -220,11 +222,11 @@ description: Implements the Project entity model with hierarchical relationships
 
 ## Security Restrictions
 
-**Forbidden in frontmatter:**
+**Potential host restrictions:**
 - XML angle brackets (`<` `>`) - security restriction
 - Skills with "claude" or "anthropic" in name (reserved)
 
-**Why**: Frontmatter appears in Claude's system prompt. Malicious content could inject instructions.
+Apply restrictions required by the selected host's validator. Frontmatter enters an agent's instruction context, so malicious content can inject instructions even when a specific reserved-name rule does not apply.
 
 ## Progressive Disclosure
 

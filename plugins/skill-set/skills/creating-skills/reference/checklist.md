@@ -57,15 +57,15 @@ Use this checklist to validate your skill before and after upload.
 - [ ] Mutation and publication boundaries have negative tests
 
 ### Cross-Model Testing
-- [ ] Tested with Haiku (enough guidance for smaller model?)
-- [ ] Tested with Sonnet (clear and efficient?)
-- [ ] Tested with Opus (not over-explaining?)
-- [ ] LLM judge is independent and Sonnet-tier or larger
+- [ ] Tested with the smallest supported model (e.g., Claude Haiku; enough guidance?)
+- [ ] Tested with the primary balanced model (e.g., Claude Sonnet; clear and efficient?)
+- [ ] Tested with the strongest supported model (e.g., Claude Opus; not over-explaining?)
+- [ ] LLM judge is independent and capable of applying the complete rubric
 
 ### Evaluation
 - [ ] Baseline comparison done (no-skill for new work, prior version for existing work)
 - [ ] Objective deterministic graders precede qualitative rubrics
-- [ ] Official `evals/<skill>/<case>/` layout validates
+- [ ] Project-supported `evals/<skill>/<case>/` layout validates
 - [ ] Nondeterministic cases run at least three times
 - [ ] At least one iteration of eval → feedback → improve completed
 - [ ] Per-case deltas, safety evidence, time, tool, token, and cost availability recorded
@@ -111,16 +111,16 @@ wc -l your-skill-name/SKILL.md
 # Should be under 200 for main instructions
 ```
 
-**Validate a Claude Code plugin and its eval layout:**
+**Validate with the project or active-host adapters:**
 
 ```bash
-claude plugin validate --strict ./plugin
-claude plugin eval ./plugin --ablation with-without \
-  --model haiku --judge-model sonnet --runs 3 \
+<host-validator> ./plugin
+<eval-adapter> run ./plugin --ablation with-without \
+  --model fast-agent --judge-model independent-judge --runs 3 \
   --output-dir eval-results --json eval-results.json
 ```
 
-If model evaluation is feature-gated, preserve the diagnostic and run every deterministic validator; never report fabricated scores.
+The angle-bracket labels are non-executable placeholders; replace them with resolved adapter commands. If model evaluation is unavailable, preserve the diagnostic and run every deterministic validator; never install or require a different host merely to fabricate coverage.
 
 ---
 

@@ -2,9 +2,9 @@
 
 set -euo pipefail
 
-mkdir -p outputs .claude/skills/mock-skill-creator
+mkdir -p outputs optional-creator
 
-cat >.claude/skills/mock-skill-creator/SKILL.md <<'CREATOR'
+cat >optional-creator/SKILL.md <<'CREATOR'
 ---
 name: mock-skill-creator
 description: Offers optional second-opinion advice for a skill artifact. Use only when explicitly told this helper is available while authoring a skill.

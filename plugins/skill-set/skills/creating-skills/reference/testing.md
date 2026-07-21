@@ -35,7 +35,7 @@ At minimum verify:
 - mutation scripts provide a safe dry run or preview where meaningful; and
 - examples use real supported tools and argument syntax.
 
-Run the host plugin validator when available. Add repository-local checks for stronger project invariants such as exact inventory, forbidden dependencies, generated-file drift, or Bash compatibility.
+Run a repository-provided validator first, then a host-provided validator when available. Treat the validator as an adapter boundary: the skill must remain testable without any one vendor CLI. Add repository-local checks for stronger project invariants such as exact inventory, forbidden dependencies, generated-file drift, or Bash compatibility.
 
 ## Trigger Testing
 
@@ -77,13 +77,13 @@ Safety tests should exercise absent or narrower authority, stale compare-and-swa
 
 ## Cross-Model Testing
 
-Test every model tier the skill supports:
+Test every capability tier the active host supports:
 
-- **Haiku** exposes missing sequence details and weak guardrails.
-- **Sonnet** is a balanced functional target and the minimum trusted LLM judge tier.
-- **Opus** exposes unnecessary instruction volume and overconstraint.
+- **Small/fast model** (e.g., Claude Haiku) exposes missing sequence details and weak guardrails.
+- **Balanced model** (e.g., Claude Sonnet) is the primary functional target.
+- **Strongest supported model** (e.g., Claude Opus) exposes unnecessary instruction volume and overconstraint.
 
-Use a different model for LLM grading than for the agent run. Hold cases, fixtures, tool grants, and run count constant when comparing models. Run nondeterministic cases at least three times.
+Use a different, sufficiently capable model for LLM grading than for the agent run. Hold cases, fixtures, tool grants, and run count constant when comparing models. Run nondeterministic cases at least three times. Record the host adapter and exact model identifiers instead of assuming vendor-specific names.
 
 ## Observe Navigation
 
@@ -109,4 +109,4 @@ Before declaring the skill ready, retain:
 - duration, turns, token, and cost data when exposed; and
 - unresolved environmental or grader limitations.
 
-The top-level lifecycle routes to the separate evaluation reference for official case layout, ablation commands, grader selection, and iteration.
+The top-level lifecycle routes to the separate evaluation reference for portable case layout, adapter-based ablation, grader selection, and iteration.

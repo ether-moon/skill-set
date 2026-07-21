@@ -25,7 +25,7 @@ Reject a missing capability or a worktree whose HEAD differs from the supplied S
 4. Split logs into discrete items with error, file/line, job, and failure type.
 5. Classify each item. Public API, data/schema, dependency, security-policy, destructive, flaky, architectural, and multiple-solution changes are always AMBIGUOUS.
 6. Apply only OBVIOUS fixes in the provided worktree. Run the narrow failing check, then the relevant regression suite.
-7. Inspect the index, then commit only explicit modified paths through `${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git` with `commit --path <path> --expected-index <fingerprint> --message-file <file>`. Do not push, post a PR comment, or resolve a review thread.
+7. Resolve `skills/managing-git-workflow/scripts/skill-set-git` from the installed skill collection, inspect the index, then commit only explicit modified paths through that absolute runner path with `commit --path <path> --expected-index <fingerprint> --message-file <file>`. Do not push, post a PR comment, or resolve a review thread.
 
 ## Result Contract
 

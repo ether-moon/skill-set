@@ -71,7 +71,7 @@ name: my-cool-skill
 - Does it mention relevant file types if applicable?
 
 **Debugging approach**:
-Ask Claude: "When would you use the [skill name] skill?" Claude will quote the description back. Adjust based on what's missing.
+Ask the active agent: "When would you use the [skill name] skill?" Compare its answer with the description and adjust what is missing.
 
 **Example fix**:
 
@@ -122,7 +122,7 @@ description: PayFlow payment processing for e-commerce. Use specifically for onl
 **Checklist**:
 
 1. **Verify MCP server is connected**
-   - Claude.ai: Settings > Extensions > [Your Service]
+   - Open the active host's connector or extension settings for the service
    - Should show "Connected" status
 
 2. **Check authentication**
@@ -131,7 +131,7 @@ description: PayFlow payment processing for e-commerce. Use specifically for onl
    - OAuth tokens refreshed
 
 3. **Test MCP independently**
-   - Ask Claude to call MCP directly (without skill)
+   - Ask the active agent to call MCP directly (without the skill)
    - "Use [Service] MCP to fetch my projects"
    - If this fails, issue is MCP not skill
 
@@ -165,15 +165,15 @@ description: PayFlow payment processing for e-commerce. Use specifically for onl
 - Treat missing baseline cases or partial-budget results as incomplete, not as zero or a pass.
 - Keep the evaluated model and LLM judge different; use a Sonnet-tier or larger judge.
 
-### `claude plugin eval` is feature-gated
+### The model evaluation adapter is unavailable
 
-Preserve the exact CLI diagnostic. Keep official cases, deterministic graders, fixture execution, and plugin validation green so the model run is ready when access is enabled. Report the run as blocked or unavailable; never estimate scores from manual inspection.
+Preserve the exact adapter diagnostic. Keep cases, deterministic graders, fixture execution, and project validation green so the model run is ready when an adapter becomes available. Report the run as unavailable; never require a different host or estimate scores from manual inspection.
 
 ---
 
 ## Instructions Not Followed
 
-**Symptom**: Skill loads but Claude doesn't follow instructions
+**Symptom**: Skill loads but the active agent doesn't follow instructions
 
 **Common causes**:
 
@@ -204,7 +204,7 @@ CRITICAL: Before calling create_project, verify:
 
 ### 4. Consider Validation Scripts
 
-For critical validations, consider bundling a script that performs checks programmatically rather than relying on language instructions. Code is deterministic; language interpretation isn't.
+For critical validations, consider bundling a script that performs checks programmatically rather than relying on language instructions. Code is deterministic; language interpretation is not.
 
 ### 5. Model "Laziness"
 

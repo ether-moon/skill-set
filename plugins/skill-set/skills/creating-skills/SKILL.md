@@ -1,6 +1,6 @@
 ---
 name: creating-skills
-description: Creates, modifies, evaluates, and optimizes Claude skills across their full lifecycle. Use for new or existing SKILL.md work, trigger design, skill structure, bundled scripts, functional evals, benchmarks, description tuning, troubleshooting, or iterative skill-quality improvement.
+description: Creates, modifies, evaluates, and optimizes agent skills across their full lifecycle. Use for new or existing SKILL.md work, trigger design, skill structure, bundled scripts, functional evals, benchmarks, description tuning, troubleshooting, or iterative skill-quality improvement.
 ---
 
 # Creating Skills
@@ -10,6 +10,12 @@ description: Creates, modifies, evaluates, and optimizes Claude skills across th
 Own the complete lifecycle locally: use cases, triggers, structure, instructions, scripts, evaluation, benchmark, and iterate-until-ready decisions. The workflow must remain complete when no external creator is installed.
 
 An available `skill-creator:skill-creator` is an optional assistant for brainstorming cases, scaffolding, or running supported evaluations. Invoke it only when it materially helps the current stage. Its presence never replaces this workflow, and its absence or unavailability never blocks progress.
+
+## Host Independence
+
+The core workflow must run with the active host's ordinary file, shell, validation, model-run, and trace capabilities. It must not require Claude Code, the `claude` CLI, Claude-specific environment variables, or a Claude-only installation layout. Use host-specific extensions only when the user explicitly targets that host; keep the base skill and its bundled scripts functional without them.
+
+Resolve validation and model evaluation in this order: host-neutral repository commands, an active-host evaluation adapter, then a documented adapter supplied by the user. A repository command backed by a vendor CLI qualifies only when the user explicitly selected that vendor target. If no model adapter exists, complete deterministic validation and retain runnable cases, but report the model benchmark as unavailable rather than substituting a Claude-only command.
 
 ## Choose the Path
 
@@ -65,7 +71,7 @@ Create before/after evidence for both triggering and outcomes:
 - at least three runs for nondeterministic model cases; and
 - no-skill ablation for a new skill or old-version comparison for an existing skill.
 
-Read `reference/evaluation.md` and `reference/testing.md` for case design and official eval layout.
+Read `reference/evaluation.md` and `reference/testing.md` for case design and the portable eval layout.
 
 ### 8. Benchmark
 
@@ -87,7 +93,7 @@ Classify every failure as an instruction gap, trigger gap, grader defect, fixtur
 ## Failure Handling
 
 - If a case cannot be graded objectively, state the uncertain criterion and use a concrete LLM rubric.
-- If an external eval tool is unavailable, keep official fixtures and deterministic validation ready; report the blocked model run without inventing results.
+- If an evaluation adapter is unavailable, keep fixtures and deterministic validation ready; report the model run as unavailable without inventing results or requiring a different host.
 - If improvements trade precision for recall or safety for convenience, expose the trade-off and retain the safer baseline until accepted.
 - If repeated iterations fail, revisit the use case and grader before adding more prose.
 

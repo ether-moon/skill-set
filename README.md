@@ -23,7 +23,7 @@ Runtime totals: **11 skills, 7 legacy commands, 4 PR agents, 0 hooks, 0 MCP serv
 |---|---|
 | `autofixing-and-escalating` | Classifies actionable findings from linters, tests, security scans, audits, and PR reviews as obvious or ambiguous, then applies only explicitly authorized fixes. |
 | `bumping-version` | Inspects, previews, prepares, and direct-pushes approved semantic-version Git commits with consistent manifests and policy-driven changelog updates. |
-| `creating-skills` | Creates, modifies, evaluates, and optimizes Claude skills across their full lifecycle. |
+| `creating-skills` | Creates, modifies, evaluates, and optimizes agent skills across their full lifecycle. |
 | `driving-with-tests` | Guides implementation and verification through Orient, Red/Green/Refactor, Probe, and Guard. |
 | `grilling-plans` | Stress-tests an existing plan, RFC, design, or proposal by resolving one decision per turn and maintaining a decision ledger. |
 | `guarding-agent-directives` | Verifies proposed agent-directive additions and audits existing CLAUDE.md, AGENTS.md, and referenced instruction files for bloat, duplication, ambiguity, and placement. |
@@ -60,11 +60,11 @@ Runtime totals: **11 skills, 7 legacy commands, 4 PR agents, 0 hooks, 0 MCP serv
 plugins/skill-set/
 ├── .claude-plugin/plugin.json
 ├── agents/                     # generated table above
-├── bin/                        # deterministic mutation executors
+├── bin/                        # legacy compatibility wrappers
 ├── commands/                   # nested legacy command names
 ├── evals/                      # official plugin eval cases
 ├── scripts/                    # inventory and eval tooling
-├── skills/                     # generated table above
+├── skills/                     # skills and portable bundled runners
 └── tests/                      # deterministic validation
 ```
 <!-- skill-set-inventory:end -->
@@ -78,6 +78,7 @@ Skills are also model-invocable and load automatically when their descriptions m
 - **Token efficiency** — Keep skill metadata and instructions focused on behavior the model cannot reliably infer.
 - **Namespacing** — Organize commands to prevent collisions.
 - **Verification** — Test runtime integrations in addition to validating static plugin structure.
+- **Portable execution** — Resolve constrained runners from each skill directory without host-specific plugin-root variables.
 
 ## Runtime Verification
 

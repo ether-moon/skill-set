@@ -12,7 +12,7 @@ execution:
   timeout_seconds: 900
   allowed_tools:
     - Skill
-    - 'Bash(${CLAUDE_PLUGIN_ROOT}/bin/skill-set-release:*)'
+    - 'Bash(*skill-set-release:*)'
 runs: 3
 graders:
   - type: tool_used

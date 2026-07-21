@@ -389,6 +389,91 @@ second.txt" "$(git diff --cached --name-only)" "index CAS preservation"
   )
 }
 
+test_commit_allows_an_explicit_tree_identical_merge() {
+  local repo input_head base_sha expected before_tree result
+  repo=$(make_repo commit-tree-identical-merge)
+
+  (
+    cd "$repo"
+    git switch --quiet -c feature
+    printf 'shared\n' > shared.txt
+    git add -- shared.txt
+    git commit --quiet -m "feat: carry shared content"
+    input_head=$(git rev-parse HEAD)
+    before_tree=$(git rev-parse "HEAD^{tree}")
+
+    git switch --quiet main
+    printf 'shared\n' > shared.txt
+    git add -- shared.txt
+    git commit --quiet -m "feat: add shared content"
+    base_sha=$(git rev-parse HEAD)
+
+    git switch --quiet feature
+    git merge --quiet --no-commit --no-ff "$base_sha"
+    expected=$(git write-tree)
+    assert_equals "$before_tree" "$expected" "tree-identical merge index"
+    printf 'merge: integrate main ancestry\n' > "$test_root/tree-identical-merge-message.txt"
+
+    result=$(/bin/bash "$runner" commit --dry-run --allow-tree-identical-merge)
+    jq -e --arg merge_head "$base_sha" '
+      .ok == true and .dry_run == true and
+      .source == "tree-identical-merge" and .would_commit == [] and
+      .tree_identical_merge == true and .merge_head == $merge_head
+    ' <<<"$result" >/dev/null
+    assert_equals "$input_head" "$(git rev-parse HEAD)" "tree-identical merge dry-run head"
+
+    result=$(/bin/bash "$runner" commit \
+      --allow-tree-identical-merge \
+      --expected-index "$expected" \
+      --message-file "$test_root/tree-identical-merge-message.txt")
+
+    jq -e --arg merge_head "$base_sha" '
+      .ok == true and .source == "tree-identical-merge" and
+      .tree_identical_merge == true and .merge_head == $merge_head
+    ' <<<"$result" >/dev/null
+    assert_equals "$input_head $base_sha" "$(git show -s --format='%P' HEAD)" "tree-identical merge parents"
+    assert_equals "$before_tree" "$(git rev-parse "HEAD^{tree}")" "tree-identical merge committed tree"
+    assert_equals "" "$(git status --porcelain)" "tree-identical merge worktree"
+  )
+}
+
+test_tree_identical_merge_flag_rejects_unsafe_states() {
+  local repo base_sha status
+  local stdout_file=$test_root/tree-identical-unsafe-stdout.json
+  local stderr_file=$test_root/tree-identical-unsafe-stderr.json
+  repo=$(make_repo commit-tree-identical-unsafe)
+
+  (
+    cd "$repo"
+
+    set +e
+    /bin/bash "$runner" commit --dry-run --allow-tree-identical-merge \
+      >"$stdout_file" 2>"$stderr_file"
+    status=$?
+    set -e
+    [[ $status -ne 0 ]] || fail "tree-identical merge flag must require an active merge"
+    jq -e '.code == "merge_not_in_progress" and .recoverable == true' "$stderr_file" >/dev/null
+
+    git switch --quiet -c feature
+    git switch --quiet main
+    printf 'base\n' > base.txt
+    git add -- base.txt
+    git commit --quiet -m "feat: add base content"
+    base_sha=$(git rev-parse HEAD)
+    git switch --quiet feature
+    git merge --quiet --no-commit --no-ff "$base_sha"
+
+    set +e
+    /bin/bash "$runner" commit --dry-run --allow-tree-identical-merge \
+      >"$stdout_file" 2>"$stderr_file"
+    status=$?
+    set -e
+    [[ $status -ne 0 ]] || fail "tree-identical merge flag must reject a changed merge tree"
+    jq -e '.code == "merge_tree_changed" and .recoverable == true' "$stderr_file" >/dev/null
+    git merge --abort
+  )
+}
+
 test_push_sends_only_existing_commits() {
   local repo
   local before_head
@@ -654,6 +739,40 @@ test_pr_create_pushes_commits_and_uses_body_file() {
   )
 }
 
+test_pr_create_reports_github_error() {
+  local repo status
+  local stdout_file=$test_root/pr-create-error-stdout.json
+  local stderr_file=$test_root/pr-create-error-stderr.json
+  repo=$(make_repo pr-create-error)
+
+  (
+    cd "$repo"
+    git switch --quiet -c feature
+    printf 'feature\n' > feature.txt
+    git add -- feature.txt
+    git commit --quiet -m "feat: rejected PR"
+    printf '## Summary\n- Rejected PR\n' > "$test_root/pr-create-error-body.md"
+
+    set +e
+    PATH="$mock_bin:$PATH" \
+      MOCK_GH_CREATE_ERROR='GraphQL: simulated pull request rejection' \
+      /bin/bash "$runner" pr-create \
+        --base main \
+        --title "Rejected PR" \
+        --body-file "$test_root/pr-create-error-body.md" \
+        >"$stdout_file" 2>"$stderr_file"
+    status=$?
+    set -e
+
+    [[ $status -ne 0 ]] || fail "PR creation must propagate GitHub rejection"
+    jq -e '
+      .code == "pr_create_failed" and
+      (.message | contains("GraphQL: simulated pull request rejection")) and
+      .recoverable == true
+    ' "$stderr_file" >/dev/null
+  )
+}
+
 test_runner_omits_forbidden_publication_shortcuts
 test_managed_input_prepare_and_discard
 test_commit_consumes_managed_message_after_success
@@ -666,6 +785,8 @@ test_commit_requires_explicit_all_changes_scope
 test_commit_dry_run_does_not_mutate_index_or_head
 test_commit_path_dry_run_reports_diff_without_message_file
 test_commit_rejects_changed_index_fingerprint
+test_commit_allows_an_explicit_tree_identical_merge
+test_tree_identical_merge_flag_rejects_unsafe_states
 test_push_sends_only_existing_commits
 test_push_dry_run_rechecks_without_publishing
 test_push_rejects_remote_race_and_divergence
@@ -673,5 +794,6 @@ test_push_allows_validated_remote_branch_override
 test_pr_create_returns_existing_pr_without_mutation
 test_pr_create_requires_dirty_exclusion_confirmation_and_supports_dry_run
 test_pr_create_pushes_commits_and_uses_body_file
+test_pr_create_reports_github_error
 
 printf 'PASS: git runner\n'

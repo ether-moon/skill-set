@@ -1,6 +1,6 @@
 ---
 description: Resolve PR blockers in one isolated, publication-gated cycle
-allowed-tools: "Bash(gh repo view:*) Bash(gh pr view:*) Bash(${CLAUDE_PLUGIN_ROOT}/bin/skill-set-pr:*) Agent"
+allowed-tools: "Bash(gh repo view:*) Bash(gh pr view:*) Agent"
 ---
 
 First discover and scan a stable current-branch PR; do not launch an under-specified resolver:

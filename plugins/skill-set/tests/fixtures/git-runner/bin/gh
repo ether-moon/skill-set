@@ -12,6 +12,10 @@ case $2 in
     ;;
   create)
     shift 2
+    if [[ -n ${MOCK_GH_CREATE_ERROR:-} ]]; then
+      printf '%s\n' "$MOCK_GH_CREATE_ERROR" >&2
+      exit 1
+    fi
     title=
     body_file=
     base=

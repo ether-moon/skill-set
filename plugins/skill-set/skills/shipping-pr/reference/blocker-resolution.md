@@ -6,6 +6,8 @@ One resolver cycle uses one isolated worktree created from the exact remote PR H
 
 If the snapshot reports a merge conflict, run only `merge-conflict-resolver`. The conflict consumes the sole cycle; after a successful expected-SHA push, return to a new snapshot on the new HEAD.
 
+When the resolved merge index is tree-identical to the pinned PR HEAD, the merge resolver must use the Git runner's explicit `--allow-tree-identical-merge` path. That path records ancestry only after validating a single active merge, a conflict-free index equal to the `HEAD` tree, and an otherwise clean worktree; never substitute a raw empty commit.
+
 If no conflict exists:
 
 1. run `ci-failure-resolver` when selected checks failed;
@@ -31,7 +33,7 @@ An AMBIGUOUS result is not success. Preserve all local work and wait for the use
 
 Write `{results:[...]}` to a regular, non-symlink file inside the resolver worktree. Each ordered result contains `agent`, `result`, `input_head`, and `output_head`; adjacent HEAD values form one chain from the blocked snapshot to the actual local HEAD. Write the queued summary and thread feedback to separate files in that worktree. The thread-feedback shape is `{threads:[{id,outcome,body}]}` with one exact blocked-snapshot thread ID per entry and an outcome of `fixed`, `accepted_as_is`, or `unresolved`. Do not supply a reviewer/provider adapter: the runner derives `claude`, `coderabbit`, `codex`, or `other` from the snapshot thread author. Bodies explain the resolution and contain no bot mentions or commands. Apart from those declared inputs, the index and worktree must contain no staged, unstaged, or untracked files.
 
-Call `${CLAUDE_PLUGIN_ROOT}/bin/skill-set-pr` with `publish`, the run ID, blocked HEAD, validated local HEAD, results file, summary file, and `--thread-feedback-file`. Do not call `git push`, `skill-set-git push`, `gh pr comment`, a thread-reply API, or a resolve API outside this command.
+Resolve `scripts/skill-set-pr` from the `shipping-pr` skill directory and call its absolute path with `publish`, the run ID, blocked HEAD, validated local HEAD, results file, summary file, and `--thread-feedback-file`. Do not call `git push`, `skill-set-git push`, `gh pr comment`, a thread-reply API, or a resolve API outside this command.
 
 The runner validates the planned agents, result set, HEAD chain, branch, pinned commits, clean publication boundary, exact thread coverage, live PR head repository/ref, bound remote push URL, and remote HEAD. It checks the remote binding again immediately before invoking one expected-SHA push when the local HEAD changed and revalidates no-code activity. Only after that gate does it post idempotently marked thread replies, resolve `fixed` and `accepted_as_is` threads, and post the summary. When all queued CodeRabbit feedback is resolved, the runner itself prepends the exact `@coderabbitai resolve` command; this is never inferred from free-form text or supplied as an adapter flag. It never asks Codex or Claude to review again or to edit the PR. `pending → prepared → gate_passed → commenting → complete` state records make interrupted publication recoverable and hidden markers suppress duplicate feedback.
 

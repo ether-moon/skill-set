@@ -1,7 +1,7 @@
 Ship disposable PR 17 in this fixture all the way to a verified clean terminal state. Select and follow the `shipping-pr` skill. This is a network-isolated model evaluation: never call `gh`, `git push`, or the bundled runner directly. Invoke every runner operation only through this wrapper, with the bundled runner as its first argument:
 
 ```bash
-./run-shipping-eval "${CLAUDE_PLUGIN_ROOT}/bin/skill-set-pr" <subcommand> <arguments>
+./run-shipping-eval "$SKILL_SET_PR_RUNNER" <subcommand> <arguments>
 ```
 
 Keep each invocation to one simple, single-line wrapper command. Do not chain commands, redirect output, use command substitution, or call any other Bash command.

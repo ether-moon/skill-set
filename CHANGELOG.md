@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **shipping-pr**: Restore unattended initial commits and pushes. Invoking the shipping workflow now authorizes committing the complete inspected working-tree scope, publishing the branch, and publishing successful resolver commits without a redundant confirmation prompt.
+- **portable runners**: Bundle Git, PR, and release executors inside their owning skill directories and resolve them relative to `SKILL.md`, removing the runtime dependency on Claude's `CLAUDE_PLUGIN_ROOT`. Legacy plugin `bin/` paths remain as compatibility wrappers.
+- **host-neutral skills**: Make `creating-skills` use validator/evaluation adapters instead of requiring the Claude CLI or Claude-specific discovery paths, and make release policy discovery use the standard `AGENTS.md` contract instead of preferring `CLAUDE.md`.
 - **shipping-pr**: Honor `--required-only=false` when snapshotting checks so failed advisory workflows are included instead of being silently treated as clean.
 
 ### Improved

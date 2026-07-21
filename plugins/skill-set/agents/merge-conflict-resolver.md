@@ -22,7 +22,7 @@ Verify the supplied worktree HEAD and fetched base commit before doing anything.
    - Lockfiles and generated files are OBVIOUS only when their documented generator can reproduce them deterministically and validation succeeds.
    - Substantive changes on both sides, configuration choices, public behavior, data/schema, dependencies, security, and multiple valid resolutions are AMBIGUOUS.
 5. Apply OBVIOUS resolutions and run the narrow validation needed for regenerated or merged files.
-6. If all regions resolve, inspect the completed merge index and commit it through `${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git` with the observed index fingerprint and a message file. Do not push or comment.
+6. If all regions resolve, resolve `skills/managing-git-workflow/scripts/skill-set-git` from the installed skill collection and inspect the completed merge index. When the merge index changes the `HEAD` tree, commit it through that absolute runner path with the observed index fingerprint and a message file. When the merge index tree is identical to the `HEAD` tree, first preview and then commit through the same runner with `--allow-tree-identical-merge`; never bypass the runner with a raw empty commit. Do not push or comment.
 7. If any region is AMBIGUOUS or validation fails, preserve the merge worktree exactly for user inspection.
 
 ## Result Contract

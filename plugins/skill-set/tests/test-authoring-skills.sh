@@ -28,6 +28,22 @@ grep -Eqi 'unavailable|not installed|absent' "$creating"
 grep -Eq 'case.yaml' "$creating_dir/reference/evaluation.md"
 grep -Eq -- '--ablation with-without' "$creating_dir/reference/evaluation.md"
 grep -Eqi 'independent.*(judge|grader)|(judge|grader).*independent' "$creating_dir/reference/evaluation.md"
+claude_cli_pattern='(^|[^[:alnum:]_-])claude[[:space:]]+(plugin|--version)([^[:alnum:]_-]|$)'
+# shellcheck disable=SC2016 # Backticks are literal documentation text.
+printf '%s\n' '- Run `claude plugin eval` through the host adapter.' | \
+  grep -Eq "$claude_cli_pattern" || fail 'Claude CLI boundary matcher misses inline documentation references'
+if grep -Erq "$claude_cli_pattern" "$creating_dir"; then
+  fail 'creating-skills must not require the Claude CLI for validation or evaluation'
+fi
+if grep -Erq '\.claude/' "$plugin_dir/evals/creating-skills"; then
+  fail 'creating-skills eval fixtures must not require Claude-specific skill discovery'
+fi
+grep -Eqi 'host-provided.*validator|validator.*host-provided' "$creating_dir/reference/testing.md" || \
+  fail 'creating-skills must define a host-neutral validator boundary'
+grep -Eqi 'evaluation adapter|eval adapter' "$creating_dir/reference/evaluation.md" || \
+  fail 'creating-skills must define a host-neutral evaluation adapter boundary'
+grep -Eqi 'must not require Claude Code|do not require Claude Code' "$creating" || \
+  fail 'creating-skills must explicitly preserve non-Claude execution'
 if grep -Erq 'evals\.json|without_skill|with_skill/outputs' "$creating_dir"; then
   fail 'creating-skills retains a legacy custom eval layout'
 fi

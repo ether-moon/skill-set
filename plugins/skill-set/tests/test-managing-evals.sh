@@ -14,8 +14,7 @@ contract=$plugin_dir/evals/safety-contract.json
 for case_file in "$commit_case/case.yaml" "$preview_case/case.yaml"; do
   grep -Eq "name: selected-managing-git-workflow" "$case_file"
   grep -Eq "name: invoked-git-runner-inspect" "$case_file"
-  # shellcheck disable=SC2016 # CLAUDE_PLUGIN_ROOT is literal grader syntax.
-  grep -Fq 'Bash(${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git:*)' "$case_file"
+  grep -Fq 'Bash(*skill-set-git:*)' "$case_file"
   ! grep -Eq '^    - (Bash|Write|Edit)$' "$case_file" || \
     fail "managing-git eval has an unrestricted operator grant: $case_file"
   grep -Eq 'name: safety-no-write-tool' "$case_file"

@@ -481,12 +481,20 @@ reconciled_cleanup=$(/bin/bash "$runner" cleanup --state-file "$reconcile_state"
 assert_equals "true" "$(printf '%s' "$reconciled_cleanup" | jq -r '.reconciled')" "cleanup reconciliation"
 
 skill_file="$plugin_dir/skills/bumping-version/SKILL.md"
+runner_source="$plugin_dir/skills/bumping-version/scripts/skill-set-release"
 assert_file "$skill_file"
 assert_executable "$runner"
-grep -Fq "allowed-tools: \"Bash(\${CLAUDE_PLUGIN_ROOT}/bin/skill-set-release:*)\"" "$skill_file" || \
-  fail "bumping-version should grant only the release runner"
+if grep -Fq 'CLAUDE.md' "$runner_source"; then
+  fail "release policy discovery must not depend on CLAUDE.md"
+fi
+grep -Fq 'AGENTS.md' "$runner_source" || \
+  fail "release policy discovery must use the portable AGENTS.md contract"
+grep -Fq 'scripts/skill-set-release' "$skill_file" || \
+  fail "bumping-version should resolve its skill-local release runner"
+! grep -Fq 'CLAUDE_PLUGIN_ROOT' "$skill_file" || \
+  fail "bumping-version should not depend on a host plugin root"
 for subcommand in inspect prepare publish cleanup; do
-  grep -Eq "skill-set-release\"[[:space:]]+$subcommand" "$skill_file" || \
+  grep -Eq "<release-runner>[[:space:]]+$subcommand" "$skill_file" || \
     fail "bumping-version should document $subcommand"
 done
 if grep -Eq 'git (add|commit|push|pull|rebase)|gh .*pr create|automatic PR|PR fallback' "$skill_file"; then
