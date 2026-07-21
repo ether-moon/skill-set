@@ -151,6 +151,15 @@ for scenario in fail cancel pending; do
   jq -e --arg bucket "$scenario" '.checks[$bucket] == 1' <<<"$result" >/dev/null
 done
 
+make_fixture all-checks
+export MOCK_GH_SCENARIO=fail
+init_case --required-only false >/dev/null
+all_checks=$(snapshot_case 101)
+assert_equals blocked "$(jq -r .status <<<"$all_checks")" "all-check failure state"
+if grep -Eq '^pr checks .* --required( |$)' "$MOCK_GH_LOG"; then
+  fail "--required-only false still passed --required to gh pr checks"
+fi
+
 make_fixture skipping
 export MOCK_GH_SCENARIO=skipping
 init_case >/dev/null

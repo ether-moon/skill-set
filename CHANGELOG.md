@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **shipping-pr**: Restore unattended initial commits and pushes. Invoking the shipping workflow now authorizes committing the complete inspected working-tree scope, publishing the branch, and publishing successful resolver commits without a redundant confirmation prompt.
+- **shipping-pr**: Honor `--required-only=false` when snapshotting checks so failed advisory workflows are included instead of being silently treated as clean.
 
 ### Improved
 
