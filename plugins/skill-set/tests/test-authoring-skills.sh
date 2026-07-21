@@ -29,6 +29,7 @@ grep -Eq 'case.yaml' "$creating_dir/reference/evaluation.md"
 grep -Eq -- '--ablation with-without' "$creating_dir/reference/evaluation.md"
 grep -Eqi 'independent.*(judge|grader)|(judge|grader).*independent' "$creating_dir/reference/evaluation.md"
 claude_cli_pattern='(^|[^[:alnum:]_-])claude[[:space:]]+(plugin|--version)([^[:alnum:]_-]|$)'
+# shellcheck disable=SC2016 # Backticks are literal documentation text.
 printf '%s\n' '- Run `claude plugin eval` through the host adapter.' | \
   grep -Eq "$claude_cli_pattern" || fail 'Claude CLI boundary matcher misses inline documentation references'
 if grep -Erq "$claude_cli_pattern" "$creating_dir"; then

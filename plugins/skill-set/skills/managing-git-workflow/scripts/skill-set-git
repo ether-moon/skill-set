@@ -450,7 +450,7 @@ commit_operation() {
       die 65 "merge_head_unavailable" "The recorded MERGE_HEAD commit is unavailable"
     [[ -z $(git ls-files --unmerged --) ]] || \
       die 65 "unresolved_merge_conflicts" "Resolve every merge conflict before creating the merge commit"
-    head_tree=$(git rev-parse HEAD^{tree}) || \
+    head_tree=$(git rev-parse "HEAD^{tree}") || \
       die 65 "head_tree_unavailable" "Could not read the current HEAD tree"
     [[ $before_index == "$head_tree" ]] || \
       die 65 "merge_tree_changed" "Use the normal commit path when the resolved merge changes the HEAD tree"

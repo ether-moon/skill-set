@@ -400,7 +400,7 @@ test_commit_allows_an_explicit_tree_identical_merge() {
     git add -- shared.txt
     git commit --quiet -m "feat: carry shared content"
     input_head=$(git rev-parse HEAD)
-    before_tree=$(git rev-parse HEAD^{tree})
+    before_tree=$(git rev-parse "HEAD^{tree}")
 
     git switch --quiet main
     printf 'shared\n' > shared.txt
@@ -432,7 +432,7 @@ test_commit_allows_an_explicit_tree_identical_merge() {
       .tree_identical_merge == true and .merge_head == $merge_head
     ' <<<"$result" >/dev/null
     assert_equals "$input_head $base_sha" "$(git show -s --format='%P' HEAD)" "tree-identical merge parents"
-    assert_equals "$before_tree" "$(git rev-parse HEAD^{tree})" "tree-identical merge committed tree"
+    assert_equals "$before_tree" "$(git rev-parse "HEAD^{tree}")" "tree-identical merge committed tree"
     assert_equals "" "$(git status --porcelain)" "tree-identical merge worktree"
   )
 }
