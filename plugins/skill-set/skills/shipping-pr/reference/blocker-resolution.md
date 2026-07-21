@@ -6,6 +6,8 @@ One resolver cycle uses one isolated worktree created from the exact remote PR H
 
 If the snapshot reports a merge conflict, run only `merge-conflict-resolver`. The conflict consumes the sole cycle; after a successful expected-SHA push, return to a new snapshot on the new HEAD.
 
+When the resolved merge index is tree-identical to the pinned PR HEAD, the merge resolver must use the Git runner's explicit `--allow-tree-identical-merge` path. That path records ancestry only after validating a single active merge, a conflict-free index equal to the `HEAD` tree, and an otherwise clean worktree; never substitute a raw empty commit.
+
 If no conflict exists:
 
 1. run `ci-failure-resolver` when selected checks failed;

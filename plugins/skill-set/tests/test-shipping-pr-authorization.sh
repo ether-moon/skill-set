@@ -6,11 +6,13 @@ test_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 plugin_dir=$(cd -- "$test_dir/.." && pwd)
 skill_file=$plugin_dir/skills/shipping-pr/SKILL.md
 resolver_file=$plugin_dir/agents/resolving-pr-blockers.md
+merge_resolver_file=$plugin_dir/agents/merge-conflict-resolver.md
 # shellcheck source=plugins/skill-set/tests/test-helper.sh
 source "$test_dir/test-helper.sh"
 
 assert_file "$skill_file"
 assert_file "$resolver_file"
+assert_file "$merge_resolver_file"
 
 grep -Fq 'A shipping request authorizes the initial branch commit and push' "$skill_file" || \
   fail 'shipping request must authorize the initial commit and push'
@@ -35,5 +37,7 @@ fi
 grep -Fq 'Do not request separate user approval for those commits or for runner publication.' \
   "$resolver_file" || \
   fail 'resolver must treat the shipping capability contract as sufficient authorization'
+grep -Fq -- '--allow-tree-identical-merge' "$merge_resolver_file" || \
+  fail 'merge resolver must use the constrained ancestry-only merge path'
 
 printf 'PASS: shipping-pr authorization contract\n'

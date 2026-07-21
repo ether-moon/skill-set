@@ -369,6 +369,9 @@ commit_operation() {
   local would_commit preview_diff preview_stat preview_index preview_error
   local paths=()
   local include_all=false
+  local allow_tree_identical_merge=false tree_identical_merge=false
+  local merge_head_path merge_head='' merge_head_candidate merge_head_lines=0 head_tree
+  local merge_unstaged merge_untracked
   local managed_message=false input_consumed=false
 
   while [[ $# -gt 0 ]]; do
@@ -390,6 +393,10 @@ commit_operation() {
         ;;
       --all)
         include_all=true
+        shift
+        ;;
+      --allow-tree-identical-merge)
+        allow_tree_identical_merge=true
         shift
         ;;
       --dry-run)
@@ -417,13 +424,45 @@ commit_operation() {
   if [[ ${#paths[@]} -gt 0 && $include_all == true ]]; then
     die 64 "conflicting_scope" "Choose repeatable --path arguments or explicitly requested --all, not both"
   fi
+  if [[ $allow_tree_identical_merge == true && (${#paths[@]} -gt 0 || $include_all == true) ]]; then
+    die 64 "conflicting_scope" "A tree-identical merge commit uses the existing merge index without --path or --all"
+  fi
 
   before_index=$(index_fingerprint)
   if [[ -n $expected_index && $before_index != "$expected_index" ]]; then
     die 75 "index_changed" "The index changed after inspection; inspect again before committing"
   fi
 
-  if [[ ${#paths[@]} -gt 0 ]]; then
+  if [[ $allow_tree_identical_merge == true ]]; then
+    merge_head_path=$(git rev-parse --git-path MERGE_HEAD) || \
+      die 65 "merge_state_unavailable" "Could not resolve the current merge state"
+    [[ -f $merge_head_path && ! -L $merge_head_path ]] || \
+      die 65 "merge_not_in_progress" "A tree-identical merge commit requires an active merge"
+    while IFS= read -r merge_head_candidate || [[ -n $merge_head_candidate ]]; do
+      merge_head_lines=$((merge_head_lines + 1))
+      if [[ $merge_head_lines -eq 1 ]]; then
+        merge_head=$merge_head_candidate
+      fi
+    done <"$merge_head_path"
+    [[ $merge_head_lines -eq 1 && ($merge_head =~ ^[0-9a-f]{40}$ || $merge_head =~ ^[0-9a-f]{64}$) ]] || \
+      die 65 "unsupported_merge_state" "A tree-identical merge commit requires exactly one valid MERGE_HEAD"
+    git cat-file -e "$merge_head^{commit}" 2>/dev/null || \
+      die 65 "merge_head_unavailable" "The recorded MERGE_HEAD commit is unavailable"
+    [[ -z $(git ls-files --unmerged --) ]] || \
+      die 65 "unresolved_merge_conflicts" "Resolve every merge conflict before creating the merge commit"
+    head_tree=$(git rev-parse HEAD^{tree}) || \
+      die 65 "head_tree_unavailable" "Could not read the current HEAD tree"
+    [[ $before_index == "$head_tree" ]] || \
+      die 65 "merge_tree_changed" "Use the normal commit path when the resolved merge changes the HEAD tree"
+    merge_unstaged=$(unstaged_json)
+    merge_untracked=$(untracked_json)
+    [[ $merge_unstaged == '[]' && $merge_untracked == '[]' ]] || \
+      die 65 "dirty_tree_identical_merge" "A tree-identical merge commit requires no unstaged or untracked files"
+    source=tree-identical-merge
+    tree_identical_merge=true
+  fi
+
+  if [[ $allow_tree_identical_merge == false && ${#paths[@]} -gt 0 ]]; then
     all_staged=$(staged_json)
     selected_staged=$(git diff --cached --name-only -z --no-ext-diff -- "${paths[@]}" | nul_to_json)
     if [[ $all_staged != "$selected_staged" && $all_staged != '[]' ]]; then
@@ -440,7 +479,7 @@ commit_operation() {
     source=paths
     requested_paths=$(printf '%s\0' "${paths[@]}" | nul_to_json)
   fi
-  if [[ $include_all == true ]]; then
+  if [[ $allow_tree_identical_merge == false && $include_all == true ]]; then
     if [[ $dry_run == false ]]; then
       stage_error=$(mktemp "${TMPDIR:-/tmp}/skill-set-git-stage.XXXXXX") || die 70 "temporary_file_failed" "Could not create a temporary error file"
       if ! git add --all >/dev/null 2>"$stage_error"; then
@@ -458,6 +497,11 @@ commit_operation() {
         would_commit=$(staged_json)
         preview_diff=$(git diff --cached --no-ext-diff --)
         preview_stat=$(git diff --cached --stat --no-ext-diff --)
+        ;;
+      tree-identical-merge)
+        would_commit='[]'
+        preview_diff=''
+        preview_stat=''
         ;;
       paths|all)
         preview_index=$(mktemp "${TMPDIR:-/tmp}/skill-set-git-index.XXXXXX") || die 70 "temporary_file_failed" "Could not create a temporary preview index"
@@ -482,7 +526,7 @@ commit_operation() {
         rm -f -- "$preview_index" "$preview_error"
         ;;
     esac
-    [[ $would_commit != '[]' ]] || die 65 "nothing_to_commit" "The requested scope contains no changes"
+    [[ $would_commit != '[]' || $tree_identical_merge == true ]] || die 65 "nothing_to_commit" "The requested scope contains no changes"
     jq -cn \
       --arg source "$source" \
       --argjson requested_paths "$requested_paths" \
@@ -490,11 +534,15 @@ commit_operation() {
       --arg index "$before_index" \
       --arg preview_diff "$preview_diff" \
       --arg preview_stat "$preview_stat" \
-      '{ok:true, operation:"commit", dry_run:true, source:$source, requested_paths:$requested_paths, would_commit:$would_commit, staged_preview:{diff:$preview_diff, stat:$preview_stat}, index:$index, pushed:false}'
+      --argjson tree_identical_merge "$tree_identical_merge" \
+      --arg merge_head "$merge_head" \
+      '{ok:true, operation:"commit", dry_run:true, source:$source, requested_paths:$requested_paths, would_commit:$would_commit, staged_preview:{diff:$preview_diff, stat:$preview_stat}, index:$index, tree_identical_merge:$tree_identical_merge, merge_head:(if $merge_head == "" then null else $merge_head end), pushed:false}'
     return
   fi
 
-  git diff --cached --quiet -- && die 65 "nothing_staged" "No staged changes are available to commit"
+  if [[ $tree_identical_merge == false ]]; then
+    git diff --cached --quiet -- && die 65 "nothing_staged" "No staged changes are available to commit"
+  fi
 
   commit_error=$(mktemp "${TMPDIR:-/tmp}/skill-set-git-commit.XXXXXX") || die 70 "temporary_file_failed" "Could not create a temporary error file"
   if ! git commit --quiet --file="$message_file" >/dev/null 2>"$commit_error"; then
@@ -517,8 +565,10 @@ commit_operation() {
     --arg after_index "$after_index" \
     --arg sha "$commit_sha" \
     --arg subject "$subject" \
+    --argjson tree_identical_merge "$tree_identical_merge" \
+    --arg merge_head "$merge_head" \
     --argjson input_consumed "$input_consumed" \
-    '{ok:true, operation:"commit", source:$source, requested_paths:$requested_paths, index_before:$before_index, index_after:$after_index, commit:{sha:$sha, subject:$subject}, input_consumed:$input_consumed, pushed:false}'
+    '{ok:true, operation:"commit", source:$source, requested_paths:$requested_paths, index_before:$before_index, index_after:$after_index, tree_identical_merge:$tree_identical_merge, merge_head:(if $merge_head == "" then null else $merge_head end), commit:{sha:$sha, subject:$subject}, input_consumed:$input_consumed, pushed:false}'
 }
 
 push_operation() {

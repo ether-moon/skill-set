@@ -65,6 +65,20 @@ The runner consumes the managed message allocation after a successful commit. If
 
 If the runner returns `index_changed`, inspect again and re-confirm the scope. If it returns `nothing_staged` or `nothing_to_commit`, stop without creating an empty commit.
 
+## Tree-Identical Merge Exception
+
+A merge resolver may need a merge commit whose tree is identical to `HEAD` solely to record the pinned base commit as a second parent. Use this exception only after the user has authorized conflict resolution and the resolver has already resolved every conflict:
+
+```bash
+<git-runner> commit --dry-run --allow-tree-identical-merge
+<git-runner> commit \
+  --allow-tree-identical-merge \
+  --expected-index "<index-fingerprint>" \
+  --message-file "<managed-message-file>"
+```
+
+The runner permits this only for an active single-parent merge with no unmerged paths, an index tree exactly equal to the current `HEAD` tree, and no unstaged or untracked files. It rejects the flag outside that narrow state and never permits a general empty commit. A merge whose resolved tree differs from `HEAD` must use the normal indexed commit path.
+
 ## Dry-Run Guarantee
 
 `commit --dry-run` never changes HEAD or the real index. It uses a temporary index for path and all-change previews, so untracked files appear in the exact staged preview without being staged.
