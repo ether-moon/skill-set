@@ -1,7 +1,7 @@
 ---
 name: shipping-pr
 description: Drives an existing or newly requested pull request through deterministic CI, review, and blocker-resolution cycles until it is verified clean or reaches a terminal stop. Use when the user asks to ship a PR, wait for CI and fix it, run PR autopilot, or keep resolving blockers until the PR is ready.
-allowed-tools: "Bash(${CLAUDE_PLUGIN_ROOT}/bin/skill-set-pr:*) Bash(${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git:*) Bash(gh pr view:*) Bash(git fetch:*) Bash(git cat-file:*) Bash(git worktree:*) Bash(mktemp:*) Bash(sleep:*) Agent"
+allowed-tools: "Bash(${CLAUDE_PLUGIN_ROOT}/bin/skill-set-pr:*) Bash(${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git:*) Bash(gh pr view:*) Bash(git fetch:*) Bash(git cat-file:*) Bash(git worktree:*) Bash(mktemp:*) Bash(sleep:*) Edit(//**/.git/skill-set/inputs/commit-message.*/content) Edit(//**/.git/worktrees/*/skill-set/inputs/commit-message.*/content) Edit(//**/.git/skill-set/inputs/pr-body.*/content) Edit(//**/.git/worktrees/*/skill-set/inputs/pr-body.*/content) Agent"
 ---
 
 # Shipping PR
@@ -10,7 +10,7 @@ allowed-tools: "Bash(${CLAUDE_PLUGIN_ROOT}/bin/skill-set-pr:*) Bash(${CLAUDE_PLU
 
 Orchestrate a resumable PR loop without embedding GitHub polling logic in a prompt. `${CLAUDE_PLUGIN_ROOT}/bin/skill-set-pr` owns snapshots, deadlines, concurrency, and state transitions. The resolver agents own edits in an isolated worktree.
 
-The user request grants `resolve-authorized` with `edit=true`, `commit=true`, `push=true`, and `comment=true` for this PR only. It does not authorize force-push, unrelated changes, merging, or publishing partial resolver work.
+A shipping request authorizes the initial branch commit and push plus `resolve-authorized` with `edit=true`, `commit=true`, `push=true`, and `comment=true` for this PR only. Do not ask for separate confirmation before committing or pushing. This does not authorize force-push, merging, unrelated post-inspection changes, or publishing partial resolver work.
 
 ## When to Use
 
@@ -41,11 +41,25 @@ Do not use for:
 
 ## Workflow
 
-### 1. Resolve the PR
+### 1. Prepare and publish the branch
 
-Use `${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git` with `inspect --base <base>` to report committed scope and dirty files. If no PR exists and `--no-create` is off, follow `managing-git-workflow`'s PR confirmation flow and call its `pr-create` operation. Dirty files remain excluded and require explicit exclusion confirmation.
+Use `${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git` with `inspect --base <base>`. Stop on a detached HEAD, a checked-out base branch, or behind/diverged history. Treat every staged, unstaged, and untracked path reported by this initial inspection as the shipping scope. The shipping request itself authorizes committing that complete scope; do not delegate back to `managing-git-workflow` for another confirmation.
 
-Record the resulting repository and PR number. Never auto-commit working-tree changes for shipping.
+When the shipping scope is dirty, preview it with `commit --dry-run --all`, generate one commit message from that exact preview and the repository's recent subject style, allocate a managed `commit-message`, replace its sentinel with the Edit tool, and run:
+
+```bash
+${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git commit --all \
+  --expected-index "$INDEX_FINGERPRINT" --message-file "$MESSAGE_FILE"
+```
+
+Inspect again after the commit. If an open PR already exists and the branch has unpublished commits, publish them without another prompt using the inspected remote, branch, and remote SHA (`absent` when no remote ref exists):
+
+```bash
+${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git push --expected-remote-sha "$REMOTE_SHA" \
+  --remote "$REMOTE" --remote-branch "$REMOTE_BRANCH"
+```
+
+If no PR exists and `--no-create` is off, generate its title/body only from the now-committed `pr_scope`, allocate and edit a managed `pr-body`, then call `skill-set-git pr-create`; that operation publishes the committed branch when needed. Do not ask for separate confirmation before committing or pushing. If `--no-create` is set, stop without creating a PR. Record the resulting repository and PR number before initializing the shipping loop.
 
 ### 2. Initialize or resume
 

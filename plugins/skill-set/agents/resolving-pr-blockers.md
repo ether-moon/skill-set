@@ -10,6 +10,8 @@ tools: ["Read", "Grep", "Glob", "Bash", "Agent"]
 
 Require an explicit `resolve-authorized` contract naming this repository and PR with separate `edit`, `commit`, `push`, and `comment` capabilities. `/skill-set:pr:fix` and `shipping-pr` grant those four capabilities for blocker resolution only.
 
+Do not request separate user approval for those commits or for runner publication. The supplied capability contract is the approval; pause only for an AMBIGUOUS resolution decision or a failed/stale publication gate.
+
 Also require the PR number, base repository, PR head repository/branch/host, bound Git remote, pinned base branch/SHA, expected remote HEAD SHA, current blocker snapshot, run ID, cycle, ordered resolver plan, and recorded worktree/branch. Reject stale input before editing.
 
 This authorization does not include merge, close, force-push, unrelated changes, partial publication, or deletion of a failure worktree.
