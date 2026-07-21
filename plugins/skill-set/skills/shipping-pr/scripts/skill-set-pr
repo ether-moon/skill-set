@@ -902,7 +902,9 @@ command_snapshot() {
   validate_repo "$prior_head_repo"
   validate_branch state.head_branch "$prior_head_branch"
   validate_sha state.head_sha "$prior_head"
-  required_only=$(jq -r '.options.required_only // true' <<<"$STATE")
+  required_only=$(jq -r '
+    if .options.required_only == null then true else .options.required_only end
+  ' <<<"$STATE")
   reviewers_active=$(jq -c '.reviewers.active // []' <<<"$STATE")
   cycle=$(jq -r '.cycle // 0' <<<"$STATE")
 
