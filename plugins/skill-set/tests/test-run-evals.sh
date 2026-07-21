@@ -21,6 +21,7 @@ root_log=$test_root/mock-roots.log
 : >"$root_log"
 
 PATH="$test_root/bin:$PATH" FAKE_CLAUDE_ROOT_LOG="$root_log" \
+  FAKE_CLAUDE_REQUIRE_PR_RUNNER=true \
   "$runner" \
     --output-dir "$test_root/results" \
     --runs 1 \

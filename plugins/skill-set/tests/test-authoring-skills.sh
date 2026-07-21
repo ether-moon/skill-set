@@ -28,7 +28,10 @@ grep -Eqi 'unavailable|not installed|absent' "$creating"
 grep -Eq 'case.yaml' "$creating_dir/reference/evaluation.md"
 grep -Eq -- '--ablation with-without' "$creating_dir/reference/evaluation.md"
 grep -Eqi 'independent.*(judge|grader)|(judge|grader).*independent' "$creating_dir/reference/evaluation.md"
-if grep -Erq '^[[:space:]]*claude[[:space:]]+(plugin|--version)' "$creating_dir"; then
+claude_cli_pattern='(^|[^[:alnum:]_-])claude[[:space:]]+(plugin|--version)([^[:alnum:]_-]|$)'
+printf '%s\n' '- Run `claude plugin eval` through the host adapter.' | \
+  grep -Eq "$claude_cli_pattern" || fail 'Claude CLI boundary matcher misses inline documentation references'
+if grep -Erq "$claude_cli_pattern" "$creating_dir"; then
   fail 'creating-skills must not require the Claude CLI for validation or evaluation'
 fi
 if grep -Erq '\.claude/' "$plugin_dir/evals/creating-skills"; then

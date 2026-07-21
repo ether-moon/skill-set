@@ -217,11 +217,19 @@ baseline_pr_runner=$baseline_plugin/skills/shipping-pr/scripts/skill-set-pr
 if [[ ! -x $baseline_pr_runner ]]; then
   baseline_pr_runner=$baseline_plugin/bin/skill-set-pr
 fi
+if [[ ! -x $baseline_pr_runner ]]; then
+  baseline_pr_runner=$candidate_snapshot_pr_runner
+fi
+if [[ ! -x $baseline_pr_runner ]]; then
+  baseline_pr_runner=$plugin_dir/skills/shipping-pr/scripts/skill-set-pr
+fi
+[[ -x $baseline_pr_runner ]] || {
+  printf 'No executable PR runner is available for the deletion baseline.\n' >&2
+  exit 1
+}
 
 baseline_command=(claude plugin eval "$baseline_plugin" --ablation none "${baseline_args[@]}" --output-dir "$output_dir/baseline" --json "$output_dir/baseline.json")
-if [[ -x $baseline_pr_runner ]]; then
-  baseline_command=(env SKILL_SET_PR_RUNNER="$baseline_pr_runner" "${baseline_command[@]}")
-fi
+baseline_command=(env SKILL_SET_PR_RUNNER="$baseline_pr_runner" "${baseline_command[@]}")
 
 run_eval_arm() {
   local arm=$1
