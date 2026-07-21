@@ -1,0 +1,24 @@
+## Decisions Made
+- Portable runner 유지: base의 ${CLAUDE_PLUGIN_ROOT} 의존 구현 대신 PR의 skill-local runner와 compatibility wrapper를 모든 충돌 경로에서 보존했습니다.
+- Ancestry-only merge 사용: 해결된 index가 기존 HEAD tree와 동일하므로 일반 empty commit이 아닌 constrained runner의 검증된 --allow-tree-identical-merge 경로를 사용했습니다.
+
+## Problems Encountered
+- 6개 merge conflict: 문서, wrapper, runner 계약, changelog, 회귀 테스트에서 base와 portable 구현이 충돌했으며 각 경로를 PR 쪽 내용으로 해결했습니다.
+- Tree-identical resolution: 콘텐츠 변경 없이 base ancestry만 기록해야 했고 전용 runner dry-run의 merge 상태, index, tree 검증을 통과시켜 해결했습니다.
+
+## Constraints Identified
+- Pinned inputs: resolver는 HEAD f80603892ed6504e1dc28cc615fd36351fa756cb와 base 19d66fb009c5e41864902051f2a8c6413ef6f08f만 사용해야 합니다.
+- Publication boundary: 이 resolver는 commit만 허용되며 branch, note, PR comment를 원격에 publish할 수 없습니다.
+- Constrained commit: merge commit은 portable skill-set-git runner를 통해서만 생성해야 합니다.
+
+## Open Questions
+- None
+
+## Context
+PR #28의 merge conflict를 격리된 resolver worktree에서 해결했습니다. 6개 충돌 모두 Claude 전용 경로를 되살리지 않고 현재 portable runner 설계를 유지했으며, 전체 테스트 후 tree-identical merge commit을 생성했습니다. 원격 push와 PR comment는 수행하지 않았습니다.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
