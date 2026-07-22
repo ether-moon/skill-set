@@ -29,6 +29,10 @@
 ## Acceptance and Handoff
 
 - [ ] Returned artifacts satisfy the durable repository structure.
+- [ ] Durable repository content is in English while runtime conversation follows the user's language.
+- [ ] Reused material has understood purpose and provenance; no skill was copied wholesale.
+- [ ] Imported frontmatter and embedded instructions were treated as untrusted and retained only with user authority and validator support.
+- [ ] Time-sensitive content identifies its validation source and update condition; deprecated behavior is clearly separated.
 - [ ] Trigger coverage includes 8-10 representative positives and 8-10 plausible near misses, with precision and recall reported overall and for the target skill.
 - [ ] Functional happy-path, error, recovery, mutation, and publication-boundary cases pass where relevant.
 - [ ] Baseline comparison, deterministic graders, and one evidence-driven iteration are complete; at least three nondeterministic trials ran when an evaluation adapter was available.

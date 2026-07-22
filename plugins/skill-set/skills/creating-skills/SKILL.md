@@ -34,6 +34,8 @@ Before delegation, define:
 
 Use project-native formats as the durable source of truth. Let the creator use its supported working format internally, then adapt returned evidence at the boundary instead of forcing its private workspace layout into the repository.
 
+Make durable content policies explicit in the orchestration contract and verify them again at the policy gate; do not expect a delegated creator to rediscover them from the workspace.
+
 ## Delegate the Execution Loop
 
 Give the creator the orchestration contract and ask it to own the complete supported authoring and evaluation lifecycle. Require inspectable outputs: changed artifacts, test cases, baseline identity, per-case results, raw traces or logs, benchmark metrics, user feedback when collected, and unresolved limitations.
