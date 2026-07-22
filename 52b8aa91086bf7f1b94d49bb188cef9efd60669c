@@ -1,0 +1,27 @@
+## Decisions Made
+- 유효성과 이점이 객관적으로 명확한 리뷰 항목만 수정하고, 구현·권한·스타일 선택이 필요한 항목은 `accepted_as_is`로 폐기했다: 사용자가 모호한 변경을 명시적으로 제외했기 때문이다.
+- new/existing eval에 `Write`와 `Edit`을 모두 강제하지 않았다: 정상 workflow에 불필요한 도구 경로를 요구하면 outcome-not-path 원칙을 위반하기 때문이다.
+- model-dependent 평가는 adapter가 있을 때만 요구하고, adapter 부재 시 deterministic validation과 runnable cases를 유지한다.
+- acceptance와 retirement 비교는 outcome, conformance, safety, efficiency를 모두 포함하되 예외 없는 zero-safety hard gate 정책 변경은 적용하지 않았다.
+
+## Problems Encountered
+- CodeRabbit이 9개의 actionable thread를 열었고 그중 일부는 여러 유효한 구현 또는 authorization policy 변경을 요구했다: 먼저 `AMBIGUOUS`로 중단한 뒤 사용자 기준을 받아 명확한 부분만 재개했다.
+- 첫 publication gate가 active `ether_karrot` Enterprise Managed User 인증의 401로 push 전에 실패했다: 원격 무변경을 확인하고 `ether-moon`으로 임시 전환해 동일 gate를 재실행한 뒤 즉시 복구했다.
+
+## Constraints Identified
+- ambiguous review 제안은 shipping 권한만으로 자동 채택할 수 없으며 명시적인 사용자 선택이 필요하다.
+- resolver의 code push, thread reply, resolve, summary publication은 `skill-set-pr publish`만 수행할 수 있다.
+- creator delegation 검증은 실제 workflow의 mutation 경로를 존중해야 하며 incidental tool 사용을 강제하면 안 된다.
+- GitHub CLI active account는 publication 후 반드시 원래 `ether_karrot`으로 복원되어야 한다.
+
+## Open Questions
+- None
+
+## Context
+PR #29의 첫 review blocker cycle에서 CodeRabbit 9개 thread를 분류하고, 명확한 네 수정 묶음만 격리 worktree에 적용했다. focused tests와 전체 suite를 통과한 뒤 expected-SHA publication gate로 commit `52b8aa9`를 푸시하고 9개 thread feedback 및 summary를 게시했다. 모호한 다섯 항목은 코드 변경 없이 근거를 남겨 `accepted_as_is`로 처리했다.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
