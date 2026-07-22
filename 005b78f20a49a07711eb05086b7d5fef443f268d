@@ -1,0 +1,23 @@
+## Decisions Made
+- 언어 계약 검증은 새 E2E fixture 대신 기존 deterministic assertion을 강화했다: 사용자가 최소 변경을 요구했고 같은 테스트가 이미 해당 계약을 검증하고 있었다.
+- 런타임 언어 체크리스트는 저장소 산출물과 사용자 대면 출력을 명시적으로 분리했다: durable repository content는 영어로 유지하고 열거된 모든 런타임 출력은 감지된 사용자 언어를 사용한다.
+
+## Problems Encountered
+- 기존 lifecycle grader는 영어 요구를 SKILL.md에만 명확히 연결했다: 모든 생성 저장소 산출물과 positive/negative eval 파일까지 명시하도록 수정했다.
+- 기존 checklist는 runtime conversation만 언급했다: reports, summaries, errors, warnings, status updates, prompts, generated PR comments를 포함하도록 확장했다.
+
+## Constraints Identified
+- 사용자 지정 범위 밖의 shipping-pr 작업 트리 변경은 보존하고 커밋에서 제외해야 한다.
+- repository documentation과 eval artifacts는 영어여야 하며, 사용자 대면 런타임 출력만 감지된 사용자 언어를 따른다.
+
+## Open Questions
+- None
+
+## Context
+PR #30의 creating-skills 언어 정책 복원 작업에서 두 리뷰 지적을 현재 코드와 대조했다. 테스트를 먼저 강화해 두 결함을 각각 재현한 뒤 lifecycle grader, checklist, authoring test 세 파일만 수정했다. 대상 테스트와 전체 plugin test suite가 통과했다.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
