@@ -45,7 +45,7 @@
   },
   "creating-skills": {
     "positive": [
-        "Create a new agent skill for incident triage, including trigger cases and functional evals.",
+      "I have skill-creator installed. Create a new agent skill for incident triage, including trigger cases and functional evals, while preserving the project's policy and final acceptance gate.",
       "Improve this existing SKILL.md because it over-triggers on nearby documentation requests.",
       "Benchmark the current skill against a no-skill baseline and iterate on the failures.",
       "Design positive and negative trigger cases for my deployment skill.",

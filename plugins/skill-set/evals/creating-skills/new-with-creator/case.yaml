@@ -43,6 +43,13 @@ graders:
     flags: m
     match: contains
   - type: tool_order
+    name: delegates-before-writing
+    before:
+      tool: Read
+      input_match: optional-creator/SKILL\.md
+    after:
+      tool: Write
+  - type: tool_order
     name: validates-after-writing
     before:
       tool: Write

@@ -47,6 +47,13 @@ graders:
     path: outputs/evals/deploying-safely/trigger-negative-general-release/case.yaml
     exists: true
   - type: tool_order
+    name: delegates-before-editing
+    before:
+      tool: Read
+      input_match: optional-creator/SKILL\.md
+    after:
+      tool: Edit
+  - type: tool_order
     name: validates-after-editing
     before:
       tool: Edit

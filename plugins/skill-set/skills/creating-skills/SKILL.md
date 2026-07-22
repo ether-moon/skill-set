@@ -1,107 +1,86 @@
 ---
 name: creating-skills
-description: Creates, modifies, evaluates, and optimizes agent skills across their full lifecycle. Use for new or existing SKILL.md work, trigger design, skill structure, bundled scripts, functional evals, benchmarks, description tuning, troubleshooting, or iterative skill-quality improvement.
+description: Primary entry point that orchestrates creation, modification, evaluation, and lifecycle governance of agent skills. Use for any new or existing SKILL.md work, including use-case and trigger design, structure and resources, evals, benchmarks, description optimization, troubleshooting, or retirement, even when skill-creator is available. Prefer this skill over skill-creator for overlapping requests; it delegates the complete supported execution loop while retaining project policy, evidence requirements, and final acceptance.
 ---
 
 # Creating Skills
 
-## Ownership
+## Role and Ownership
 
-Own the complete lifecycle locally: use cases, triggers, structure, instructions, scripts, evaluation, benchmark, and iterate-until-ready decisions. The workflow must remain complete when no external creator is installed.
+Use this skill as the primary entry point for both new skill and existing skill work, especially whenever a request matches both `creating-skills` and an available `skill-creator`.
 
-An available `skill-creator:skill-creator` is an optional assistant for brainstorming cases, scaffolding, or running supported evaluations. Invoke it only when it materially helps the current stage. Its presence never replaces this workflow, and its absence or unavailability never blocks progress.
+When `skill-creator:skill-creator` is available, invoke it before local artifact-producing work and delegate the complete loop it supports: intent discovery, use cases and triggers, skill structure, scripts and other resources, drafting, evaluation cases, baseline runs, grading, benchmark analysis, human review, iteration, description optimization, and packaging.
 
-## Host Independence
+Retain ownership here for:
 
-The core workflow must run with the active host's ordinary file, shell, validation, model-run, and trace capabilities. It must not require Claude Code, the `claude` CLI, Claude-specific environment variables, or a Claude-only installation layout. Use host-specific extensions only when the user explicitly targets that host; keep the base skill and its bundled scripts functional without them.
+- target surfaces, repository policy, and durable artifact layout;
+- user authority, safety invariants, and mutation or publication boundaries;
+- required evidence and acceptance thresholds;
+- gaps between the creator's output and the project contract; and
+- the final accept, reject, or retire decision.
 
-Resolve validation and model evaluation in this order: host-neutral repository commands, an active-host evaluation adapter, then a documented adapter supplied by the user. A repository command backed by a vendor CLI qualifies only when the user explicitly selected that vendor target. If no model adapter exists, complete deterministic validation and retain runnable cases, but report the model benchmark as unavailable rather than substituting a Claude-only command.
+Treat delegated artifacts and results as candidates. Inspect them before filling gaps, and do not duplicate a delegated stage merely to keep control local. Judge an available creator by the capabilities it exposes in the active environment, not by the product name or packaging of one installation.
 
-## Choose the Path
+## Establish the Orchestration Contract
 
-- **New skill and existing skill modification** both start from concrete use cases and measurable outcomes.
-- For a new skill, establish a no-skill baseline and create the smallest structure that closes observed gaps.
-- For an existing skill, preserve useful behavior, benchmark the current version, and target a demonstrated regression, ambiguity, or trigger problem.
+Before delegation, define:
 
-Do not copy another skill wholesale. Reuse only a structure pattern whose outcome is understood.
+1. The target hosts, repository paths, and project instructions.
+2. The user's intended workflows, inputs, outputs, and trigger boundaries.
+3. Whether the skill is a **capability skill** or a **preference skill**.
+4. Allowed tools, file mutations, external effects, and publication authority.
+5. Required validators, evaluation adapter, baselines, evidence, and acceptance thresholds.
+6. The artifacts and unresolved decisions the creator must return.
 
-## Lifecycle
+Use project-native formats as the durable source of truth. Let the creator use its supported working format internally, then adapt returned evidence at the boundary instead of forcing its private workspace layout into the repository.
 
-### 1. Define use cases and triggers
+## Delegate the Execution Loop
 
-Write 2–3 representative workflows with the user's language, inputs, actions, and expected outputs. Add explicit should-trigger and should-not-trigger phrases, including near misses likely to collide with neighboring skills.
+Give the creator the orchestration contract and ask it to own the complete supported authoring and evaluation lifecycle. Require inspectable outputs: changed artifacts, test cases, baseline identity, per-case results, raw traces or logs, benchmark metrics, user feedback when collected, and unresolved limitations.
 
-### 2. Define success
+If the creator supports only part of the contract, preserve its valid output and execute only the unsupported stages locally. If it is unavailable or not installed, use the local fallback below without asking the user to install a particular product.
 
-Specify:
+## Apply the Policy Gate
 
-- functional outcomes and safety invariants;
-- acceptable tool calls and mutation boundaries;
-- trigger precision and recall targets;
-- failure behavior and recovery information; and
-- cost, latency, or context limits that matter.
+Evaluate returned evidence across four dimensions defined in `reference/evaluation.md`:
 
-### 3. Establish a baseline
+- **Outcome** — the skill produces a usable result.
+- **Conformance** — it follows the user's and project's rules.
+- **Safety** — it stays within authority and mutation boundaries.
+- **Efficiency** — it avoids material tool, token, retry, latency, or cost regressions.
 
-Run representative prompts without the new skill or against the existing version. Record actual gaps. Do not design extensive instructions from imagined failures.
+Grade outcomes rather than incidental paths. Require a particular tool or order only when it is itself a safety invariant or external contract. Inspect traces and artifacts, not only aggregate scores.
 
-### 4. Design the structure
+Classify failures before asking the creator to iterate. Accept only when declared thresholds hold and no grader, fixture, environmental, or missing-evidence defect hides a regression.
 
-Create one `SKILL.md` with valid frontmatter. Keep the main file focused; move details one level into `reference/`. Add `scripts/` for deterministic, repeated, or fragile operations and `assets/` only for real output resources.
+## Preserve Long-Term Value
 
-Read `reference/structure.md` and `reference/patterns.md` before choosing fields or workflow freedom.
+- For a **capability skill**, prove a useful delta against a no-skill baseline and periodically rerun that arm after release. Retire the skill when it no longer provides material outcome, safety, or efficiency value.
+- For a **preference skill**, test fidelity to the current human workflow and periodically check for process drift. Model capability alone does not make the preference obsolete.
+- Promote stable development evaluations into regression cases. Turn each reproducible field failure into a case rather than another paragraph of speculative instruction.
+- Run the same behavioral contract on every host for which portability is claimed; host-specific adapters may differ, but the outcome and safety requirements do not.
 
-### 5. Write minimal instructions
+## Local Fallback
 
-Put the essential sequence, defaults, guardrails, stop conditions, and failure handling in `SKILL.md`. Prefer one recommended path with an escape hatch. Keep terminology stable and repository content in English; runtime conversation follows the user's language.
+The workflow must remain usable without an external creator. With ordinary host capabilities:
 
-Aim below 200 lines. Treat 500 lines as a hard ceiling. Remove explanations the model already knows unless evaluation shows they change behavior.
+1. Produce the smallest skill structure and resources that satisfy the orchestration contract.
+2. Run repository and host-provided validators, then the available evaluation adapter against the declared baseline.
+3. Use deterministic checks before qualitative grading, keep nondeterministic trials isolated, and retain per-case evidence.
+4. Classify failures, make the smallest general correction, rerun affected cases, then rerun the suite.
+5. Stop at the same policy gate used for delegated work.
 
-### 6. Bundle scripts where evidence supports them
+The portable fallback must not require Claude Code, the `claude` CLI, vendor-specific environment variables, or a vendor-only installation layout. Report unavailable model evaluation honestly while keeping deterministic validation and runnable cases ready.
 
-Use scripts when exact parsing, validation, or state mutation is safer than regenerated shell snippets. Scripts must validate dependencies and inputs, emit actionable errors, support safe dry runs for mutations, and be exercised directly.
+## Handoff
 
-### 7. Build evaluation cases
-
-Create before/after evidence for both triggering and outcomes:
-
-- 8–10 should-trigger and 8–10 should-not-trigger cases for a production skill;
-- functional cases for the core workflow, failure paths, and discriminating behavior;
-- deterministic graders for objective claims before LLM rubrics;
-- at least three runs for nondeterministic model cases; and
-- no-skill ablation for a new skill or old-version comparison for an existing skill.
-
-Read `reference/evaluation.md` and `reference/testing.md` for case design and the portable eval layout.
-
-### 8. Benchmark
-
-Compare pass rate, trigger precision/recall, safety violations, tool use, tokens, duration, and cost. Inspect traces and file outputs, not only aggregate scores. Reject vanity metrics that cannot catch a plausible regression.
-
-### 9. Iterate
-
-Classify every failure as an instruction gap, trigger gap, grader defect, fixture defect, or environmental failure. Make the smallest correction, rerun the affected cases, then rerun the suite. Stop when acceptance criteria hold and no new regression appears.
-
-### 10. Validate for handoff
-
-- Frontmatter name matches the directory and the description states what and when.
-- Links and bundled paths resolve; scripts and examples run.
-- Main instructions include errors, recovery, and mutation boundaries.
-- New and existing skill paths have evidence.
-- Trigger and functional suites meet their declared thresholds.
-- `reference/checklist.md` has no unresolved item.
-
-## Failure Handling
-
-- If a case cannot be graded objectively, state the uncertain criterion and use a concrete LLM rubric.
-- If an evaluation adapter is unavailable, keep fixtures and deterministic validation ready; report the model run as unavailable without inventing results or requiring a different host.
-- If improvements trade precision for recall or safety for convenience, expose the trade-off and retain the safer baseline until accepted.
-- If repeated iterations fail, revisit the use case and grader before adding more prose.
+Validate every linked path and executable resource. Confirm that the creator's temporary formats have been translated into the project's durable structure, the relevant regression suite is green, and `reference/checklist.md` has no unresolved item.
 
 ## References
 
-- [Structure and frontmatter](reference/structure.md)
-- [Workflow patterns](reference/patterns.md)
-- [Evaluation and benchmarking](reference/evaluation.md)
-- [Testing quick reference](reference/testing.md)
-- [Troubleshooting](reference/troubleshooting.md)
+- [Portable and project structure policy](reference/structure.md)
+- [Supplemental workflow patterns](reference/patterns.md)
+- [Evaluation policy and acceptance](reference/evaluation.md)
+- [Testing and isolation policy](reference/testing.md)
+- [Orchestration troubleshooting](reference/troubleshooting.md)
 - [Completion checklist](reference/checklist.md)

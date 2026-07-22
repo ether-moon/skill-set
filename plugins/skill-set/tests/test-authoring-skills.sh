@@ -23,10 +23,22 @@ for lifecycle_term in 'use cases' triggers structure scripts evaluation benchmar
   grep -Eqi "$lifecycle_term" "$creating" || fail "creating-skills misses lifecycle term: $lifecycle_term"
 done
 grep -Eqi 'new skill.*existing skill|existing skill.*new skill' "$creating"
-grep -Eqi 'optional.*skill-creator|skill-creator.*optional' "$creating"
+grep -Eqi 'primary entry point.*skill-creator|skill-creator.*primary entry point' "$creating" || \
+  fail 'creating-skills must win the overlapping skill-creator entry point'
+grep -Eqi 'delegate.*(complete|full).*(loop|lifecycle).*skill-creator|skill-creator.*delegate.*(complete|full).*(loop|lifecycle)' "$creating" || \
+  fail 'creating-skills must delegate the complete supported loop to skill-creator'
+grep -Eqi 'final.*(accept|reject|retire)|(accept|reject|retire).*final' "$creating" || \
+  fail 'creating-skills must retain the final lifecycle decision'
 grep -Eqi 'unavailable|not installed|absent' "$creating"
+grep -Eqi 'capability skill' "$creating"
+grep -Eqi 'preference skill' "$creating"
 grep -Eq 'case.yaml' "$creating_dir/reference/evaluation.md"
-grep -Eq -- '--ablation with-without' "$creating_dir/reference/evaluation.md"
+for dimension in outcome conformance safety efficiency; do
+  grep -Eqi "$dimension" "$creating_dir/reference/evaluation.md" || \
+    fail "creating-skills evaluation policy misses dimension: $dimension"
+done
+grep -Eqi 'grade outcomes.*not paths|outcomes.*rather than paths' "$creating_dir/reference/evaluation.md" || \
+  fail 'creating-skills must grade outcomes rather than incidental paths'
 grep -Eqi 'independent.*(judge|grader)|(judge|grader).*independent' "$creating_dir/reference/evaluation.md"
 claude_cli_pattern='(^|[^[:alnum:]_-])claude[[:space:]]+(plugin|--version)([^[:alnum:]_-]|$)'
 # shellcheck disable=SC2016 # Backticks are literal documentation text.
@@ -42,6 +54,15 @@ grep -Eqi 'host-provided.*validator|validator.*host-provided' "$creating_dir/ref
   fail 'creating-skills must define a host-neutral validator boundary'
 grep -Eqi 'evaluation adapter|eval adapter' "$creating_dir/reference/evaluation.md" || \
   fail 'creating-skills must define a host-neutral evaluation adapter boundary'
+grep -Eqi '(fresh|isolated).*(case|arm|trial)|(case|arm|trial).*(fresh|isolated)' "$creating_dir/reference/testing.md" || \
+  fail 'creating-skills must isolate every nondeterministic run'
+grep -Eqi 'cross-host|supported host' "$creating_dir/reference/testing.md" || \
+  fail 'creating-skills must verify every claimed host'
+grep -Eqi 'no-skill.*(retire|retirement)|(retire|retirement).*no-skill' "$creating_dir/reference/checklist.md" || \
+  fail 'creating-skills must recheck whether a capability skill can retire'
+grep -Eqi 'preserve.*(explicitly requested|existing).*name|(explicitly requested|existing).*name.*preserve' \
+  "$creating_dir/reference/structure.md" || \
+  fail 'creating-skills must preserve valid user-selected and existing skill names'
 grep -Eqi 'must not require Claude Code|do not require Claude Code' "$creating" || \
   fail 'creating-skills must explicitly preserve non-Claude execution'
 if grep -Erq 'evals\.json|without_skill|with_skill/outputs' "$creating_dir"; then
@@ -72,6 +93,16 @@ for case_dir in \
   if grep -Erqi 'Do not (create|edit) files' "$case_dir"; then
     fail "creating-skills functional eval is explanation-only: $case_dir"
   fi
+done
+
+for case_dir in \
+  "$plugin_dir/evals/creating-skills/new-with-creator" \
+  "$plugin_dir/evals/creating-skills/existing-with-creator"; do
+  grep -Eqi 'delegate' "$case_dir/prompt.md" || \
+    fail "creator-present eval must request delegation: $case_dir"
+  grep -Eqi 'skill-creator.*(owns|own).*(authoring|execution|loop)|(authoring|execution|loop).*(owned|owns).*skill-creator' \
+    "$case_dir/graders/lifecycle.md" || \
+    fail "creator-present eval must give execution ownership to skill-creator: $case_dir"
 done
 
 validator_root=$(mktemp -d "${TMPDIR:-/tmp}/skill-set-authoring-validator.XXXXXX")

@@ -7,12 +7,12 @@ mkdir -p outputs optional-creator
 cat >optional-creator/SKILL.md <<'CREATOR'
 ---
 name: mock-skill-creator
-description: Offers optional second-opinion advice for a skill artifact. Use only when explicitly told this helper is available while authoring a skill.
+description: Executes a delegated end-to-end skill authoring and evaluation-preparation loop. Use when an orchestration skill supplies a bounded skill contract.
 ---
 
 # Mock Skill Creator
 
-Suggest one discriminating positive trigger and one plausible near miss. Return advice only; the calling workflow owns files, validation, and acceptance.
+Own the artifact-producing work in the delegated contract: draft or revise the skill, create its positive and near-miss negative evaluation cases, and return the artifacts for policy review. Do not make the final acceptance decision.
 CREATOR
 
 cat >validate-skill.sh <<'VALIDATOR'
