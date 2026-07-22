@@ -1,0 +1,28 @@
+## Decisions Made
+- `creating-skills`를 스킬 작성·개선 요청의 우선 진입점으로 만들고, 사용 가능한 `skill-creator`에는 지원되는 전체 작성·평가 루프를 위임한다: 중복 실행을 피하면서 프로젝트 정책을 일관되게 적용하기 위해서다.
+- 프로젝트 정책, 안전·권한 경계, 증거 기준, 최종 accept/reject/retire 판정은 `creating-skills`가 유지한다: 실행 위임이 거버넌스 위임으로 확대되지 않도록 하기 위해서다.
+- capability/preference 분류, 결과 중심 평가, 격리된 반복 실행, cross-host 검증, no-skill retirement 검토는 `skill-creator`와 겹치지 않는 장기 정책으로 남긴다.
+- 최신 main과의 충돌에서는 새 검증 기준을 간결한 오케스트레이션 체크리스트에 통합하고 의미가 같은 모델 계층 설명은 한 곳만 유지한다.
+
+## Problems Encountered
+- 기존 브랜치가 원격보다 4커밋 뒤처졌고 연결된 PR #28이 이미 merged 상태였다: 변경을 stash에 보존하고 최신 `origin/main`에서 새 브랜치를 만들었다.
+- stash 적용 시 `checklist.md`와 `testing.md`가 충돌했다: 최신 main의 검증 기준과 새 역할 분리를 함께 보존하도록 수동 병합했다.
+- 새 브랜치가 `origin/main`을 upstream으로 상속했다: main으로 잘못 푸시하지 않도록 upstream을 제거하고 새 원격 브랜치명을 runner로 검증했다.
+
+## Constraints Identified
+- 스킬 실행 경로는 Claude Code나 특정 vendor CLI·환경 변수에 의존하면 안 된다: `skill-creator`는 여러 agent host에서 사용되기 때문이다.
+- creator가 지원하는 단계는 로컬에서 중복 실행하지 않고, 지원하지 않는 단계만 fallback으로 채워야 한다.
+- 실행 경로는 안전 또는 외부 계약일 때만 grader가 강제하며, 그 외에는 outcome, conformance, safety, efficiency를 평가해야 한다.
+- 저장소 문서는 영어로 유지하고 사용자 대화와 런타임 보고만 사용자 언어를 따른다.
+
+## Open Questions
+- None
+
+## Context
+`creating-skills`를 오케스트레이션 진입점으로 재설계하고 `skill-creator`를 전체 실행 루프의 내부 엔진으로 활용하도록 문서, eval, trigger generator, inventory, 회귀 테스트를 갱신했다. 중복 reference를 크게 줄이면서 프로젝트 고유 평가·수명주기 정책과 portable fallback을 보존했다. 최신 main에 변경을 이식한 뒤 전체 테스트 suite가 통과했고 새 PR 브랜치에 커밋했다.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
