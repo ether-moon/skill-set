@@ -1,257 +1,45 @@
-# Troubleshooting Guide
+# Orchestration Troubleshooting
 
-## Table of Contents
+## `skill-creator` Wins the Entry Point
 
-- [Skill Won't Upload](#skill-wont-upload) (SKILL.md not found, invalid frontmatter, invalid name)
-- [Skill Doesn't Trigger](#skill-doesnt-trigger)
-- [Skill Triggers Too Often](#skill-triggers-too-often)
-- [Evaluations Fail or Cannot Run](#evaluations-fail-or-cannot-run)
-- [MCP Connection Issues](#mcp-connection-issues)
-- [Instructions Not Followed](#instructions-not-followed) (verbosity, buried instructions, ambiguity, validation scripts, model laziness)
-- [Large Context Issues](#large-context-issues)
-- [Common Error Messages](#common-error-messages)
+**Symptom:** An overlapping skill-authoring request selects `skill-creator` directly and bypasses project policy.
 
----
+**Response:** Strengthen the `creating-skills` description as the primary entry point, keep the creator described as its execution engine, and add a competitive trigger case. Do not narrow `skill-creator` globally; other environments may use it directly without this orchestrator.
 
-## Skill Won't Upload
+## Creator Is Available but Not Delegated
 
-### Error: "Could not find SKILL.md in uploaded folder"
+**Symptom:** The run reads creator guidance as optional advice, then recreates the entire loop locally.
 
-**Cause**: File not named exactly SKILL.md
+**Response:** Require creator invocation before artifact-producing work, pass the complete orchestration contract, and inspect returned artifacts before filling gaps. Review traces for duplicated drafting, test generation, or benchmarking.
 
-**Solution**:
-- Rename to SKILL.md (case-sensitive)
-- Verify with: `ls -la` should show SKILL.md
+## Creator Capability Is Partial
 
-### Error: "Invalid frontmatter"
+**Symptom:** The creator can draft artifacts but cannot run a model, viewer, validator, or host-specific stage.
 
-**Cause**: YAML formatting issue
+**Response:** Preserve valid output and execute only the unsupported stage through the repository or active-host adapter. Record the missing capability; do not rerun supported stages from scratch.
 
-**Common mistakes**:
+## Creator Is Unavailable
 
-```yaml
-# Wrong - missing delimiters
-name: my-skill
-description: Does things
+Use the local fallback without asking the user to install a particular creator. Run deterministic validation, retain runnable cases, and report unavailable model evaluation exactly.
 
-# Wrong - unclosed quotes
-name: my-skill
-description: "Does things
+## Working and Durable Formats Differ
 
-# Correct
----
-name: my-skill
-description: Does things
----
-```
+**Symptom:** The creator returns a single-file evaluation manifest, a sibling workspace, `references/`, or another supported temporary layout while the project expects case directories or `reference/`.
 
-### Error: "Invalid skill name"
+**Response:** Translate the returned artifacts and evidence at the adapter boundary. Preserve raw results for audit, validate the durable repository layout, and avoid embedding creator-private paths in the skill.
 
-**Cause**: Name has spaces or capitals
+## Aggregate Scores Hide a Problem
 
-```yaml
-# Wrong
-name: My Cool Skill
+Inspect per-case trials, raw traces, safety violations, and grader evidence. Treat missing metrics as unavailable, not zero. Repair non-discriminating graders or contaminated fixtures before editing instructions.
 
-# Correct
-name: my-cool-skill
-```
+## Trigger Metrics Improve but Behavior Regresses
 
----
+Hold functional instructions constant during description optimization. Recheck outcome, conformance, safety, and efficiency after trigger changes; selection accuracy alone cannot approve the skill.
 
-## Skill Doesn't Trigger
+## Instructions Keep Growing
 
-**Symptom**: Skill never loads automatically
+Classify the failure first. Ask the creator for the smallest general correction, bundle repeated deterministic work, and remove guidance that traces show is unused. A repeated failure may be a grader, fixture, environment, or use-case defect rather than an instruction gap.
 
-**Fix**: Revise your description field.
+## Post-Release Value Declines
 
-**Quick checklist**:
-- Is it too generic? ("Helps with projects" won't work)
-- Does it include trigger phrases users would actually say?
-- Does it mention relevant file types if applicable?
-
-**Debugging approach**:
-Ask the active agent: "When would you use the [skill name] skill?" Compare its answer with the description and adjust what is missing.
-
-**Example fix**:
-
-```yaml
-# Too vague
-description: Processes documents
-
-# More specific
-description: Processes PDF legal documents for contract review. Use when user asks to "review contract", "analyze agreement", or uploads PDF legal documents.
-```
-
----
-
-## Skill Triggers Too Often
-
-**Symptom**: Skill loads for unrelated queries
-
-**Solutions**:
-
-### 1. Add Negative Triggers
-
-```yaml
-description: Advanced data analysis for CSV files. Use for statistical modeling, regression, clustering. Do NOT use for simple data exploration (use data-viz skill instead).
-```
-
-### 2. Be More Specific
-
-```yaml
-# Too broad
-description: Processes documents
-
-# More specific
-description: Processes PDF legal documents for contract review
-```
-
-### 3. Clarify Scope
-
-```yaml
-description: PayFlow payment processing for e-commerce. Use specifically for online payment workflows, not for general financial queries.
-```
-
----
-
-## MCP Connection Issues
-
-**Symptom**: Skill loads but MCP calls fail
-
-**Checklist**:
-
-1. **Verify MCP server is connected**
-   - Open the active host's connector or extension settings for the service
-   - Should show "Connected" status
-
-2. **Check authentication**
-   - API keys valid and not expired
-   - Proper permissions/scopes granted
-   - OAuth tokens refreshed
-
-3. **Test MCP independently**
-   - Ask the active agent to call MCP directly (without the skill)
-   - "Use [Service] MCP to fetch my projects"
-   - If this fails, issue is MCP not skill
-
-4. **Verify tool names**
-   - Skill references correct MCP tool names
-   - Check MCP server documentation
-   - Tool names are case-sensitive
-
----
-
-## Evaluations Fail or Cannot Run
-
-### Layout or schema failure
-
-- Parse every `case.yaml` and grader frontmatter as YAML rather than relying on text patterns.
-- Verify the case has a non-empty prompt, at least one grader, a bounded timeout, and valid fixture paths.
-- Keep fixtures and scaffold scripts within their case directory.
-- Run deterministic generators with `--check` so generated trigger cases cannot drift from their catalog.
-
-### Trigger metrics look better than behavior
-
-- Confirm all 8-10 positive and 8-10 negative cases ran for every skill.
-- Compute precision and recall per skill, not only across the plugin.
-- Use near misses rather than unrelated negatives.
-- Inspect actual Skill calls; do not infer triggering only from a plausible final answer.
-
-### Baseline comparison is misleading
-
-- Materialize the exact baseline commit or prior skill version.
-- Use the same prompts, fixtures, model, judge, tool grants, and run count in each arm.
-- Treat missing baseline cases or partial-budget results as incomplete, not as zero or a pass.
-- Keep the evaluated model and LLM judge different; use a Sonnet-tier or larger judge.
-
-### The model evaluation adapter is unavailable
-
-Preserve the exact adapter diagnostic. Keep cases, deterministic graders, fixture execution, and project validation green so the model run is ready when an adapter becomes available. Report the run as unavailable; never require a different host or estimate scores from manual inspection.
-
----
-
-## Instructions Not Followed
-
-**Symptom**: Skill loads but the active agent doesn't follow instructions
-
-**Common causes**:
-
-### 1. Instructions Too Verbose
-
-- Keep instructions concise
-- Use bullet points and numbered lists
-- Move detailed reference to separate files
-
-### 2. Instructions Buried
-
-- Put critical instructions at the top
-- Use `## Important` or `## Critical` headers
-- Repeat key points if needed
-
-### 3. Ambiguous Language
-
-```markdown
-# Bad
-Make sure to validate things properly
-
-# Good
-CRITICAL: Before calling create_project, verify:
-- Project name is non-empty
-- At least one team member assigned
-- Start date is not in the past
-```
-
-### 4. Consider Validation Scripts
-
-For critical validations, consider bundling a script that performs checks programmatically rather than relying on language instructions. Code is deterministic; language interpretation is not.
-
-### 5. Model "Laziness"
-
-Add explicit encouragement:
-
-```markdown
-## Performance Notes
-- Take your time to do this thoroughly
-- Quality is more important than speed
-- Do not skip validation steps
-```
-
-Note: Adding this to user prompts is more effective than in SKILL.md
-
----
-
-## Large Context Issues
-
-**Symptom**: Skill seems slow or responses degraded
-
-**Causes**:
-- Skill content too large
-- Too many skills enabled simultaneously
-- All content loaded instead of progressive disclosure
-
-**Solutions**:
-
-### 1. Optimize SKILL.md Size
-
-- Move detailed docs to `reference/`
-- Link to references instead of inline
-- Keep SKILL.md under 200 lines
-
-### 2. Reduce Enabled Skills
-
-- Evaluate if you have more than 20-50 skills enabled simultaneously
-- Recommend selective enablement
-- Consider skill "packs" for related capabilities
-
----
-
-## Common Error Messages
-
-| Error | Cause | Solution |
-|-------|-------|----------|
-| "Could not find SKILL.md" | Wrong filename | Rename to exactly SKILL.md |
-| "Invalid frontmatter" | YAML syntax error | Check `---` delimiters and quotes |
-| "Invalid skill name" | Spaces/capitals in name | Use kebab-case only |
-| "Description too long" | Over 1024 chars | Shorten description |
-| "Forbidden characters" | XML tags in frontmatter | Remove `<` and `>` |
+Run the durable suite with the capability skill unloaded. If the no-skill arm now meets the same outcome, conformance, safety, and efficiency thresholds, begin retirement review. For preference skills, check workflow drift instead of assuming stronger models preserve the intended process.

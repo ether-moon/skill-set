@@ -40,7 +40,7 @@ outcome_criteria() {
       printf '%s' 'Pass only if the response follows the release preparation contract: detect and reconcile manifests, update the changelog, use the release executor, and preserve the explicit approval gate before publishing.'
       ;;
     creating-skills)
-      printf '%s' 'Pass only if the response applies the complete skill lifecycle: define use cases and triggers, design the structure and scripts, create representative evaluations, benchmark, and iterate without depending on another authoring skill.'
+      printf '%s' 'Pass only if the response treats creating-skills as the primary entry point, establishes project policy and acceptance criteria, delegates the complete supported authoring and evaluation loop to skill-creator when available, retains final acceptance, and completes the same lifecycle locally when the creator is unavailable.'
       ;;
     driving-with-tests)
       printf '%s' 'Pass only if the response selects the appropriate testing mode and follows Orient, a proportional Red/Green/Refactor loop, Probe, and Guard while respecting existing implementation and project constraints.'

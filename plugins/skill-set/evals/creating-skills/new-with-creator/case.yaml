@@ -42,6 +42,21 @@ graders:
     pattern: "^description:.*Use when"
     flags: m
     match: contains
+  - type: regex
+    name: post-incident-summary-excluded
+    target:
+      source: file
+      path: outputs/incident-triage/SKILL.md
+    pattern: "^description:.*Do not use.*post-incident.*status summar"
+    flags: im
+    match: contains
+  - type: tool_order
+    name: delegates-before-writing
+    before:
+      tool: Read
+      input_match: optional-creator/SKILL\.md
+    after:
+      tool: Write
   - type: tool_order
     name: validates-after-writing
     before:

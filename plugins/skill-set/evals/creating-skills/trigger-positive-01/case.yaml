@@ -5,7 +5,7 @@ tags:
   - creating-skills
   - trigger-positive
 execution:
-  prompt: "Create a new agent skill for incident triage, including trigger cases and functional evals."
+  prompt: "I have skill-creator installed. Create a new agent skill for incident triage, including trigger cases and functional evals, while preserving the project's policy and final acceptance gate."
   max_turns: 4
   timeout_seconds: 180
   allowed_tools:
@@ -19,5 +19,5 @@ graders:
     min: 1
   - type: llm
     name: workflow-outcome
-    criteria: "Pass only if the response applies the complete skill lifecycle: define use cases and triggers, design the structure and scripts, create representative evaluations, benchmark, and iterate without depending on another authoring skill."
+    criteria: "Pass only if the response treats creating-skills as the primary entry point, establishes project policy and acceptance criteria, delegates the complete supported authoring and evaluation loop to skill-creator when available, retains final acceptance, and completes the same lifecycle locally when the creator is unavailable."
     focus: last_message

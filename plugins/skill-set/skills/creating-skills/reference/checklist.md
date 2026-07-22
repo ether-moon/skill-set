@@ -1,139 +1,53 @@
-# Quick Checklist
+# Orchestration Checklist
 
-Use this checklist to validate your skill before and after upload.
+## Entry Point and Contract
 
-## Table of Contents
+- [ ] `creating-skills` was selected as the primary entry point for overlapping authoring work.
+- [ ] Target hosts, paths, project rules, and user authority are explicit.
+- [ ] Capability skill or preference skill classification is recorded.
+- [ ] Outcome, conformance, safety, and efficiency thresholds were defined before evaluation.
+- [ ] Required durable artifacts, evidence, and final decision owner are explicit.
 
-- [Before You Start](#before-you-start)
-- [During Development](#during-development)
-- [Before Handoff](#before-handoff)
-- [After Release](#after-release)
-- [Quick Validation Commands](#quick-validation-commands)
-- [Common Issues Checklist](#common-issues-checklist)
+## Delegation
 
-## Before You Start
+- [ ] An available `skill-creator` received the complete supported authoring and evaluation loop.
+- [ ] Delegated work was inspected before any local gap-filling.
+- [ ] Local work covers only unavailable, invalid, or contract-missing stages.
+- [ ] Creator-specific temporary results were translated into the project layout.
+- [ ] Unresolved limitations and unavailable metrics remain visible.
 
-- [ ] Identified 2-3 concrete use cases
-- [ ] Tools identified (built-in or MCP)
-- [ ] Baseline behavior recorded without the new skill or with the current version
-- [ ] Planned folder structure
+## Evidence
 
-## During Development
+- [ ] Repository and host-provided validators pass where available.
+- [ ] Objective claims use deterministic checks before qualitative grading.
+- [ ] Qualitative grading uses an independent capable judge or explicit human review.
+- [ ] Every case, arm, and trial used fresh context, fixtures, and output state.
+- [ ] Nondeterministic results retain per-case distributions and flakiness.
+- [ ] Safety boundaries include negative evidence for forbidden effects.
+- [ ] Every host for which portability is claimed ran the same behavioral contract.
 
-### File Structure
-- [ ] Folder named in kebab-case
-- [ ] SKILL.md file exists (exact spelling)
-- [ ] No README.md in skill folder
+## Acceptance and Handoff
 
-### YAML Frontmatter
-- [ ] Has `---` delimiters
-- [ ] `name` field: kebab-case, no spaces, no capitals
-- [ ] `description` includes WHAT and WHEN
-- [ ] `description` written in third person (not "I can" or "You can")
-- [ ] No XML tags (`<` `>`) anywhere
-- [ ] Description under 1024 characters
+- [ ] Returned artifacts satisfy the durable repository structure.
+- [ ] Trigger coverage includes 8-10 representative positives and 8-10 plausible near misses, with precision and recall reported overall and for the target skill.
+- [ ] Functional happy-path, error, recovery, mutation, and publication-boundary cases pass where relevant.
+- [ ] Baseline comparison, deterministic graders, and one evidence-driven iteration are complete; at least three nondeterministic trials ran when an evaluation adapter was available.
+- [ ] Available supported model tiers were exercised and qualitative grading used an independent capable judge or explicit human review; unavailable model evaluation is reported honestly.
+- [ ] Every link, fixture, executable path, validator, and generated inventory is current.
+- [ ] Outcome, conformance, safety, and efficiency thresholds hold.
+- [ ] Failures were classified before another iteration was requested.
+- [ ] Stable cases were promoted into the regression suite.
+- [ ] Final accept, reject, or retire decision remains with `creating-skills`.
 
-### Instructions
-- [ ] Instructions are clear and actionable
-- [ ] Error handling included
-- [ ] Examples provided
-- [ ] References one level deep from SKILL.md (no nested chains)
-- [ ] SKILL.md under 200 lines (move details to reference/; hard ceiling: 500)
-- [ ] Consistent terminology throughout (one term per concept)
-- [ ] No time-sensitive information (or in "old patterns" collapsed section)
-- [ ] Default tool/approach provided (not a list of options without recommendation)
+## Fallback
 
-## Before Handoff
-
-### Triggering Tests
-- [ ] Added 8-10 representative should-trigger cases
-- [ ] Added 8-10 near-miss should-not-trigger cases
-- [ ] Measured precision and recall overall and for this skill
-
-### Functional Tests
-- [ ] Functional tests pass
-- [ ] Tool integration works (if applicable)
-- [ ] Error and recovery cases pass
-- [ ] Mutation and publication boundaries have negative tests
-
-### Cross-Model Testing
-- [ ] Tested with the smallest supported model (e.g., Claude Haiku; enough guidance?)
-- [ ] Tested with the primary balanced model (e.g., Claude Sonnet; clear and efficient?)
-- [ ] Tested with the strongest supported model (e.g., Claude Opus; not over-explaining?)
-- [ ] LLM judge is independent and capable of applying the complete rubric
-
-### Evaluation
-- [ ] Baseline comparison done (no-skill for new work, prior version for existing work)
-- [ ] Objective deterministic graders precede qualitative rubrics
-- [ ] Project-supported `evals/<skill>/<case>/` layout validates
-- [ ] Nondeterministic cases run at least three times
-- [ ] At least one iteration of eval → feedback → improve completed
-- [ ] Per-case deltas, safety evidence, time, tool, token, and cost availability recorded
-
-### Packaging
-- [ ] Host plugin or skill validator passes
-- [ ] Every local link, fixture, and executable path resolves
-- [ ] Generated inventories or catalogs show no drift
-- [ ] Distribution archive created only when the target surface requires one
+- [ ] If no creator was available, the local workflow completed without requiring a vendor-specific installation.
+- [ ] Missing model evaluation is reported as unavailable, not inferred or scored as zero.
+- [ ] Deterministic validation and runnable cases remain ready for a future adapter.
 
 ## After Release
 
-- [ ] Test in real conversations
-- [ ] Monitor for under/over-triggering
-- [ ] Collect user feedback
-- [ ] Iterate on description and instructions
-- [ ] Update version in metadata
-
----
-
-## Quick Validation Commands
-
-**Check folder structure:**
-```bash
-ls -la your-skill-name/
-# Should show SKILL.md, optionally scripts/, reference/, assets/
-```
-
-**Check SKILL.md exists:**
-```bash
-test -f your-skill-name/SKILL.md && echo "OK" || echo "MISSING"
-```
-
-**Check frontmatter:**
-```bash
-head -10 your-skill-name/SKILL.md
-# Should start with --- and contain name: and description:
-```
-
-**Count lines:**
-```bash
-wc -l your-skill-name/SKILL.md
-# Should be under 200 for main instructions
-```
-
-**Validate with the project or active-host adapters:**
-
-```bash
-<host-validator> ./plugin
-<eval-adapter> run ./plugin --ablation with-without \
-  --model fast-agent --judge-model independent-judge --runs 3 \
-  --output-dir eval-results --json eval-results.json
-```
-
-The angle-bracket labels are non-executable placeholders; replace them with resolved adapter commands. If model evaluation is unavailable, preserve the diagnostic and run every deterministic validator; never install or require a different host merely to fabricate coverage.
-
----
-
-## Common Issues Checklist
-
-If skill isn't working, check these first:
-
-- [ ] SKILL.md spelled exactly right (case-sensitive)
-- [ ] Frontmatter has `---` on first line
-- [ ] Name is kebab-case only
-- [ ] Description includes trigger phrases
-- [ ] No XML tags in frontmatter
-- [ ] MCP server connected (if using MCP)
-- [ ] Tool names are correct (case-sensitive)
-- [ ] Eval case and grader YAML parses and all fixture paths stay inside the case
-- [ ] Agent model and LLM judge model are independent
+- [ ] Reproducible field failures become regression cases.
+- [ ] Trigger and workflow drift are monitored on supported hosts.
+- [ ] Preference skills are checked against the current human process.
+- [ ] Capability skills periodically rerun a no-skill arm and enter retirement review when the skill adds no material value.

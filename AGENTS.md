@@ -17,7 +17,7 @@ Runtime totals: **11 skills, 7 legacy commands, 4 PR agents, 0 hooks, 0 MCP serv
 |---|---|
 | `autofixing-and-escalating` | Classifies actionable findings from linters, tests, security scans, audits, and PR reviews as obvious or ambiguous, then applies only explicitly authorized fixes. |
 | `bumping-version` | Inspects, previews, prepares, and direct-pushes approved semantic-version Git commits with consistent manifests and policy-driven changelog updates. |
-| `creating-skills` | Creates, modifies, evaluates, and optimizes agent skills across their full lifecycle. |
+| `creating-skills` | This skill is the primary entry point for creating, modifying, evaluating, and governing the lifecycle of agent skills. |
 | `driving-with-tests` | Guides implementation and verification through Orient, Red/Green/Refactor, Probe, and Guard. |
 | `grilling-plans` | Stress-tests an existing plan, RFC, design, or proposal by resolving one decision per turn and maintaining a decision ledger. |
 | `guarding-agent-directives` | Verifies proposed agent-directive additions and audits existing CLAUDE.md, AGENTS.md, and referenced instruction files for bloat, duplication, ambiguity, and placement. |
