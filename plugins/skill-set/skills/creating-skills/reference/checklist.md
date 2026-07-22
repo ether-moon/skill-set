@@ -31,8 +31,8 @@
 - [ ] Returned artifacts satisfy the durable repository structure.
 - [ ] Trigger coverage includes 8-10 representative positives and 8-10 plausible near misses, with precision and recall reported overall and for the target skill.
 - [ ] Functional happy-path, error, recovery, mutation, and publication-boundary cases pass where relevant.
-- [ ] Baseline comparison, deterministic graders, at least three nondeterministic trials, and one evidence-driven iteration are complete.
-- [ ] Supported model tiers were exercised and qualitative grading used an independent capable judge or explicit human review.
+- [ ] Baseline comparison, deterministic graders, and one evidence-driven iteration are complete; at least three nondeterministic trials ran when an evaluation adapter was available.
+- [ ] Available supported model tiers were exercised and qualitative grading used an independent capable judge or explicit human review; unavailable model evaluation is reported honestly.
 - [ ] Every link, fixture, executable path, validator, and generated inventory is current.
 - [ ] Outcome, conformance, safety, and efficiency thresholds hold.
 - [ ] Failures were classified before another iteration was requested.

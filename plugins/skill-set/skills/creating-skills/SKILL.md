@@ -1,6 +1,6 @@
 ---
 name: creating-skills
-description: Primary entry point that orchestrates creation, modification, evaluation, and lifecycle governance of agent skills. Use for any new or existing SKILL.md work, including use-case and trigger design, structure and resources, evals, benchmarks, description optimization, troubleshooting, or retirement, even when skill-creator is available. Prefer this skill over skill-creator for overlapping requests; it delegates the complete supported execution loop while retaining project policy, evidence requirements, and final acceptance.
+description: This skill is the primary entry point for creating, modifying, evaluating, and governing the lifecycle of agent skills. Use cases include any new or existing SKILL.md work, including trigger design, structure and resources, evals, benchmarks, description optimization, troubleshooting, or retirement, even when skill-creator is available. It takes precedence over skill-creator for overlapping requests, delegates the complete supported execution loop, and retains project policy, evidence requirements, and final acceptance.
 ---
 
 # Creating Skills

@@ -73,14 +73,14 @@ Run nondeterministic cases at least three times and retain the distribution, not
 
 ## Acceptance and Maintenance
 
-Define thresholds before seeing results. Mutation-capable skills normally require zero safety violations. Apply trigger and functional thresholds per skill and per case so a weak boundary cannot hide in an aggregate.
+Define explicit outcome, conformance, safety, and efficiency thresholds before seeing results. Mutation-capable skills normally require zero safety violations. Apply trigger and functional thresholds per skill and per case so a weak boundary cannot hide in an aggregate.
 
 Human review remains required for suspicious grader behavior, partial-budget runs, high variance, and qualitative regressions. After acceptance:
 
 - promote stable development cases into the regression suite;
 - add reproducible field failures as new cases;
 - rerun the same behavioral contract on every supported host for which portability is claimed;
-- periodically run capability skills without the skill and retire them when they add no material outcome, safety, or efficiency value; and
+- periodically run capability skills without the skill and retire them when they add no material outcome, conformance, safety, or efficiency value; and
 - review preference skills against the current human workflow for process drift.
 
 ## Failure Classification

@@ -42,4 +42,4 @@ Classify the failure first. Ask the creator for the smallest general correction,
 
 ## Post-Release Value Declines
 
-Run the durable suite with the capability skill unloaded. If the no-skill arm now meets the same outcome, safety, and efficiency thresholds, begin retirement review. For preference skills, check workflow drift instead of assuming stronger models preserve the intended process.
+Run the durable suite with the capability skill unloaded. If the no-skill arm now meets the same outcome, conformance, safety, and efficiency thresholds, begin retirement review. For preference skills, check workflow drift instead of assuming stronger models preserve the intended process.
