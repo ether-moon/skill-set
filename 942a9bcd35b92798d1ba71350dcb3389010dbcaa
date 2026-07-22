@@ -1,0 +1,24 @@
+## Decisions Made
+- 이미 병합된 PR #29의 merge commit `dbf6607c`를 최신 immutable `main` snapshot으로 사용했다: 중복 merge를 피하고 release 입력을 정확히 고정하기 위해서다.
+- 사용자가 지정한 patch 수준에 따라 버전을 `1.14.0`에서 `1.14.1`로 올렸다.
+- changelog에는 마지막 bump 이후 #27, #28, #29의 변경을 `Improved` 범주로 기록하고 manifest와 changelog만 release scope에 포함했다.
+
+## Problems Encountered
+- PR #29는 merge 요청을 처리하기 전에 이미 `MERGED` 상태였다: 추가 merge를 하지 않고 실제 merge commit을 검증한 뒤 release 준비로 진행했다.
+
+## Constraints Identified
+- release publication은 준비와 분리되며 exact base SHA, input digest, commit SHA를 검증한 뒤 별도 사용자 승인이 필요하다.
+- version bump commit은 feature commit과 분리하고 `CHANGELOG.md` 및 발견된 manifest 외 파일을 포함하면 안 된다.
+- direct push는 정상 fast-forward만 허용되며 force-push나 PR fallback을 사용하지 않는다.
+
+## Open Questions
+- 준비된 commit `942a9bc`를 `origin/main`에 직접 publish할지 사용자 승인을 기다리고 있다.
+
+## Context
+PR #29가 `dbf6607c`로 main에 병합된 상태를 확인한 뒤 repository release runner로 patch bump를 준비했다. `CHANGELOG.md`와 `plugins/skill-set/.claude-plugin/plugin.json`을 `1.14.1`로 갱신한 별도 commit `942a9bc`가 격리 worktree에 생성됐으며 아직 원격 main에는 publish되지 않았다.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
