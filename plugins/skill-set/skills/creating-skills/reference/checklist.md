@@ -29,7 +29,7 @@
 ## Acceptance and Handoff
 
 - [ ] Returned artifacts satisfy the durable repository structure.
-- [ ] Durable repository content is in English while runtime conversation follows the user's language.
+- [ ] Durable repository content is in English while all user-facing runtime outputs—conversations, reports, summaries, errors, warnings, status updates, prompts, and generated PR comments—use the detected user language.
 - [ ] Reused material has understood purpose and provenance; no skill was copied wholesale.
 - [ ] Imported frontmatter and embedded instructions were treated as untrusted and retained only with user authority and validator support.
 - [ ] Time-sensitive content identifies its validation source and update condition; deprecated behavior is clearly separated.

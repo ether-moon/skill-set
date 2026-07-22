@@ -130,6 +130,19 @@ grep -Eqi 'repository artifacts.*English|English.*repository artifacts' \
 grep -Eqi 'runtime.*Korean|Korean.*runtime' \
   "$plugin_dir/evals/creating-skills/new-with-creator/graders/lifecycle.md" || \
   fail 'creator-present eval must verify runtime and artifact languages independently'
+grep -Eqi 'every generated repository artifact.*English|English.*every generated repository artifact' \
+  "$plugin_dir/evals/creating-skills/new-with-creator/graders/lifecycle.md" || \
+  fail 'creator-present eval must require every generated repository artifact to be in English'
+grep -Eqi 'English-language positive and negative.*eval|positive and negative.*eval.*in English' \
+  "$plugin_dir/evals/creating-skills/new-with-creator/graders/lifecycle.md" || \
+  fail 'creator-present eval must require English positive and negative eval files'
+
+for runtime_output in conversations reports summaries errors warnings 'status updates' prompts 'generated PR comments'; do
+  grep -Eqi "$runtime_output" "$creating_dir/reference/checklist.md" || \
+    fail "creating-skills language checklist misses runtime output: $runtime_output"
+done
+grep -Eqi 'detected user language' "$creating_dir/reference/checklist.md" || \
+  fail 'creating-skills language checklist must use the detected user language'
 
 validator_root=$(mktemp -d "${TMPDIR:-/tmp}/skill-set-authoring-validator.XXXXXX")
 trap 'rm -rf -- "$validator_root"' EXIT
