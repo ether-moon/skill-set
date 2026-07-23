@@ -1,16 +1,16 @@
 ---
 name: shipping-pr
 description: Drives an existing or newly requested pull request through deterministic CI, review, and blocker-resolution cycles until it is verified clean or reaches a terminal stop. Use when the user asks to ship a PR, wait for CI and fix it, run PR autopilot, or keep resolving blockers until the PR is ready.
-allowed-tools: "Bash(gh pr view:*) Bash(git fetch:*) Bash(git cat-file:*) Bash(git worktree:*) Bash(mktemp:*) Bash(sleep:*) Edit(//**/.git/skill-set/inputs/commit-message.*/content) Edit(//**/.git/worktrees/*/skill-set/inputs/commit-message.*/content) Edit(//**/.git/skill-set/inputs/pr-body.*/content) Edit(//**/.git/worktrees/*/skill-set/inputs/pr-body.*/content) Agent"
+allowed-tools: "Bash(*skill-set-pr:*) Bash(gh pr view:*) Bash(git fetch:*) Bash(git cat-file:*) Bash(mktemp:*) Bash(sleep:*) Edit(//**/.git/skill-set/inputs/commit-message.*/content) Edit(//**/.git/worktrees/*/skill-set/inputs/commit-message.*/content) Edit(//**/.git/skill-set/inputs/pr-body.*/content) Edit(//**/.git/worktrees/*/skill-set/inputs/pr-body.*/content) Agent"
 ---
 
 # Shipping PR
 
 ## Purpose
 
-Orchestrate a resumable PR loop without embedding GitHub polling logic in a prompt. Resolve `scripts/skill-set-pr` relative to the directory containing this `SKILL.md`; resolve the Git runner from the sibling `managing-git-workflow/scripts/skill-set-git` path. Invoke both through their resolved absolute paths without depending on a host-specific plugin-root environment variable or shell variables persisting across tool calls. The examples use `<git-runner>` and `<pr-runner>` as non-executable placeholders; replace them with the resolved absolute paths in every invocation. The PR runner owns snapshots, deadlines, concurrency, and state transitions. The resolver agents own edits in an isolated worktree.
+Orchestrate a resumable PR loop without embedding GitHub polling logic in a prompt. Resolve `scripts/skill-set-pr` relative to the directory containing this `SKILL.md`; resolve the Git runner from the sibling `managing-git-workflow/scripts/skill-set-git` path. Invoke both through their resolved absolute paths without depending on a host-specific plugin-root environment variable or shell variables persisting across tool calls. The examples use `<git-runner>` and `<pr-runner>` as non-executable placeholders; replace them with the resolved absolute paths in every invocation. The PR runner owns snapshots, deadlines, concurrency, and state transitions. Resolver agents edit the currently checked-out PR worktree and branch in place.
 
-A shipping request authorizes the initial branch commit and push plus `resolve-authorized` with `edit=true`, `commit=true`, `push=true`, and `comment=true` for this PR only. Do not ask for separate confirmation before committing or pushing. This does not authorize force-push, merging, unrelated post-inspection changes, or publishing partial resolver work.
+A shipping request authorizes the initial branch commit and push plus `resolve-authorized` with `edit=true`, `commit=true`, `push=true`, and `comment=true` for this PR only. Do not ask for separate confirmation before committing or pushing. This does not authorize force-push, merging or closing the PR, unrelated post-inspection changes, or publishing partial resolver work.
 
 ## When to Use
 
@@ -36,6 +36,8 @@ Do not use for:
 ## Common Scenarios
 
 - “Ship this PR and keep fixing blockers” runs the full resumable loop with the default limits.
+- “Ship this branch even though it is behind main” commits and publishes the current branch state, then lets the normal blocker cycle resolve any base conflict.
+- “Keep resolving without extra checkouts” reconciles and fixes the PR in the currently checked-out worktree and branch.
 - “Resume PR 42” loads the active run and branches on its persisted status/publication phase without starting a duplicate resolver.
 - “Is this PR truly clean?” snapshots the same HEAD across checks, paginated threads, mergeability, and auto-detected reviewers; pending evidence is reported rather than resolved.
 
@@ -43,7 +45,9 @@ Do not use for:
 
 ### 1. Prepare and publish the branch
 
-Use the resolved Git runner with `inspect --base <base>`. Stop on a detached HEAD, a checked-out base branch, or behind/diverged history. Treat every staged, unstaged, and untracked path reported by this initial inspection as the shipping scope. The shipping request itself authorizes committing that complete scope; do not delegate back to `managing-git-workflow` for another confirmation.
+Use the resolved Git runner with `inspect --base <base>`. Stop on a detached HEAD or a checked-out base branch. Being behind or diverged from the base branch is not a preparation blocker. The base identifies PR scope; it does not require the current branch to contain the latest base HEAD before publication. Treat every staged, unstaged, and untracked path reported by this initial inspection as the shipping scope. The shipping request itself authorizes committing that complete scope; do not delegate back to `managing-git-workflow` for another confirmation.
+
+Commit and publish the current branch state first; do not pull, merge, or rebase the base branch during preparation. Let the first PR snapshot classify any resulting base conflict, then resolve it through the normal merge-conflict blocker cycle. Keep the separate remote-branch publication gate: the inspected PR-head remote SHA must still match, and the push must remain a normal fast-forward update. If the remote PR branch changed or cannot yet accept a fast-forward push, re-inspect, fetch its exact HEAD, reconcile it into the current branch in place, and retry. Wait for the user only when that reconciliation contains an AMBIGUOUS conflict; never force-push.
 
 When the shipping scope is dirty, preview it with `commit --dry-run --all`, generate one commit message from that exact preview and the repository's recent subject style, allocate a managed `commit-message`, replace its sentinel with the Edit tool, and run:
 
@@ -90,7 +94,11 @@ Call `skill-set-pr snapshot --pr "$PR" --expected-run-id "$RUN_ID"`. The JSON re
 
 ### 4. Resolve one cycle
 
-Read `headRefOid`, `headRefName`, `headRepository.nameWithOwner`, `baseRefOid`, `baseRefName`, and the PR URL host, then re-read them and require they still equal the blocked snapshot. Choose an absolute temporary worktree path and branch. Pin and fetch both exact SHAs without moving the caller's branch. Bind `$REMOTE` to a push URL whose canonical host and `owner/repo` equal the PR head repository; for a fork PR this is normally a fork remote, not the base repository's `origin`. Select the ordered resolver plan: merge alone for a conflict; otherwise CI first when checks failed, then review when actionable threads exist.
+Read `headRefOid`, `headRefName`, `headRepository.nameWithOwner`, `baseRefOid`, `baseRefName`, and the PR URL host, then re-read them before resolution. If the PR HEAD changed before the resolver transition, return `blocked -> polling`, take a fresh snapshot, and continue automatically. Use the currently checked-out PR worktree and branch; record its absolute repository root as `$WORKTREE` and its current branch as `$RESOLVER_BRANCH`. Do not create a temporary worktree or resolver branch.
+
+Fetch the exact PR HEAD and base SHAs without checking out another branch. Preserve the complete current branch state. If new authorized working-tree changes exist, commit them through the Git runner before resolver edits. When local and remote PR history differ, reconcile it in place and continue: fast-forward the current branch when local HEAD is an ancestor of the fetched PR HEAD; keep local commits when the remote HEAD is their ancestor; otherwise merge the fetched exact PR HEAD into the current branch without rebasing. Resolve unambiguous conflicts in place and preserve genuinely ambiguous conflicts for the user's decision. Re-read a concurrently changed PR HEAD and repeat this reconciliation instead of creating another checkout or stopping merely because the SHAs differ.
+
+Bind `$REMOTE` to a push URL whose canonical host and `owner/repo` equal the PR head repository; for a fork PR this is normally a fork remote, not the base repository's `origin`. Select the ordered resolver plan: merge alone for a base conflict; otherwise CI first when checks failed, then review when actionable threads exist.
 
 Transition from `blocked` to `resolving` with the returned `run_id`, `--increment-cycle`, one `--resolver-agent` per planned agent, and all recovery fields:
 
@@ -100,6 +108,7 @@ Transition from `blocked` to `resolving` with the returned `run_id`, `--incremen
   --increment-cycle --worktree "$WORKTREE" --resolver-branch "$RESOLVER_BRANCH" \
   --remote "$REMOTE" --remote-branch "$HEAD_BRANCH" \
   --expected-remote-sha "$HEAD_SHA" --base-sha "$BASE_SHA" --base-branch "$BASE_BRANCH" \
+  --workspace-mode current \
   --resolver-agent "$RESOLVER_AGENT"
 ```
 
@@ -110,7 +119,7 @@ For a CI-plus-review cycle, repeat `--resolver-agent` in that order. Then invoke
 - pinned base SHA/ref, PR head repository/branch/host, bound remote, and recorded worktree/branch;
 - current cycle;
 - the explicit capability contract;
-- the requirement to use one isolated remote-HEAD worktree.
+- `workspace_mode=current`, requiring every resolver to stay in the recorded current worktree and branch.
 
 Follow [blocker-resolution.md](reference/blocker-resolution.md). A conflict consumes the entire cycle. Without conflict, CI resolution runs before review resolution in the same worktree.
 
@@ -129,8 +138,9 @@ Each attempted agent writes one ordered entry to a results file inside the resol
 `publish` rejects missing, reordered, ambiguous, failed, or partial results before mutation. Except for the declared results/summary/thread-feedback inputs, the resolver worktree must have no staged, unstaged, or untracked changes; this prevents publishing a committed subset while leaving partial edits behind. It revalidates the live PR head repository/ref and the remote push URL, including once immediately before a code push. For code changes it invokes exactly one expected-SHA `skill-set-git push`; for no-code activity it revalidates the unchanged remote HEAD. After that gate it posts each queued resolution reply once and resolves only threads whose outcome is `fixed` or `accepted_as_is`. If every queued CodeRabbit item is resolved, it derives the exact `@coderabbitai resolve` command and places it in the identified summary comment. It never emits `@codex review`, `@claude review`, edit-delegation commands, or free-form bot mentions. Its publication journal makes the same intent safe to resume without a second successful push or duplicate feedback.
 
 - Successful `publish`: transition `resolving -> polling` with `--resolver-attempt` and `--resolver-result success` or `no-op`, then snapshot again. The transition is rejected unless the publication journal is `complete`.
+- PR HEAD changed before publication: preserve the reconciled current branch, transition `resolving -> polling` with `--resolver-attempt --resolver-result stale`, take a fresh snapshot, and continue automatically. `stale` never publishes the old result chain and does not require a completed publication journal.
 - AMBIGUOUS decision: transition `resolving -> awaiting_user` with `--resolver-attempt --resolver-result ambiguous`; do not push.
-- Partial or failed attempt: transition to `failed` or `awaiting_user` with `--resolver-attempt` and its result; do not push and preserve the worktree.
+- Partial or failed attempt: transition to `failed` or `awaiting_user` with `--resolver-attempt` and its result; do not push and preserve the current worktree and branch.
 - No progress: return to `polling` as a `no-op`. Only the next snapshot may produce `stalled` after observing the same HEAD and blocker fingerprint.
 
 Every transition supplies `--from`, `--to`, and `--expected-run-id`. Treat a compare-and-swap rejection as fresh external state: reload rather than overwriting it.

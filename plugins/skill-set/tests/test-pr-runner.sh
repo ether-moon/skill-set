@@ -97,7 +97,7 @@ start_resolution() {
   run_ok transition --pr 17 --from blocked --to resolving --expected-run-id "$run_id" \
     --increment-cycle --worktree "$target" --resolver-branch "$branch" --remote origin \
     --remote-branch feature --expected-remote-sha "$head_sha" --base-sha "$head_sha" \
-    --base-branch main "$@"
+    --base-branch main --workspace-mode current "$@"
 }
 
 write_single_result() {
@@ -275,11 +275,57 @@ wrong_remote=$(run_fail transition --pr 17 --from blocked --to resolving \
   --expected-run-id "$run_id" --increment-cycle --worktree "$repo" \
   --resolver-branch "$resolver_branch" --remote wrong --remote-branch feature \
   --expected-remote-sha "$head_sha" --base-sha "$head_sha" --base-branch main \
+  --workspace-mode current \
   --resolver-agent ci-failure-resolver)
 assert_equals remote_binding_mismatch "$(jq -r .error.code <<<"$wrong_remote")" \
   "wrong remote repository binding"
 assert_equals 0 "$(count_log '^push ')" "wrong remote push count"
 assert_equals 0 "$(count_log '^pr comment ')" "wrong remote comment count"
+
+make_fixture workspace-mode-required
+export MOCK_GH_SCENARIO=fail
+initialized=$(init_case)
+run_id=$(jq -r .run_id <<<"$initialized")
+snapshot_case 101 >/dev/null
+resolver_branch=$(git -C "$repo" branch --show-current)
+missing_workspace_mode=$(run_fail transition --pr 17 --from blocked --to resolving \
+  --expected-run-id "$run_id" --increment-cycle --worktree "$repo" \
+  --resolver-branch "$resolver_branch" --remote origin --remote-branch feature \
+  --expected-remote-sha "$head_sha" --base-sha "$head_sha" --base-branch main \
+  --resolver-agent ci-failure-resolver)
+assert_equals resolution_metadata_required "$(jq -r .error.code <<<"$missing_workspace_mode")" \
+  "workspace mode requirement"
+
+invalid_workspace_mode=$(run_fail transition --pr 17 --from blocked --to resolving \
+  --expected-run-id "$run_id" --increment-cycle --worktree "$repo" \
+  --resolver-branch "$resolver_branch" --remote origin --remote-branch feature \
+  --expected-remote-sha "$head_sha" --base-sha "$head_sha" --base-branch main \
+  --workspace-mode temporary \
+  --resolver-agent ci-failure-resolver)
+assert_equals invalid_workspace_mode "$(jq -r .error.code <<<"$invalid_workspace_mode")" \
+  "workspace mode validation"
+
+workspace_resolution=$(run_ok transition --pr 17 --from blocked --to resolving \
+  --expected-run-id "$run_id" --increment-cycle --worktree "$repo" \
+  --resolver-branch "$resolver_branch" --remote origin --remote-branch feature \
+  --expected-remote-sha "$head_sha" --base-sha "$head_sha" --base-branch main \
+  --workspace-mode current \
+  --resolver-agent ci-failure-resolver)
+assert_equals current "$(jq -r .resolution.workspace_mode <<<"$workspace_resolution")" \
+  "persisted workspace mode"
+
+state_file=$(git -C "$repo" rev-parse --git-common-dir)/skill-set/shipping-pr/17.json
+jq 'del(.resolution.workspace_mode)' "$repo/$state_file" >"$repo/$state_file.tmp"
+mv "$repo/$state_file.tmp" "$repo/$state_file"
+legacy_workspace_resume=$(run_ok init --pr 17 --repo owner/repo --resume)
+assert_equals current "$(jq -r .resolution.workspace_mode <<<"$legacy_workspace_resume")" \
+  "legacy current-worktree recovery"
+
+jq '.resolution.workspace_mode = "temporary"' "$repo/$state_file" >"$repo/$state_file.tmp"
+mv "$repo/$state_file.tmp" "$repo/$state_file"
+invalid_workspace_resume=$(run_fail init --pr 17 --repo owner/repo --resume)
+assert_equals invalid_state "$(jq -r .error.code <<<"$invalid_workspace_resume")" \
+  "recovery workspace mode enforcement"
 
 make_fixture wrong-branch-binding
 export MOCK_GH_SCENARIO=fail
@@ -292,6 +338,7 @@ wrong_branch=$(run_fail transition --pr 17 --from blocked --to resolving \
   --expected-run-id "$run_id" --increment-cycle --worktree "$repo" \
   --resolver-branch "$resolver_branch" --remote origin --remote-branch different-feature \
   --expected-remote-sha "$head_sha" --base-sha "$head_sha" --base-branch main \
+  --workspace-mode current \
   --resolver-agent ci-failure-resolver)
 assert_equals head_branch_mismatch "$(jq -r .error.code <<<"$wrong_branch")" \
   "wrong PR head branch binding"
@@ -310,6 +357,7 @@ live_branch_drift=$(run_fail transition --pr 17 --from blocked --to resolving \
   --expected-run-id "$run_id" --increment-cycle --worktree "$repo" \
   --resolver-branch "$resolver_branch" --remote origin --remote-branch feature \
   --expected-remote-sha "$head_sha" --base-sha "$head_sha" --base-branch main \
+  --workspace-mode current \
   --resolver-agent ci-failure-resolver)
 assert_equals pr_head_binding_changed "$(jq -r .error.code <<<"$live_branch_drift")" \
   "live PR head branch revalidation"
@@ -328,6 +376,7 @@ fork_resolution=$(run_ok transition --pr 17 --from blocked --to resolving \
   --expected-run-id "$run_id" --increment-cycle --worktree "$repo" \
   --resolver-branch "$resolver_branch" --remote fork --remote-branch feature \
   --expected-remote-sha "$head_sha" --base-sha "$head_sha" --base-branch main \
+  --workspace-mode current \
   --resolver-agent ci-failure-resolver)
 jq -e '.head_repo == "contributor/repo" and .head_branch == "feature" and
   .resolution.head_repo == "contributor/repo" and .resolution.remote == "fork" and
@@ -479,6 +528,18 @@ jq -e --arg path "$repo" '
 resumed_awaiting=$(run_ok init --pr 17 --repo owner/repo --resume)
 jq -e --arg path "$repo" '.resumed == true and .status == "awaiting_user" and .resolution.worktree == $path' \
   <<<"$resumed_awaiting" >/dev/null
+
+make_fixture stale-resolver-retry
+export MOCK_GH_SCENARIO=fail
+initialized=$(init_case)
+run_id=$(jq -r .run_id <<<"$initialized")
+snapshot_case 101 >/dev/null
+start_resolution "$run_id" --resolver-agent ci-failure-resolver >/dev/null
+stale_retry=$(run_ok transition --pr 17 --from resolving --to polling \
+  --expected-run-id "$run_id" --resolver-attempt --resolver-result stale)
+jq -e '.status == "polling" and .resolver_attempt.result == "stale" and
+  .resolution.result == "stale" and .resolution.publication.phase == "pending"' \
+  <<<"$stale_retry" >/dev/null
 
 for dirty_kind in untracked unstaged staged metachar; do
   make_fixture "publication-dirty-$dirty_kind"
@@ -876,7 +937,11 @@ assert_equals invalid_github_response "$(jq -r .error.code <<<"$malformed_cr")" 
 # The command-log cases above exercise publication safety. Keep agent and command
 # contracts wired to that executable gate rather than a second mutation path.
 resolver=$plugin_dir/agents/resolving-pr-blockers.md
-grep -Eq 'isolated worktree' "$resolver"
+grep -Eq 'current worktree' "$resolver"
+grep -Fq 'workspace_mode=current' "$resolver"
+if grep -Eq 'Create the recorded temporary local branch|Clean up the isolated worktree' "$resolver"; then
+  fail "resolver still requires temporary worktree lifecycle management"
+fi
 grep -Eq 'conflict.*sole cycle|sole cycle.*conflict' "$resolver"
 grep -Eq 'CI.*then.*review|CI.*review.*sequential' "$resolver"
 grep -Eq 'expected-SHA push' "$resolver"
@@ -891,7 +956,8 @@ fix_command=$plugin_dir/commands/pr/fix.md
 grep -Eq 'headRefOid.*baseRefOid|baseRefOid.*headRefOid' "$fix_command"
 grep -Eq 'headRepository' "$fix_command"
 grep -Eq 'Re-read.*metadata|re-read.*metadata' "$fix_command"
-grep -Eq 'Require the HEAD still equals the snapshot' "$fix_command"
+grep -Eq 'If the HEAD changed.*fresh snapshot|fresh snapshot.*If the HEAD changed' "$fix_command"
+grep -Fq 'workspace_mode=current' "$fix_command"
 grep -Eq 'canonical.*push URL|canonical host' "$plugin_dir/skills/shipping-pr/SKILL.md" \
   "$plugin_dir/skills/shipping-pr/reference/blocker-resolution.md"
 grep -Eq 'praise phrase followed by any request remains actionable' \

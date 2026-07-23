@@ -91,6 +91,12 @@ validate_absolute_path() {
     die invalid_path "$1 must be an absolute path without newlines." "Pass an absolute resolver worktree path."
 }
 
+validate_workspace_mode() {
+  [[ $2 == current ]] || \
+    die invalid_workspace_mode "$1 must be current." \
+      "Pass $1 current; resolver publication does not support temporary worktrees."
+}
+
 lowercase() {
   printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
 }
@@ -232,6 +238,7 @@ read_state() {
     ((.resolution == null) or
       ((.resolution | type == "object") and
        (.resolution.worktree | type == "string" and startswith("/")) and
+       ((.resolution.workspace_mode == null) or (.resolution.workspace_mode == "current")) and
        (.resolution.branch | type == "string" and length > 0) and
        (.resolution.remote | type == "string" and length > 0) and
        (.resolution.remote_branch | type == "string" and length > 0) and
@@ -266,6 +273,29 @@ read_state() {
   ' >/dev/null 2>&1 <<<"$STATE" || \
     die invalid_state "The shipping state file is malformed or unsupported." \
       "Inspect or move $STATE_FILE, then initialize a new run."
+
+  if jq -e '.resolution != null and .resolution.workspace_mode == null' \
+    >/dev/null 2>&1 <<<"$STATE"; then
+    local recorded_worktree actual_worktree recorded_branch actual_branch
+    recorded_worktree=$(jq -r .resolution.worktree <<<"$STATE")
+    actual_worktree=$(git rev-parse --show-toplevel 2>/dev/null) || \
+      die resolver_worktree_missing "Unable to verify the current worktree for legacy resolver recovery." \
+        "Return to the recorded resolver worktree and retry."
+    recorded_worktree=$(cd -- "$recorded_worktree" 2>/dev/null && pwd -P) || \
+      die resolver_worktree_missing "The recorded resolver worktree is unavailable." \
+        "Restore or inspect the recorded current worktree before recovery."
+    actual_worktree=$(cd -- "$actual_worktree" 2>/dev/null && pwd -P) || \
+      die resolver_worktree_missing "Unable to resolve the current worktree." \
+        "Return to the recorded resolver worktree and retry."
+    recorded_branch=$(jq -r .resolution.branch <<<"$STATE")
+    actual_branch=$(git symbolic-ref --quiet --short HEAD 2>/dev/null) || \
+      die invalid_resolver_worktree "The current checkout is detached during legacy resolver recovery." \
+        "Restore the recorded resolver branch and retry."
+    [[ $actual_worktree == "$recorded_worktree" && $actual_branch == "$recorded_branch" ]] || \
+      die workspace_mode_missing "Legacy resolver state lacks workspace_mode and is not in its recorded checkout." \
+        "Return to $recorded_worktree on $recorded_branch; the runner will migrate it to workspace_mode=current."
+    STATE=$(jq -c '.resolution.workspace_mode = "current"' <<<"$STATE")
+  fi
 }
 
 write_state() {
@@ -1172,7 +1202,7 @@ command_transition() {
   local resolver_attempt=false increment_cycle=false dry_run=false
   local resolver_result=
   local worktree='' resolver_branch='' remote='' remote_branch=''
-  local expected_remote_sha='' base_sha='' base_branch=''
+  local expected_remote_sha='' base_sha='' base_branch='' workspace_mode=''
   local resolver_agents=()
   NOW_OVERRIDE=
   while [[ $# -gt 0 ]]; do
@@ -1181,15 +1211,16 @@ command_transition() {
       --from) [[ $# -ge 2 ]] || die invalid_argument "--from requires a value." "Pass the expected current state."; from=$2; shift 2 ;;
       --to) [[ $# -ge 2 ]] || die invalid_argument "--to requires a value." "Pass the destination state."; to=$2; shift 2 ;;
       --expected-run-id) [[ $# -ge 2 ]] || die invalid_argument "--expected-run-id requires a value." "Pass the run_id returned by init."; expected_run_id=$2; shift 2 ;;
-      --resolver-result) [[ $# -ge 2 ]] || die invalid_argument "--resolver-result requires a value." "Pass success, no-op, partial-failure, ambiguous, or failed."; resolver_result=$2; shift 2 ;;
+      --resolver-result) [[ $# -ge 2 ]] || die invalid_argument "--resolver-result requires a value." "Pass success, no-op, stale, partial-failure, ambiguous, or failed."; resolver_result=$2; shift 2 ;;
       --resolver-agent) [[ $# -ge 2 ]] || die invalid_argument "--resolver-agent requires a value." "Pass a resolver agent name."; resolver_agents+=("$2"); shift 2 ;;
       --worktree) [[ $# -ge 2 ]] || die invalid_argument "--worktree requires a value." "Pass the planned absolute resolver worktree path."; worktree=$2; shift 2 ;;
-      --resolver-branch) [[ $# -ge 2 ]] || die invalid_argument "--resolver-branch requires a value." "Pass the temporary local branch."; resolver_branch=$2; shift 2 ;;
+      --resolver-branch) [[ $# -ge 2 ]] || die invalid_argument "--resolver-branch requires a value." "Pass the recorded current local branch."; resolver_branch=$2; shift 2 ;;
       --remote) [[ $# -ge 2 ]] || die invalid_argument "--remote requires a value." "Pass the Git remote name."; remote=$2; shift 2 ;;
       --remote-branch) [[ $# -ge 2 ]] || die invalid_argument "--remote-branch requires a value." "Pass the PR head branch."; remote_branch=$2; shift 2 ;;
       --expected-remote-sha) [[ $# -ge 2 ]] || die invalid_argument "--expected-remote-sha requires a value." "Pass the observed PR HEAD SHA."; expected_remote_sha=$2; shift 2 ;;
       --base-sha) [[ $# -ge 2 ]] || die invalid_argument "--base-sha requires a value." "Pass the pinned PR base SHA."; base_sha=$2; shift 2 ;;
       --base-branch) [[ $# -ge 2 ]] || die invalid_argument "--base-branch requires a value." "Pass the PR base branch."; base_branch=$2; shift 2 ;;
+      --workspace-mode) [[ $# -ge 2 ]] || die invalid_argument "--workspace-mode requires a value." "Pass --workspace-mode current."; workspace_mode=$2; shift 2 ;;
       --resolver-attempt) resolver_attempt=true; shift ;;
       --increment-cycle) increment_cycle=true; shift ;;
       --now) [[ $# -ge 2 ]] || die invalid_argument "--now requires a value." "Pass an epoch second."; NOW_OVERRIDE=$2; shift 2 ;;
@@ -1216,16 +1247,19 @@ command_transition() {
 
   local has_resolution_flags=false
   if [[ -n $worktree || -n $resolver_branch || -n $remote || -n $remote_branch || \
-    -n $expected_remote_sha || -n $base_sha || -n $base_branch || ${#resolver_agents[@]} -gt 0 ]]; then
+    -n $expected_remote_sha || -n $base_sha || -n $base_branch || -n $workspace_mode || \
+    ${#resolver_agents[@]} -gt 0 ]]; then
     has_resolution_flags=true
   fi
 
   local resolution_json=null
   if [[ $from == blocked && $to == resolving ]]; then
     [[ -n $worktree && -n $resolver_branch && -n $remote && -n $remote_branch && \
-      -n $expected_remote_sha && -n $base_sha && -n $base_branch && ${#resolver_agents[@]} -gt 0 ]] || \
+      -n $expected_remote_sha && -n $base_sha && -n $base_branch && -n $workspace_mode && \
+      ${#resolver_agents[@]} -gt 0 ]] || \
       die resolution_metadata_required "Starting a resolver requires complete recovery and publication metadata." \
-        "Pass --worktree, --resolver-branch, --remote, --remote-branch, --expected-remote-sha, --base-sha, --base-branch, and --resolver-agent."
+        "Pass --worktree, --resolver-branch, --remote, --remote-branch, --expected-remote-sha, --base-sha, --base-branch, --workspace-mode current, and --resolver-agent."
+    validate_workspace_mode --workspace-mode "$workspace_mode"
     validate_absolute_path --worktree "$worktree"
     validate_branch --resolver-branch "$resolver_branch"
     validate_branch --remote-branch "$remote_branch"
@@ -1299,13 +1333,15 @@ command_transition() {
     fi
     local resolution_now
     resolution_now=$(now_epoch)
-    resolution_json=$(jq -cn --arg worktree "$worktree" --arg branch "$resolver_branch" \
+    resolution_json=$(jq -cn --arg worktree "$worktree" --arg workspace_mode "$workspace_mode" \
+      --arg branch "$resolver_branch" \
       --arg remote "$remote" --arg remote_branch "$remote_branch" --arg base_branch "$base_branch" \
       --arg github_host "$github_host" --arg head_repo "$head_repo" --arg head_branch "$head_branch" \
       --arg expected "$expected_remote_sha" --arg base "$base_sha" \
       --arg fingerprint "$(jq -r .blocker_fingerprint <<<"$STATE")" \
       --argjson agents "$resolver_agents_json" --argjson started_at "$resolution_now" \
-      '{worktree:$worktree,branch:$branch,remote:$remote,remote_branch:$remote_branch,
+      '{worktree:$worktree,workspace_mode:$workspace_mode,branch:$branch,
+        remote:$remote,remote_branch:$remote_branch,
         github_host:$github_host,head_repo:$head_repo,head_branch:$head_branch,
         base_branch:$base_branch,expected_remote_sha:$expected,base_sha:$base,
         expected_head_sha:$expected,blocker_fingerprint:$fingerprint,expected_agents:$agents,
@@ -1346,8 +1382,8 @@ command_transition() {
   fi
 
   if [[ -n $resolver_result ]]; then
-    case "$resolver_result" in success|no-op|partial-failure|ambiguous|failed) ;; *)
-      die invalid_argument "Unknown resolver result: $resolver_result" "Use success, no-op, partial-failure, ambiguous, or failed." ;;
+    case "$resolver_result" in success|no-op|stale|partial-failure|ambiguous|failed) ;; *)
+      die invalid_argument "Unknown resolver result: $resolver_result" "Use success, no-op, stale, partial-failure, ambiguous, or failed." ;;
     esac
   fi
   if [[ $from == resolving ]]; then
@@ -1356,9 +1392,9 @@ command_transition() {
         "Pass --resolver-attempt with the structured resolver result."
     [[ -n $resolver_result ]] || \
       die resolver_result_required "Leaving resolving requires --resolver-result." \
-        "Pass success, no-op, partial-failure, ambiguous, or failed."
+        "Pass success, no-op, stale, partial-failure, ambiguous, or failed."
     case "$resolver_result:$to" in
-      success:polling|no-op:polling|ambiguous:awaiting_user|\
+      success:polling|no-op:polling|stale:polling|ambiguous:awaiting_user|\
       partial-failure:awaiting_user|partial-failure:failed|failed:failed|failed:awaiting_user) ;;
       success:*|no-op:*)
         die invalid_resolver_transition "$resolver_result must return to polling for a post-resolver snapshot." \
@@ -1623,7 +1659,7 @@ command_publish() {
       "Inspect the preserved recovery path and retry."
   [[ $actual_toplevel == "$physical_worktree" ]] || \
     die invalid_resolver_worktree "The recorded resolver path is not the worktree root." \
-      "Use the exact isolated worktree root; a subdirectory cannot define the publication boundary."
+      "Use the exact recorded worktree root; a subdirectory cannot define the publication boundary."
   if git -C "$worktree" ls-files --error-unmatch -- \
     ":(top,literal)$results_relative" >/dev/null 2>&1; then
     die managed_publication_input "--results-file must be an untracked publication artifact, not a tracked project file." \

@@ -1,6 +1,6 @@
 ---
 name: resolving-pr-blockers
-description: Resolves one authorized PR-blocker cycle in an isolated remote-HEAD worktree, then performs a single publication gate. Use for explicit PR fix requests or when shipping-pr delegates a blocked snapshot.
+description: Resolves one authorized PR-blocker cycle in the current PR worktree, then performs a single publication gate. Use for explicit PR fix requests or when shipping-pr delegates a blocked snapshot.
 tools: ["Read", "Grep", "Glob", "Bash", "Agent"]
 ---
 
@@ -10,18 +10,19 @@ tools: ["Read", "Grep", "Glob", "Bash", "Agent"]
 
 Require an explicit `resolve-authorized` contract naming this repository and PR with separate `edit`, `commit`, `push`, and `comment` capabilities. `/skill-set:pr:fix` and `shipping-pr` grant those four capabilities for blocker resolution only.
 
-Do not request separate user approval for those commits or for runner publication. The supplied capability contract is the approval; pause only for an AMBIGUOUS resolution decision or a failed/stale publication gate.
+Do not request separate user approval for those commits or for runner publication. The supplied capability contract is the approval. Retry stale state through a fresh snapshot; pause only for an AMBIGUOUS resolution decision or an external failure that cannot be repaired automatically.
 
-Also require the PR number, base repository, PR head repository/branch/host, bound Git remote, pinned base branch/SHA, expected remote HEAD SHA, current blocker snapshot, run ID, cycle, ordered resolver plan, and recorded worktree/branch. Reject stale input before editing.
+Also require the PR number, base repository, PR head repository/branch/host, bound Git remote, pinned base branch/SHA, expected remote HEAD SHA, current blocker snapshot, run ID, cycle, ordered resolver plan, recorded worktree/branch, and `workspace_mode=current`. Reconcile stale local input in place before editing.
 
-This authorization does not include merge, close, force-push, unrelated changes, partial publication, or deletion of a failure worktree.
+This authorization does not include closing the PR, force-push, unrelated changes, partial publication, or discarding current worktree state.
 
-## Prepare One Isolated Worktree
+## Prepare the Current Worktree
 
 1. Re-read the remote PR metadata and require its HEAD, head repository/ref/host, and base SHA to equal the recorded values.
-2. Fetch the exact HEAD SHA and exact base SHA without changing the caller's branch; verify both commit objects. Never substitute a moving local base ref.
-3. Create the recorded temporary local branch and isolated worktree outside the main checkout from the pinned HEAD. If resuming, inspect the recorded path instead of creating a duplicate.
-4. Verify the temporary branch, worktree HEAD, pinned base commit, and PR publication branch. Require the bound remote's canonical push URL to target the recorded PR head repository; use a fork remote for a fork PR. Do not touch existing dirty files in any other worktree.
+2. Verify `workspace_mode=current`, the recorded worktree is the caller's repository root, and the recorded branch is still checked out. Never create another worktree or branch and never switch branches.
+3. Fetch the exact HEAD SHA and exact base SHA without checkout; verify both commit objects. Never substitute a moving local ref.
+4. Preserve the complete authorized current state. Commit new working-tree changes through the Git runner, then reconcile local and remote PR history in place: fast-forward when local is behind, retain local descendants when ahead, or merge the exact fetched remote commit when diverged. Retry against a newly observed remote HEAD instead of stopping for a routine mismatch. Only an AMBIGUOUS conflict or an external failure that cannot be repaired automatically waits for the user.
+5. Verify the current branch, reconciled HEAD, pinned base commit, and PR publication branch. Require the bound remote's canonical push URL to target the recorded PR head repository; use a fork remote for a fork PR.
 
 All resolver agents operate sequentially in this same worktree. They may edit and commit there, but receive `push=false` and `comment=false`.
 
@@ -43,11 +44,13 @@ Never run resolver agents in parallel. Stop on `AMBIGUOUS` or `failed` and prese
 
 ## Executable Publication Gate
 
-Collect each attempted resolver's structured result in the exact planned order. Write a results file inside the resolver worktree as `{results:[{agent,result,input_head,output_head},...]}`. The HEAD chain must start at the pinned PR HEAD, connect between agents, and end at the actual local HEAD. Write any queued summary and `{threads:[{id,outcome,body}]}` feedback to separate files in the same worktree; never add a reviewer/provider adapter. Before publication, require no staged, unstaged, or untracked changes other than those declared input files; otherwise return `partial-failure` and preserve the worktree.
+Collect each attempted resolver's structured result in the exact planned order. Write a results file inside the current worktree as `{results:[{agent,result,input_head,output_head},...]}`. The HEAD chain must start at the pinned PR HEAD, include any in-place reconciliation, connect between agents, and end at the actual local HEAD. Write any queued summary and `{threads:[{id,outcome,body}]}` feedback to separate files in the same worktree; never add a reviewer/provider adapter. Before publication, require no staged, unstaged, or untracked changes other than those declared input files; otherwise return `partial-failure` and preserve the worktree.
 
 Resolve `skills/shipping-pr/scripts/skill-set-pr` from the installed skill collection and call its absolute path with `publish`, the PR, run ID, pinned HEAD, actual local HEAD, results file, optional summary file, and the required `--thread-feedback-file` when review was planned. This is the only authorized push/comment path. It revalidates the live PR head repository/ref and bound remote immediately before the expected-SHA push, or performs a no-code HEAD recheck, then publishes resolution replies, thread state, and the summary after the gate. It derives the exact CodeRabbit resolve command from completed CodeRabbit outcomes and never triggers Codex or Claude review. Never call `git push`, `skill-set-git push`, `gh pr comment`, or a thread API directly.
 
-A partial failure or AMBIGUOUS result must not invoke publication and must not publish the successful subset. Preserve the failure worktree and branch and report their exact paths, local commits, expected remote SHA, state publication phase, and recovery command.
+A partial failure or AMBIGUOUS result must not invoke publication and must not publish the successful subset. Preserve the current worktree and branch and report their exact paths, local commits, expected remote SHA, state publication phase, and recovery command.
+
+If the live PR HEAD changes before the publication gate succeeds, preserve the current branch and return resolver result `stale` through `resolving -> polling`. Take a fresh snapshot and reconcile automatically; do not turn routine staleness into `awaiting_user`.
 
 ## Result
 
@@ -58,8 +61,8 @@ Return:
 - local before/after HEAD and published commits;
 - ordered resolver results;
 - runner publication phase and whether its expected-SHA push/comment occurred;
-- worktree/branch cleanup or preserved recovery paths.
+- current worktree/branch and preserved recovery paths.
 
-Clean up the isolated worktree and temporary branch only after all required publication succeeds. On any authentication, remote-SHA, branch-protection, resolver, or publication failure, preserve both.
+Do not remove a worktree or delete a branch after publication; the resolver reused the caller's current checkout. On any authentication, remote-SHA, branch-protection, resolver, or publication failure, preserve it unchanged for recovery.
 
 Use the user's language for reports, but keep commands, paths, state names, and result identifiers in English.

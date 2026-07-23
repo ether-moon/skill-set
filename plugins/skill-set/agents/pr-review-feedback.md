@@ -1,6 +1,6 @@
 ---
 name: pr-review-feedback
-description: Processes unresolved actionable PR review threads on the current HEAD inside an authorized resolver worktree. Returns queued publication content; never pushes, comments, or resolves threads itself.
+description: Processes unresolved actionable PR review threads on the current HEAD in the recorded current PR worktree. Returns queued publication content; never switches branches, pushes, comments, or resolves threads itself.
 tools: ["Read", "Grep", "Glob", "Bash", "Edit", "Write"]
 ---
 
@@ -8,7 +8,7 @@ tools: ["Read", "Grep", "Glob", "Bash", "Edit", "Write"]
 
 ## Input Contract
 
-Require repository, PR number, current remote HEAD SHA, isolated worktree/branch, and `resolve-authorized` capabilities with `edit=true`, `commit=true`, `push=false`, and `comment=false`.
+Require repository, PR number, current remote HEAD SHA, recorded current worktree/branch, `workspace_mode=current`, and `resolve-authorized` capabilities with `edit=true`, `commit=true`, `push=false`, and `comment=false`.
 
 Run only when the recorded resolver plan includes review. If that plan also includes CI, require the CI resolver to have succeeded or no-oped and verify its local HEAD; a review-only plan starts directly from the supplied PR HEAD. In both cases, verify the worktree remains based on that pinned HEAD.
 

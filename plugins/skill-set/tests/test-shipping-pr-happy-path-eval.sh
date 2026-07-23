@@ -119,8 +119,10 @@ resolving=$(run_stage transition --pr 17 --from blocked --to resolving \
   --expected-run-id "$run_id" --increment-cycle --worktree "$test_root" \
   --resolver-branch main --remote origin --remote-branch feature \
   --expected-remote-sha "$head_sha" --base-sha "$head_sha" --base-branch main \
+  --workspace-mode current \
   --resolver-agent pr-review-feedback)
 jq -e '.status == "resolving" and .cycle == 1 and
+  .resolution.workspace_mode == "current" and
   .resolution.expected_agents == ["pr-review-feedback"] and
   .resolution.publication.phase == "pending"' <<<"$resolving" >/dev/null
 

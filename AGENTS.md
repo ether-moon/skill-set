@@ -36,17 +36,17 @@ Runtime totals: **11 skills, 7 legacy commands, 4 PR agents, 0 hooks, 0 MCP serv
 | `/skill-set:git:pr` | Create or find a pull request from committed changes |
 | `/skill-set:git:push` | Push existing commits with remote SHA protection |
 | `/skill-set:plan:grill` | Stress-test an existing plan one decision per turn, stopping after five user questions with a Confirmed, Rejected, and Unresolved ledger. |
-| `/skill-set:pr:fix` | Resolve PR blockers in one isolated, publication-gated cycle |
+| `/skill-set:pr:fix` | Resolve PR blockers in the current PR worktree through one publication-gated cycle |
 | `/skill-set:pr:ship` | Ship a PR through resumable CI, review, and blocker-resolution cycles |
 
 #### PR Agents
 
 | Agent | Description |
 |---|---|
-| `ci-failure-resolver` | Analyzes current-HEAD CI failures and applies authorized, unambiguous fixes inside a resolver worktree. |
-| `merge-conflict-resolver` | Resolves an authorized merge conflict inside the isolated remote-HEAD worktree for a PR. |
-| `pr-review-feedback` | Processes unresolved actionable PR review threads on the current HEAD inside an authorized resolver worktree. |
-| `resolving-pr-blockers` | Resolves one authorized PR-blocker cycle in an isolated remote-HEAD worktree, then performs a single publication gate. |
+| `ci-failure-resolver` | Analyzes current-HEAD CI failures and applies authorized, unambiguous fixes in the recorded current PR worktree. |
+| `merge-conflict-resolver` | Resolves an authorized merge conflict in the recorded current PR worktree. |
+| `pr-review-feedback` | Processes unresolved actionable PR review threads on the current HEAD in the recorded current PR worktree. |
+| `resolving-pr-blockers` | Resolves one authorized PR-blocker cycle in the current PR worktree, then performs a single publication gate. |
 
 #### Standard Layout
 
