@@ -1,0 +1,23 @@
+## Decisions Made
+- ShellCheck 호환 literal: Markdown backtick을 보존하면서 command substitution으로 해석되지 않도록 escaped double-quoted grep 패턴을 사용했다.
+- 모든 CI check 추적: 후속 shipping run은 `required-only=false`로 실행해 비필수 check 실패도 clean 판정에서 제외되지 않게 한다.
+
+## Problems Encountered
+- shipping runner의 `required-only=true` clean 판정 후 GitHub의 deterministic-validation이 실패했다: 최종 GitHub 상태 교차 검증으로 발견했다.
+- GitHub Actions ShellCheck가 SC2016을 보고했다: 두 grep literal의 quoting만 최소 수정했다.
+
+## Constraints Identified
+- 현재 checkout과 branch를 유지해야 한다: 수정·검증·커밋 과정에서 worktree 생성이나 branch 전환을 사용하지 않았다.
+- CI 수정은 실패 로그와 직접 연관된 한 파일로 제한해야 한다: 다른 review-resolution 변경은 건드리지 않았다.
+
+## Open Questions
+- None
+
+## Context
+PR #31의 새 HEAD에서 deterministic-validation이 ShellCheck SC2016으로 실패했다. `test-shipping-pr-authorization.sh`의 literal backtick 패턴 두 곳을 수정하고 syntax, targeted test, 전체 suite를 통과시켰다.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
