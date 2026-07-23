@@ -1,7 +1,7 @@
 ---
 name: shipping-pr
 description: Drives an existing or newly requested pull request through deterministic CI, review, and blocker-resolution cycles until it is verified clean or reaches a terminal stop. Use when the user asks to ship a PR, wait for CI and fix it, run PR autopilot, or keep resolving blockers until the PR is ready.
-allowed-tools: "Bash(gh pr view:*) Bash(git fetch:*) Bash(git cat-file:*) Bash(mktemp:*) Bash(sleep:*) Edit(//**/.git/skill-set/inputs/commit-message.*/content) Edit(//**/.git/worktrees/*/skill-set/inputs/commit-message.*/content) Edit(//**/.git/skill-set/inputs/pr-body.*/content) Edit(//**/.git/worktrees/*/skill-set/inputs/pr-body.*/content) Agent"
+allowed-tools: "Bash(*skill-set-pr:*) Bash(gh pr view:*) Bash(git fetch:*) Bash(git cat-file:*) Bash(mktemp:*) Bash(sleep:*) Edit(//**/.git/skill-set/inputs/commit-message.*/content) Edit(//**/.git/worktrees/*/skill-set/inputs/commit-message.*/content) Edit(//**/.git/skill-set/inputs/pr-body.*/content) Edit(//**/.git/worktrees/*/skill-set/inputs/pr-body.*/content) Agent"
 ---
 
 # Shipping PR
@@ -108,6 +108,7 @@ Transition from `blocked` to `resolving` with the returned `run_id`, `--incremen
   --increment-cycle --worktree "$WORKTREE" --resolver-branch "$RESOLVER_BRANCH" \
   --remote "$REMOTE" --remote-branch "$HEAD_BRANCH" \
   --expected-remote-sha "$HEAD_SHA" --base-sha "$BASE_SHA" --base-branch "$BASE_BRANCH" \
+  --workspace-mode current \
   --resolver-agent "$RESOLVER_AGENT"
 ```
 

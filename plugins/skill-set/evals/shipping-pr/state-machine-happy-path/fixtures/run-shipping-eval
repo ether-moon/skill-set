@@ -85,6 +85,8 @@ case $subcommand in
         next_phase=resolving
         stage=transition-resolving
         output_file=03-resolving-transition.json
+        [[ $(arg_value --workspace-mode "$@" || true) == current ]] || \
+          fail 'resolving transition must record --workspace-mode current'
         ;;
       resolving:polling)
         expected_phase=published
@@ -136,6 +138,7 @@ case $stage in
     ;;
   transition-resolving)
     jq -e '.status == "resolving" and .cycle == 1 and
+      .resolution.workspace_mode == "current" and
       .resolution.expected_agents == ["pr-review-feedback"]' >/dev/null <<<"$output"
     ;;
   publish)

@@ -9,6 +9,7 @@ resolver_file=$plugin_dir/agents/resolving-pr-blockers.md
 merge_resolver_file=$plugin_dir/agents/merge-conflict-resolver.md
 base_lag_case=$plugin_dir/evals/shipping-pr/behind-base-current-branch-publication
 current_worktree_case=$plugin_dir/evals/shipping-pr/current-worktree-resolution
+partial_publication_prompt=$plugin_dir/evals/shipping-pr/partial-resolver-publication-stop/prompt.md
 # shellcheck source=plugins/skill-set/tests/test-helper.sh
 source "$test_dir/test-helper.sh"
 
@@ -45,6 +46,10 @@ grep -Fq 'Edit(//**/.git/skill-set/inputs/commit-message.*/content)' "$skill_fil
   fail 'shipping must allow writing a managed commit message without a new permission prompt'
 grep -Fq 'Edit(//**/.git/skill-set/inputs/pr-body.*/content)' "$skill_file" || \
   fail 'shipping must allow writing a managed PR body without a new permission prompt'
+grep -Fq 'Bash(*skill-set-pr:*)' "$skill_file" || \
+  fail 'shipping must authorize its portable PR runner invocation'
+grep -Fq 'Bash(*skill-set-pr:*)' "$plugin_dir/commands/pr/fix.md" || \
+  fail 'PR fix must authorize its portable PR runner invocation'
 
 if grep -Fq 'Never auto-commit working-tree changes for shipping.' "$skill_file"; then
   fail 'shipping still forbids the requested automatic initial commit'
@@ -87,6 +92,13 @@ ruby -ryaml -e '
   abort "missing functional tag" unless parsed.fetch("tags").include?("functional")
   abort "missing workspace-policy tag" unless
     parsed.fetch("tags").include?("workspace-policy")
+  guarded_tools = parsed.fetch("graders").filter_map do |grader|
+    next unless grader["type"] == "tool_used" && grader["min"] == 0 &&
+      grader["max"] == 0 && grader["arm"] == "both"
+    grader["tool"]
+  end
+  abort "missing Bash, Write, and Edit mutation guards" unless
+    %w[Bash Write Edit].all? { |tool| guarded_tools.include?(tool) }
 ' "$current_worktree_case/case.yaml"
 
 grep -Fq 'same checked-out branch and worktree' "$current_worktree_case/prompt.md" || \
@@ -94,6 +106,14 @@ grep -Fq 'same checked-out branch and worktree' "$current_worktree_case/prompt.m
 grep -Fq 'does not create a temporary worktree or resolver branch' \
   "$current_worktree_case/graders/functional-contract.md" || \
   fail 'current-worktree eval must grade the requested workspace policy'
+
+grep -Fq 'returned `AMBIGUOUS` after finding an ambiguous public-API request' \
+  "$partial_publication_prompt" || \
+  fail 'partial-publication fixture must use the resolver AMBIGUOUS result'
+if grep -Fq 'returned `failed` after finding an ambiguous public-API request' \
+  "$partial_publication_prompt"; then
+  fail 'partial-publication fixture still conflates AMBIGUOUS with failed'
+fi
 
 grep -Fq 'Do not request separate user approval for those commits or for runner publication.' \
   "$resolver_file" || \
