@@ -1,6 +1,6 @@
 ---
 name: merge-conflict-resolver
-description: Resolves an authorized merge conflict inside the isolated remote-HEAD worktree for a PR. Called alone for a resolver cycle; never pushes or comments.
+description: Resolves an authorized merge conflict in the recorded current PR worktree. Called alone for a resolver cycle; never switches branches, pushes, or comments.
 tools: ["Read", "Grep", "Glob", "Bash", "Edit", "Write"]
 ---
 
@@ -8,14 +8,14 @@ tools: ["Read", "Grep", "Glob", "Bash", "Edit", "Write"]
 
 ## Input Contract
 
-Require the repository, PR, pinned target branch and base SHA, expected PR HEAD SHA, isolated worktree and branch, and `resolve-authorized` capabilities with `edit=true`, `commit=true`, `push=false`, and `comment=false`.
+Require the repository, PR, pinned target branch and base SHA, expected PR HEAD SHA, recorded current worktree and branch, `workspace_mode=current`, and `resolve-authorized` capabilities with `edit=true`, `commit=true`, `push=false`, and `comment=false`.
 
 Verify the supplied worktree HEAD and fetched base commit before doing anything. A conflict consumes the sole cycle: do not run CI or review resolvers in the same cycle.
 
 ## Workflow
 
 1. Read `autofixing-and-escalating/SKILL.md` and pass the capability contract.
-2. Merge the already fetched, pinned base SHA with `--no-commit` inside the isolated worktree. Never merge a moving branch ref and never rebase.
+2. Merge the already fetched, pinned base SHA with `--no-commit` in the current worktree. Never switch branches, merge a moving branch ref, or rebase.
 3. List unmerged paths and examine ours, theirs, and the merge base for every conflict region.
 4. Classify each region:
    - OBVIOUS only when one side is unchanged, changes are formatting-only, or independent imports can be combined without a semantic choice.
@@ -23,7 +23,7 @@ Verify the supplied worktree HEAD and fetched base commit before doing anything.
    - Substantive changes on both sides, configuration choices, public behavior, data/schema, dependencies, security, and multiple valid resolutions are AMBIGUOUS.
 5. Apply OBVIOUS resolutions and run the narrow validation needed for regenerated or merged files.
 6. If all regions resolve, resolve `skills/managing-git-workflow/scripts/skill-set-git` from the installed skill collection and inspect the completed merge index. When the merge index changes the `HEAD` tree, commit it through that absolute runner path with the observed index fingerprint and a message file. When the merge index tree is identical to the `HEAD` tree, first preview and then commit through the same runner with `--allow-tree-identical-merge`; never bypass the runner with a raw empty commit. Do not push or comment.
-7. If any region is AMBIGUOUS or validation fails, preserve the merge worktree exactly for user inspection.
+7. If any region is AMBIGUOUS or validation fails, preserve the current worktree exactly for user inspection.
 
 ## Result Contract
 

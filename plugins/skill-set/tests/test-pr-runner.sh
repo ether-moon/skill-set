@@ -480,6 +480,18 @@ resumed_awaiting=$(run_ok init --pr 17 --repo owner/repo --resume)
 jq -e --arg path "$repo" '.resumed == true and .status == "awaiting_user" and .resolution.worktree == $path' \
   <<<"$resumed_awaiting" >/dev/null
 
+make_fixture stale-resolver-retry
+export MOCK_GH_SCENARIO=fail
+initialized=$(init_case)
+run_id=$(jq -r .run_id <<<"$initialized")
+snapshot_case 101 >/dev/null
+start_resolution "$run_id" --resolver-agent ci-failure-resolver >/dev/null
+stale_retry=$(run_ok transition --pr 17 --from resolving --to polling \
+  --expected-run-id "$run_id" --resolver-attempt --resolver-result stale)
+jq -e '.status == "polling" and .resolver_attempt.result == "stale" and
+  .resolution.result == "stale" and .resolution.publication.phase == "pending"' \
+  <<<"$stale_retry" >/dev/null
+
 for dirty_kind in untracked unstaged staged metachar; do
   make_fixture "publication-dirty-$dirty_kind"
   export MOCK_GH_SCENARIO=fail
@@ -876,7 +888,11 @@ assert_equals invalid_github_response "$(jq -r .error.code <<<"$malformed_cr")" 
 # The command-log cases above exercise publication safety. Keep agent and command
 # contracts wired to that executable gate rather than a second mutation path.
 resolver=$plugin_dir/agents/resolving-pr-blockers.md
-grep -Eq 'isolated worktree' "$resolver"
+grep -Eq 'current worktree' "$resolver"
+grep -Fq 'workspace_mode=current' "$resolver"
+if grep -Eq 'Create the recorded temporary local branch|Clean up the isolated worktree' "$resolver"; then
+  fail "resolver still requires temporary worktree lifecycle management"
+fi
 grep -Eq 'conflict.*sole cycle|sole cycle.*conflict' "$resolver"
 grep -Eq 'CI.*then.*review|CI.*review.*sequential' "$resolver"
 grep -Eq 'expected-SHA push' "$resolver"
@@ -891,7 +907,8 @@ fix_command=$plugin_dir/commands/pr/fix.md
 grep -Eq 'headRefOid.*baseRefOid|baseRefOid.*headRefOid' "$fix_command"
 grep -Eq 'headRepository' "$fix_command"
 grep -Eq 'Re-read.*metadata|re-read.*metadata' "$fix_command"
-grep -Eq 'Require the HEAD still equals the snapshot' "$fix_command"
+grep -Eq 'If the HEAD changed.*fresh snapshot|fresh snapshot.*If the HEAD changed' "$fix_command"
+grep -Fq 'workspace_mode=current' "$fix_command"
 grep -Eq 'canonical.*push URL|canonical host' "$plugin_dir/skills/shipping-pr/SKILL.md" \
   "$plugin_dir/skills/shipping-pr/reference/blocker-resolution.md"
 grep -Eq 'praise phrase followed by any request remains actionable' \

@@ -1,6 +1,6 @@
 ---
 name: ci-failure-resolver
-description: Analyzes current-HEAD CI failures and applies authorized, unambiguous fixes inside a resolver worktree. Called sequentially by resolving-pr-blockers; never pushes or comments.
+description: Analyzes current-HEAD CI failures and applies authorized, unambiguous fixes in the recorded current PR worktree. Called sequentially by resolving-pr-blockers; never switches branches, pushes, or comments.
 tools: ["Read", "Grep", "Glob", "Bash", "Edit", "Write"]
 ---
 
@@ -11,11 +11,11 @@ tools: ["Read", "Grep", "Glob", "Bash", "Edit", "Write"]
 Require all of:
 
 - repository, PR number, and current remote HEAD SHA;
-- isolated worktree and temporary branch paths from `resolving-pr-blockers`;
+- recorded current worktree and branch from `resolving-pr-blockers`, with `workspace_mode=current`;
 - current failed-check snapshot or failed run IDs;
 - `resolve-authorized` capabilities with `edit=true`, `commit=true`, `push=false`, and `comment=false`.
 
-Reject a missing capability or a worktree whose HEAD differs from the supplied SHA. Never operate in the caller's original worktree.
+Reject a missing capability. Reconcile a differing local/remote HEAD in place through the orchestrator contract, and operate only in the supplied current worktree without switching branches.
 
 ## Workflow
 

@@ -1181,10 +1181,10 @@ command_transition() {
       --from) [[ $# -ge 2 ]] || die invalid_argument "--from requires a value." "Pass the expected current state."; from=$2; shift 2 ;;
       --to) [[ $# -ge 2 ]] || die invalid_argument "--to requires a value." "Pass the destination state."; to=$2; shift 2 ;;
       --expected-run-id) [[ $# -ge 2 ]] || die invalid_argument "--expected-run-id requires a value." "Pass the run_id returned by init."; expected_run_id=$2; shift 2 ;;
-      --resolver-result) [[ $# -ge 2 ]] || die invalid_argument "--resolver-result requires a value." "Pass success, no-op, partial-failure, ambiguous, or failed."; resolver_result=$2; shift 2 ;;
+      --resolver-result) [[ $# -ge 2 ]] || die invalid_argument "--resolver-result requires a value." "Pass success, no-op, stale, partial-failure, ambiguous, or failed."; resolver_result=$2; shift 2 ;;
       --resolver-agent) [[ $# -ge 2 ]] || die invalid_argument "--resolver-agent requires a value." "Pass a resolver agent name."; resolver_agents+=("$2"); shift 2 ;;
       --worktree) [[ $# -ge 2 ]] || die invalid_argument "--worktree requires a value." "Pass the planned absolute resolver worktree path."; worktree=$2; shift 2 ;;
-      --resolver-branch) [[ $# -ge 2 ]] || die invalid_argument "--resolver-branch requires a value." "Pass the temporary local branch."; resolver_branch=$2; shift 2 ;;
+      --resolver-branch) [[ $# -ge 2 ]] || die invalid_argument "--resolver-branch requires a value." "Pass the recorded current local branch."; resolver_branch=$2; shift 2 ;;
       --remote) [[ $# -ge 2 ]] || die invalid_argument "--remote requires a value." "Pass the Git remote name."; remote=$2; shift 2 ;;
       --remote-branch) [[ $# -ge 2 ]] || die invalid_argument "--remote-branch requires a value." "Pass the PR head branch."; remote_branch=$2; shift 2 ;;
       --expected-remote-sha) [[ $# -ge 2 ]] || die invalid_argument "--expected-remote-sha requires a value." "Pass the observed PR HEAD SHA."; expected_remote_sha=$2; shift 2 ;;
@@ -1346,8 +1346,8 @@ command_transition() {
   fi
 
   if [[ -n $resolver_result ]]; then
-    case "$resolver_result" in success|no-op|partial-failure|ambiguous|failed) ;; *)
-      die invalid_argument "Unknown resolver result: $resolver_result" "Use success, no-op, partial-failure, ambiguous, or failed." ;;
+    case "$resolver_result" in success|no-op|stale|partial-failure|ambiguous|failed) ;; *)
+      die invalid_argument "Unknown resolver result: $resolver_result" "Use success, no-op, stale, partial-failure, ambiguous, or failed." ;;
     esac
   fi
   if [[ $from == resolving ]]; then
@@ -1356,9 +1356,9 @@ command_transition() {
         "Pass --resolver-attempt with the structured resolver result."
     [[ -n $resolver_result ]] || \
       die resolver_result_required "Leaving resolving requires --resolver-result." \
-        "Pass success, no-op, partial-failure, ambiguous, or failed."
+        "Pass success, no-op, stale, partial-failure, ambiguous, or failed."
     case "$resolver_result:$to" in
-      success:polling|no-op:polling|ambiguous:awaiting_user|\
+      success:polling|no-op:polling|stale:polling|ambiguous:awaiting_user|\
       partial-failure:awaiting_user|partial-failure:failed|failed:failed|failed:awaiting_user) ;;
       success:*|no-op:*)
         die invalid_resolver_transition "$resolver_result must return to polling for a post-resolver snapshot." \
@@ -1623,7 +1623,7 @@ command_publish() {
       "Inspect the preserved recovery path and retry."
   [[ $actual_toplevel == "$physical_worktree" ]] || \
     die invalid_resolver_worktree "The recorded resolver path is not the worktree root." \
-      "Use the exact isolated worktree root; a subdirectory cannot define the publication boundary."
+      "Use the exact recorded worktree root; a subdirectory cannot define the publication boundary."
   if git -C "$worktree" ls-files --error-unmatch -- \
     ":(top,literal)$results_relative" >/dev/null 2>&1; then
     die managed_publication_input "--results-file must be an untracked publication artifact, not a tracked project file." \

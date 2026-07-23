@@ -1,6 +1,10 @@
 # Blocker Resolution and Publication Gate
 
-One resolver cycle uses one isolated worktree created from the exact remote PR HEAD and one temporary local branch. Before editing, fetch and verify both `expected_remote_sha` and the exact PR `baseRefOid`; record the base SHA/ref, PR head repository/branch/host, worktree, branch, bound remote, ordered agents, and blocker fingerprint in the runner transition. The remote's canonical push URL must target that head repository, including the contributor's repository for a fork PR. Do not rely on a moving local target ref.
+One resolver cycle uses the currently checked-out PR worktree and branch. Do not create another worktree, create a temporary resolver branch, or switch branches. Before editing, fetch and verify both `expected_remote_sha` and the exact PR `baseRefOid`; record the base SHA/ref, PR head repository/branch/host, current worktree, current branch, bound remote, ordered agents, and blocker fingerprint in the runner transition. The remote's canonical push URL must target that head repository, including the contributor's repository for a fork PR. Do not rely on a moving local target ref.
+
+## In-Place Reconciliation
+
+Preserve the complete current branch state. Commit any newly authorized working-tree changes through the Git runner before resolver edits. If the fetched remote PR HEAD differs from local HEAD, reconcile without changing branches: fast-forward local HEAD when possible, keep unpublished local descendants, or merge the exact fetched remote commit into the current branch when the histories diverged. Never rebase or force-push. A routine local/remote mismatch is work to reconcile, not a reason to create another checkout or stop. Only an ambiguous conflict or an external failure that cannot be repaired automatically waits for the user.
 
 ## Ordering
 
@@ -13,7 +17,7 @@ If no conflict exists:
 1. run `ci-failure-resolver` when selected checks failed;
 2. when CI is planned, require it to succeed or no-op before continuing;
 3. run `pr-review-feedback` only when actionable threads put it in the recorded plan; a review-only plan begins there;
-4. when both are planned, keep them sequential in the same worktree and branch.
+4. when both are planned, keep them sequential in the current worktree and branch.
 
 Do not run resolvers in parallel. They must see earlier edits and share one publication decision.
 
@@ -37,7 +41,9 @@ Resolve `scripts/skill-set-pr` from the `shipping-pr` skill directory and call i
 
 The runner validates the planned agents, result set, HEAD chain, branch, pinned commits, clean publication boundary, exact thread coverage, live PR head repository/ref, bound remote push URL, and remote HEAD. It checks the remote binding again immediately before invoking one expected-SHA push when the local HEAD changed and revalidates no-code activity. Only after that gate does it post idempotently marked thread replies, resolve `fixed` and `accepted_as_is` threads, and post the summary. When all queued CodeRabbit feedback is resolved, the runner itself prepends the exact `@coderabbitai resolve` command; this is never inferred from free-form text or supplied as an adapter flag. It never asks Codex or Claude to review again or to edit the PR. `pending → prepared → gate_passed → commenting → complete` state records make interrupted publication recoverable and hidden markers suppress duplicate feedback.
 
-A partial failure, failed resolver, AMBIGUOUS result, missing result, reordered agent, or broken HEAD chain fails before push or comment. Preserve the failure worktree and branch and report both paths.
+A partial failure, failed resolver, AMBIGUOUS result, missing result, reordered agent, or broken HEAD chain fails before push or comment. Preserve the current worktree and branch and report both paths.
+
+When the live PR HEAD changes before publication, do not treat ordinary staleness as a user decision. Preserve the current branch, return `resolving -> polling` with resolver result `stale`, take a fresh snapshot, reconcile the exact new HEAD in place, and retry the normal cycle. The stale result publishes neither code nor comments.
 
 ## Progress
 
