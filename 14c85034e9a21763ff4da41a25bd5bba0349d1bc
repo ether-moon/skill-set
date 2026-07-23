@@ -1,0 +1,25 @@
+## Decisions Made
+- `workspace_mode=current`를 transition 상태에 필수 저장: resume와 publication이 임시 worktree 없이 같은 checkout 정책을 검증할 수 있도록 했습니다.
+- Bash `input_match` 제안은 적용하지 않음: 실제 validator는 이 일반 grader에 해당 필드를 요구하지 않으며 전체 210개 eval 검증이 통과했습니다.
+- PR runner 권한은 `Bash(*skill-set-pr:*)` 패턴으로 허용: 설치 위치에 독립적인 portable runner 호출을 두 workflow frontmatter에서 승인합니다.
+
+## Problems Encountered
+- 기존 active run에는 `workspace_mode` 필드가 없음: 기록된 worktree와 branch가 현재 checkout과 일치할 때만 `current`로 안전하게 승격하는 recovery 경로를 추가했습니다.
+- happy-path eval wrapper가 새 필수 transition 인자를 누락함: focused fixture와 호출 회귀를 보강한 뒤 전체 suite를 다시 통과시켰습니다.
+
+## Constraints Identified
+- Resolver는 현재 checkout과 branch만 사용해야 함: 임시 worktree, branch switch, rebase, force-push는 허용되지 않습니다.
+- Branch push와 review feedback은 단일 `skill-set-pr publish` gate만 수행해야 함: 부분 결과나 AMBIGUOUS 결과는 publication할 수 없습니다.
+- Repository content와 commit message는 English를 사용해야 함: runtime 보고만 사용자의 Korean 언어를 따릅니다.
+
+## Open Questions
+- None
+
+## Context
+PR #31의 CodeRabbit unresolved threads 5개를 검증하고, 현재-worktree resolution 상태 기록, eval mutation guards, AMBIGUOUS fixture, portable runner 권한을 수정했습니다. Bash `input_match` 지적은 현재 validator 계약과 맞지 않아 코드 변경 없이 accepted-as-is로 분류했습니다. 전체 tests, strict plugin validation, 210-case eval validation, references, inventory, diff checks가 통과했습니다.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
