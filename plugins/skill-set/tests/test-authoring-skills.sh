@@ -63,6 +63,25 @@ grep -Eqi 'no-skill.*(retire|retirement)|(retire|retirement).*no-skill' "$creati
 grep -Eqi 'preserve.*(explicitly requested|existing).*name|(explicitly requested|existing).*name.*preserve' \
   "$creating_dir/reference/structure.md" || \
   fail 'creating-skills must preserve valid user-selected and existing skill names'
+grep -Eqi 'repository (content|artifacts).*(English)|English.*repository (content|artifacts)' \
+  "$creating_dir/reference/structure.md" || \
+  fail 'creating-skills must keep repository artifacts in English'
+grep -Eqi 'runtime.*user.*language|user.*language.*runtime' \
+  "$creating_dir/reference/structure.md" || \
+  fail 'creating-skills must separate runtime language from artifact language'
+grep -Eqi 'do not copy.*skill wholesale|skill wholesale.*do not copy' \
+  "$creating_dir/reference/structure.md" || \
+  fail 'creating-skills must prohibit wholesale skill copying'
+grep -Eqi 'provenance' "$creating_dir/reference/structure.md" || \
+  fail 'creating-skills must require understood provenance for reused material'
+grep -Eqi 'untrusted.*frontmatter|frontmatter.*untrusted' \
+  "$creating_dir/reference/structure.md" || \
+  fail 'creating-skills must treat imported frontmatter as untrusted input'
+grep -Eqi 'time-sensitive.*(validation source|update condition)|(validation source|update condition).*time-sensitive' \
+  "$creating_dir/reference/structure.md" || \
+  fail 'creating-skills must govern time-sensitive content'
+grep -Eqi 'content polic(y|ies).*(contract|policy gate)|(contract|policy gate).*content polic(y|ies)' "$creating" || \
+  fail 'creating-skills must pass durable content policies through its contract and policy gate'
 grep -Eqi 'must not require Claude Code|do not require Claude Code' "$creating" || \
   fail 'creating-skills must explicitly preserve non-Claude execution'
 if grep -Erq 'evals\.json|without_skill|with_skill/outputs' "$creating_dir"; then
@@ -104,6 +123,26 @@ for case_dir in \
     "$case_dir/graders/lifecycle.md" || \
     fail "creator-present eval must give execution ownership to skill-creator: $case_dir"
 done
+
+grep -Eqi 'repository artifacts.*English|English.*repository artifacts' \
+  "$plugin_dir/evals/creating-skills/new-with-creator/prompt.md" || \
+  fail 'creator-present eval must pass the repository artifact language policy'
+grep -Eqi 'runtime.*Korean|Korean.*runtime' \
+  "$plugin_dir/evals/creating-skills/new-with-creator/graders/lifecycle.md" || \
+  fail 'creator-present eval must verify runtime and artifact languages independently'
+grep -Eqi 'every generated repository artifact.*English|English.*every generated repository artifact' \
+  "$plugin_dir/evals/creating-skills/new-with-creator/graders/lifecycle.md" || \
+  fail 'creator-present eval must require every generated repository artifact to be in English'
+grep -Eqi 'English-language positive and negative.*eval|positive and negative.*eval.*in English' \
+  "$plugin_dir/evals/creating-skills/new-with-creator/graders/lifecycle.md" || \
+  fail 'creator-present eval must require English positive and negative eval files'
+
+for runtime_output in conversations reports summaries errors warnings 'status updates' prompts 'generated PR comments'; do
+  grep -Eqi "$runtime_output" "$creating_dir/reference/checklist.md" || \
+    fail "creating-skills language checklist misses runtime output: $runtime_output"
+done
+grep -Eqi 'detected user language' "$creating_dir/reference/checklist.md" || \
+  fail 'creating-skills language checklist must use the detected user language'
 
 validator_root=$(mktemp -d "${TMPDIR:-/tmp}/skill-set-authoring-validator.XXXXXX")
 trap 'rm -rf -- "$validator_root"' EXIT
