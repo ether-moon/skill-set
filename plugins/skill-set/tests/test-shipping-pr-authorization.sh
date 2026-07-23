@@ -107,10 +107,10 @@ grep -Fq 'does not create a temporary worktree or resolver branch' \
   "$current_worktree_case/graders/functional-contract.md" || \
   fail 'current-worktree eval must grade the requested workspace policy'
 
-grep -Fq 'returned `AMBIGUOUS` after finding an ambiguous public-API request' \
+grep -Fq "returned \`AMBIGUOUS\` after finding an ambiguous public-API request" \
   "$partial_publication_prompt" || \
   fail 'partial-publication fixture must use the resolver AMBIGUOUS result'
-if grep -Fq 'returned `failed` after finding an ambiguous public-API request' \
+if grep -Fq "returned \`failed\` after finding an ambiguous public-API request" \
   "$partial_publication_prompt"; then
   fail 'partial-publication fixture still conflates AMBIGUOUS with failed'
 fi
