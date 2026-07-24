@@ -1,0 +1,26 @@
+## Decisions Made
+- model eval 정책을 제품 중립적인 네 단계 흐름으로 단순화: deterministic validation, development smoke, focused comparison, campaign을 분리해 자동 확대와 승인 재사용을 방지한다.
+- stateless preflight planner를 사용: 기본 4 calls, 100,000 projected tokens, 25,000 tokens/call fallback을 적용하고 최근 동등 trace p95를 선택적으로 사용한다.
+- 객관적 검사는 deterministic test로 이동하고 qualitative expectation은 output당 하나의 batched model grader로 제한: 중복 case와 불필요한 model invocation을 줄인다.
+- provider별 adapter와 사후 token 상태관리를 제외: 현재 목표에는 사전 차단만 필요하며 복잡한 실행 상태는 과도하다.
+
+## Problems Encountered
+- worktree의 creating-skills에 요청에서 언급한 planner가 없었음: 새 executable script와 deterministic 회귀 테스트를 추가했다.
+- 기존 lifecycle 테스트가 `iterate`라는 특정 어형을 요구해 명시적 iteration 정책 문구와 충돌함: `iteration` 의미를 검증하도록 테스트를 정리했다.
+
+## Constraints Identified
+- 정책과 planner 검증은 model invocation 없이 수행해야 함: skill validator와 전체 deterministic/mock suite만 실행했다.
+- project-specific change detection, safety contract, representative-case selection은 각 project authoring skill이 소유함: creating-skills에는 공통 stage와 preflight 원칙만 유지했다.
+- focused comparison과 campaign은 이전 승인을 재사용할 수 없음: 새로운 목적, 승인, preflight plan이 필요하다.
+
+## Open Questions
+- None
+
+## Context
+`creating-skills`의 model evaluation 정책을 기술 중립적이고 token 효율적인 형태로 개편했다. 핵심 파일은 SKILL.md, evaluation/testing/checklist/troubleshooting references, 새 `scripts/plan_eval_budget.py`, 그리고 authoring 회귀 테스트다. 전체 deterministic suite와 skill/reference validator가 통과했으며 실제 model evaluation은 실행하지 않았다.
+
+## Recorded Decisions
+- None
+
+## Vault Entries Referenced
+- None
