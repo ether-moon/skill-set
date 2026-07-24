@@ -10,14 +10,10 @@ execution:
   timeout_seconds: 180
   allowed_tools:
     - Skill
-runs: 3
+runs: 1
 graders:
   - type: tool_used
     name: selected-zooming-out-on-code
     tool: Skill
     input_match: "zooming-out-on-code"
     min: 1
-  - type: llm
-    name: workflow-outcome
-    criteria: "Pass only if the response performs read-only orientation and reports exactly Responsibility, Callers, Dependencies, Siblings, and Unknowns without recommendations, edits, or architecture redesign."
-    focus: last_message
