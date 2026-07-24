@@ -1,6 +1,6 @@
 ---
 name: creating-skills
-description: This skill is the primary entry point for creating, modifying, evaluating, and governing the lifecycle of agent skills. Use cases include any new or existing SKILL.md work, including trigger design, structure and resources, evals, benchmarks, description optimization, troubleshooting, or retirement, even when skill-creator is available. It takes precedence over skill-creator for overlapping requests, delegates the complete supported execution loop, and retains project policy, evidence requirements, and final acceptance.
+description: This skill is the primary entry point for creating, modifying, evaluating, and governing the lifecycle of agent skills. Use cases include any new or existing SKILL.md work, including trigger design, structure and resources, evals, benchmarks, model-invocation budgeting, token or cost regressions, description optimization, troubleshooting, or retirement, even when skill-creator is available. It takes precedence over skill-creator for overlapping requests, delegates supported work within an explicit evaluation budget, and retains project policy, evidence requirements, and final acceptance.
 ---
 
 # Creating Skills
@@ -9,7 +9,7 @@ description: This skill is the primary entry point for creating, modifying, eval
 
 Use this skill as the primary entry point for both new skill and existing skill work, especially whenever a request matches both `creating-skills` and an available `skill-creator`.
 
-When `skill-creator:skill-creator` is available, invoke it before local artifact-producing work and delegate the complete loop it supports: intent discovery, use cases and triggers, skill structure, scripts and other resources, drafting, evaluation cases, baseline runs, grading, benchmark analysis, human review, iteration, description optimization, and packaging.
+When a compatible `skill-creator` is available, invoke it before local artifact-producing work and delegate only the stages it supports within the current evaluation budget: intent discovery, use cases and triggers, skill structure, scripts and other resources, drafting, evaluation cases, grading, benchmark analysis, human review, separately authorized iteration, description optimization, and packaging.
 
 Retain ownership here for:
 
@@ -29,18 +29,43 @@ Before delegation, define:
 2. The user's intended workflows, inputs, outputs, and trigger boundaries.
 3. Whether the skill is a **capability skill** or a **preference skill**.
 4. Allowed tools, file mutations, external effects, and publication authority.
-5. Required validators, evaluation adapter, baselines, evidence, and acceptance thresholds.
+5. Required validators, evaluation stage, evaluation adapter when available, evidence, and acceptance thresholds.
 6. The artifacts and unresolved decisions the creator must return.
 
 Use project-native formats as the durable source of truth. Let the creator use its supported working format internally, then adapt returned evidence at the boundary instead of forcing its private workspace layout into the repository.
 
 Make durable content policies explicit in the orchestration contract and verify them again at the policy gate; do not expect a delegated creator to rediscover them from the workspace.
 
+## Gate Model Evaluation
+
+Treat every fresh eval worker, qualitative judge, optimizer, or other model-backed task as a model invocation. Deterministic validators, parsers, and aggregation scripts do not count as model invocations.
+
+Keep evaluation stages separate and run only the stage currently authorized:
+
+1. **Deterministic validation** — validate structure, scripts, fixtures, schemas, and objective assertions without model invocations.
+2. **Development smoke** — run only changed or highest-signal cases, candidate-only, once each, within the default budget.
+3. **Focused comparison** — add a baseline only for cases that need it, with a separate purpose and freshly approved budget.
+4. **Campaign** — run a full suite, repeated trials, or cross-model evaluation only after an explicit request and a separate budget.
+
+Do not advance stages automatically or reuse approval from an earlier stage. Do not add cases, arms, trials, graders, optimizers, models, retries, or iterations after approval.
+
+Before any model invocation, run the stateless `scripts/plan_eval_budget.py` preflight with the planned cases, arms, trials, judge calls, optimizer calls, and other calls. It computes:
+
+```text
+execution calls = cases × arms × trials
+total calls = execution calls + judge calls + optimizer calls + other calls
+projected tokens = total calls × estimated tokens per call
+```
+
+The default limits are 4 total calls and 100,000 projected tokens. Use the recent equivalent-trace p95 when available; otherwise use the 25,000-token fallback. If either limit is exceeded, the planner exits with code 2 and no model invocation may start. `max-total-tokens` is a conservative preflight estimate, not a runtime hard cap.
+
+Do not add provider-specific adapters, capability-negotiation protocols, post-call token-debit state machines, execution-history databases, provider token normalization, automatic retries, or automatic iterations. Keep project-specific change detection, safety contracts, and representative-case selection in the project authoring skill.
+
 ## Delegate the Execution Loop
 
-Give the creator the orchestration contract and ask it to own the complete supported authoring and evaluation lifecycle. Require inspectable outputs: changed artifacts, test cases, baseline identity, per-case results, raw traces or logs, benchmark metrics, user feedback when collected, and unresolved limitations.
+Give the creator the orchestration contract and the current stage's budget envelope. Ask it to own the supported work without expanding that envelope. Require inspectable outputs: changed artifacts, test cases, baseline identity when approved, per-case results, raw traces or logs, benchmark metrics, user feedback when collected, and unresolved limitations.
 
-If the creator supports only part of the contract, preserve its valid output and execute only the unsupported stages locally. If it is unavailable or not installed, use the local fallback below without asking the user to install a particular product.
+If the creator cannot honor the budget, delegate artifact production but not model invocation. If it supports only part of the contract, preserve its valid output and execute only the unsupported work locally. If it is unavailable, use the local fallback below without requiring a particular product.
 
 ## Apply the Policy Gate
 
@@ -53,30 +78,30 @@ Evaluate returned evidence across four dimensions defined in `reference/evaluati
 
 Grade outcomes rather than incidental paths. Require a particular tool or order only when it is itself a safety invariant or external contract. Inspect traces and artifacts, not only aggregate scores.
 
-Classify failures before asking the creator to iterate. Accept only when declared thresholds hold and no grader, fixture, environmental, or missing-evidence defect hides a regression.
+Classify failures before proposing any separately authorized follow-up. Accept only when declared thresholds hold and no grader, fixture, environmental, or missing-evidence defect hides a regression.
 
 ## Preserve Long-Term Value
 
-- For a **capability skill**, prove a useful delta against a no-skill baseline and periodically rerun that arm after release. Retire the skill when it no longer provides material outcome, safety, or efficiency value.
-- For a **preference skill**, test fidelity to the current human workflow and periodically check for process drift. Model capability alone does not make the preference obsolete.
+- For a **capability skill**, use a focused comparison only when proving value or preventing a specific regression requires a baseline. Retire the skill when approved evidence shows no material outcome, safety, or efficiency value.
+- For a **preference skill**, test fidelity to the current human workflow when that question is explicitly in scope. Model capability alone does not make the preference obsolete.
 - Promote stable development evaluations into regression cases. Turn each reproducible field failure into a case rather than another paragraph of speculative instruction.
-- Run the same behavioral contract on every host for which portability is claimed; host-specific adapters may differ, but the outcome and safety requirements do not.
+- Test portability only as an explicitly requested campaign with its own budget.
 
 ## Local Fallback
 
 The workflow must remain usable without an external creator. With ordinary host capabilities:
 
 1. Produce the smallest skill structure and resources that satisfy the orchestration contract.
-2. Run repository and host-provided validators, then the available evaluation adapter against the declared baseline.
-3. Use deterministic checks before qualitative grading, keep nondeterministic trials isolated, and retain per-case evidence.
-4. Classify failures, make the smallest general correction, rerun affected cases, then rerun the suite.
+2. Run repository and environment-provided validators, then a budgeted development smoke only when that stage is authorized and an evaluation adapter is available.
+3. Use deterministic checks before qualitative grading and retain per-case evidence.
+4. Classify failures, make the smallest general correction, and rerun only affected cases.
 5. Stop at the same policy gate used for delegated work.
 
-The portable fallback must not require Claude Code, the `claude` CLI, vendor-specific environment variables, or a vendor-only installation layout. Report unavailable model evaluation honestly while keeping deterministic validation and runnable cases ready.
+The portable fallback must not require a vendor-specific CLI, environment variable, or installation layout. Report unavailable model evaluation honestly while keeping deterministic validation and runnable cases ready.
 
 ## Handoff
 
-Validate every linked path and executable resource. Confirm that the creator's temporary formats have been translated into the project's durable structure, the relevant regression suite is green, and `reference/checklist.md` has no unresolved item.
+Validate every linked path and executable resource. Confirm that temporary formats have been translated into the project's durable structure, the approved regression scope is green, and `reference/checklist.md` has no unresolved item.
 
 ## References
 

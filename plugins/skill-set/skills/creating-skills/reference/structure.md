@@ -71,7 +71,7 @@ Host-specific fields such as invocation controls, tool grants, models, isolated 
 - When one skill orchestrates another, identify the orchestrator as the primary entry point and describe the delegated skill as an internal execution capability.
 - Keep trigger policy in the description; the body is unavailable until after selection.
 
-Do not tune a description from easy or irrelevant negatives. Use the creator's trigger-optimization loop and the project's durable behavioral cases.
+Do not tune a description from easy or irrelevant negatives. Treat trigger optimization as a separately requested campaign with an accepted preflight budget, using the project's durable behavioral cases.
 
 ## Progressive Disclosure
 

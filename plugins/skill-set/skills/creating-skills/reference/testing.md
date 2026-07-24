@@ -6,13 +6,14 @@
 - [Test in Layers](#test-in-layers)
 - [Structural Boundary](#structural-boundary)
 - [Behavioral Contracts](#behavioral-contracts)
+- [Efficient Case Design](#efficient-case-design)
 - [Isolated Execution](#isolated-execution)
-- [Cross-Model and Cross-Host Testing](#cross-model-and-cross-host-testing)
+- [Campaign Execution](#campaign-execution)
 - [Trace Review](#trace-review)
 
 ## Responsibility
 
-Delegate test generation, execution, grading, aggregation, and review to `skill-creator` when supported. This reference defines the policy its evidence must satisfy and the local fallback when a capability is unavailable.
+Delegate test generation, budgeted execution, grading, aggregation, and review to a compatible `skill-creator` when supported. The preflight envelope remains authoritative; a creator that cannot honor it may produce artifacts but must not launch model invocations. This reference defines the common evidence policy and local fallback.
 
 ## Test in Layers
 
@@ -23,7 +24,7 @@ Use the cheapest layer that can disprove the claim:
 3. **Triggering** — realistic positive requests and plausible near misses select the right entry point.
 4. **Functional behavior** — the complete workflow produces the required outcome.
 5. **Safety** — absent or narrower authority cannot cause forbidden effects.
-6. **Comparison** — the candidate improves or preserves the declared baseline.
+6. **Comparison** — when separately approved, the candidate improves or preserves the declared baseline.
 
 Do not substitute prose claims for executing a script or inspecting an artifact.
 
@@ -43,35 +44,46 @@ When: the skill follows its normal entry point
 Then: required output, state transition, scope, and recovery behavior
 ```
 
-Trigger cases should cover natural phrasing, uncommon valid uses, competition with neighboring skills, and near misses that share vocabulary but need another workflow. Functional cases should cover the happy path, invalid input, dependency failure, partial completion, retry, concurrency, and publication boundaries when relevant.
+The project authoring skill owns change detection, safety contracts, and representative-case selection. Keep each common case focused on one observable regression risk rather than repeating a generic command or failure matrix.
 
 Verify both what happened and what did not happen. Command logs and state inspection are stronger safety evidence than a rubric that merely says the run was safe.
 
+## Efficient Case Design
+
+- Give each case one regression risk that differs from every existing case.
+- Do not repeat the full policy or a long command matrix in every prompt; reference concise task-local fixtures and contracts.
+- Move checks for strings, file existence, tool calls, and state transitions into deterministic tests.
+- Merge expectations that measure the same meaning.
+- Leave only genuinely qualitative judgment to a model grader.
+- Use at most one batched model-grader call for one output; do not launch one grader per expectation.
+- Do not add a case that duplicates an existing deterministic test or cannot reproduce an actual or credible observed failure.
+- After a fix, rerun only affected cases. Do not automatically rerun the full suite.
+
 ## Isolated Execution
 
-Start every case, comparison arm, and nondeterministic trial in a fresh context with reset fixtures and a separate output directory. Pass raw task artifacts and the skill under test; do not leak the expected answer, suspected bug, intended fix, or earlier conclusions.
+Start every approved case, comparison arm, and trial in a fresh eval-worker context with reset fixtures and a separate output directory. Pass raw task artifacts and the skill under test; do not leak the expected answer, suspected bug, intended fix, or earlier conclusions.
 
 Use disposable repositories, mock services, or scoped test accounts for stateful workflows. Preserve unrelated user changes and clean trial artifacts that a later run could discover.
 
-## Cross-Model and Cross-Host Testing
+## Campaign Execution
 
-Test the supported model tiers that matter:
+Treat a full suite, repeated trials, cross-model evaluation, cross-environment portability check, or broad optimizer pass as a campaign. Run it only after an explicit request, a stated purpose, and a separate accepted preflight budget.
 
-- a small or fast model exposes missing sequence details and weak guardrails;
-- the primary balanced model is the main functional target; and
-- the strongest supported model exposes unnecessary instruction volume and overconstraint.
+Do not infer a campaign from successful deterministic validation, development smoke, or focused comparison. Do not reuse approval from any earlier stage.
 
-Use an independent capable judge for qualitative grading. Hold cases, fixtures, grants, and run counts constant across model comparisons.
-
-For every supported host on which portability is claimed, run the same behavioral contract through that host's adapter. Record host-specific skill selection, reference navigation, tool grants, and unsupported metrics rather than assuming one host's result generalizes.
+When a campaign needs qualitative grading, batch the qualitative expectations for each output into one model-grader call. Hold cases, fixtures, grants, and approved run counts constant across comparison arms.
 
 ## Trace Review
 
 Inspect whether the run:
 
 - selected `creating-skills` as the primary entry point for overlapping authoring requests;
-- delegated the complete supported loop instead of treating `skill-creator` as optional advice;
+- delegated only supported work inside the accepted preflight plan;
 - loaded only relevant references and reused bundled scripts;
+- ran deterministic validation before any development smoke;
+- kept development smoke candidate-only and single-trial;
+- added a baseline only for an approved focused comparison;
+- started a campaign only after an explicit request and separate budget;
 - stopped at the intended authority boundary; and
 - returned enough evidence for the policy gate.
 
