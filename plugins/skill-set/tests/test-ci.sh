@@ -34,16 +34,25 @@ fi
 
 eval_workflow=$repo_dir/.github/workflows/evaluate-skill-set.yml
 assert_file "$eval_workflow"
-grep -Eq 'schedule:' "$eval_workflow"
 grep -Eq 'workflow_dispatch:' "$eval_workflow"
+if grep -Eq 'schedule:|cron:' "$eval_workflow"; then
+  fail 'model evaluations must not run on an automatic schedule'
+fi
 grep -Eq 'fetch-depth: 0' "$eval_workflow"
 grep -Eq 'scripts/run-evals' "$eval_workflow"
+# shellcheck disable=SC2016 # EVAL_STAGE is literal workflow syntax.
+grep -Eq -- '--stage "\$EVAL_STAGE"' "$eval_workflow"
+grep -Eq -- '--plan' "$eval_workflow"
+grep -Eq 'MAX_CALLS:.*inputs.max_calls' "$eval_workflow"
+grep -Eq 'MAX_TOTAL_TOKENS:.*inputs.max_total_tokens' "$eval_workflow"
 # shellcheck disable=SC2016 # EVAL_MODEL is literal workflow syntax.
 grep -Eq -- '--model "\$EVAL_MODEL"' "$eval_workflow"
 # shellcheck disable=SC2016 # JUDGE_MODEL is literal workflow syntax.
 grep -Eq -- '--judge-model "\$JUDGE_MODEL"' "$eval_workflow"
 grep -Eq 'acceptance-summary.json' "$eval_workflow"
-grep -Eq "REQUESTED_RUNS:.*'3'" "$eval_workflow"
+if grep -Eq "REQUESTED_RUNS:.*'3'|default: '3'" "$eval_workflow"; then
+  fail 'model evaluation must not default to three trials'
+fi
 grep -Eq 'human review' "$eval_workflow"
 grep -Eq 'upload-artifact' "$eval_workflow"
 grep -Eq 'early access' "$eval_workflow"

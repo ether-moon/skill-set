@@ -194,26 +194,28 @@ runner=$plugin_dir/scripts/run-evals
 assert_executable "$runner"
 grep -Eq 'summarize-evals' "$runner"
 "$runner" --help | grep -Eq '95c1b2a'
-eval_plan=$(/bin/bash "$runner" --plan --runs 1 --model test-model --judge-model test-judge --max-cost-usd 1 --tag trigger-positive)
-printf '%s\n' "$eval_plan" | grep -Eq -- '--allow-tools Bash Write Edit'
-printf '%s\n' "$eval_plan" | grep -Eq -- '--keep-temp'
-printf '%s\n' "$eval_plan" | grep -Eq -- '--output-dir [^ ]+/candidate'
-if printf '%s\n' "$eval_plan" | grep -Eq -- '--output-dir --'; then
-  fail 'run-evals left --output-dir without its value'
+eval_plan=$(/bin/bash "$runner" --plan --case creating-skills-trigger-positive-01 --model test-model --judge-model test-judge)
+printf '%s\n' "$eval_plan" | jq -e '
+  .stage == "development-smoke" and
+  .selected_cases == ["creating-skills-trigger-positive-01"] and
+  .arms == ["candidate"] and
+  .trials == 1 and
+  .budget.total_calls == 1 and
+  .budget.projected_tokens == 25000 and
+  .budget.allowed == true
+' >/dev/null
+if /bin/bash "$runner" --plan --case creating-skills-existing-with-creator --model same-model --judge-model same-model >/dev/null 2>&1; then
+  fail 'run-evals must keep actual qualitative grading independent'
 fi
-if /bin/bash "$runner" --plan --model same-model --judge-model same-model >/dev/null 2>&1; then
-  fail 'run-evals must keep the agent and LLM judge models independent'
-fi
-if /bin/bash "$runner" --plan --model sonnet --judge-model haiku >/dev/null 2>&1; then
-  fail 'run-evals must require a Sonnet-tier or larger LLM judge'
-fi
-if /bin/bash "$runner" --plan --runs 0 >/dev/null 2>&1; then
+if /bin/bash "$runner" --plan --case creating-skills-trigger-positive-01 --runs 0 >/dev/null 2>&1; then
   fail 'run-evals must reject a non-positive run count'
 fi
-if /bin/bash "$runner" --plan --max-cost-usd invalid >/dev/null 2>&1; then
+if /bin/bash "$runner" --plan --case creating-skills-trigger-positive-01 --max-cost-usd invalid >/dev/null 2>&1; then
   fail 'run-evals must reject an invalid cost target'
 fi
-if /bin/bash "$runner" --plan --baseline-ref HEAD >/dev/null 2>&1; then
+if /bin/bash "$runner" --plan --stage focused-comparison --case creating-skills-trigger-positive-01 \
+  --baseline deletion-baseline --reason regression --max-calls 4 --max-total-tokens 100000 \
+  --baseline-ref HEAD >/dev/null 2>&1; then
   fail 'run-evals must reject any baseline other than pinned 95c1b2a'
 fi
 grep -Eq '95c1b2a56b7b972f25bb9b5ae4c3cc942734b674' "$runner"
@@ -224,6 +226,17 @@ grep -Eq 'baseline_normalization: \[\]' "$runner"
 validator=$plugin_dir/scripts/validate-evals
 assert_executable "$validator"
 grep -Eq 'YAML.safe_load' "$validator"
-grep -Eq 'runs must be an integer of at least 3' "$validator"
+grep -Eq 'runs must be a positive integer' "$validator"
+grep -Eq 'at most one batched llm grader' "$validator"
 "$validator"
+ruby -ryaml -e '
+  files = Dir.glob(File.join(ARGV.fetch(0), "*", "trigger-*", "case.yaml"))
+  abort "missing generated trigger cases" if files.empty?
+  files.each do |file|
+    parsed = YAML.safe_load(File.read(file), aliases: false)
+    abort "#{file}: trigger cases must default to one run" unless parsed["runs"] == 1
+    abort "#{file}: trigger cases must use deterministic graders only" if
+      Array(parsed["graders"]).any? { |grader| grader["type"] == "llm" }
+  end
+' "$plugin_dir/evals"
 printf 'PASS: eval layout\n'

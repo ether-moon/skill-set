@@ -59,8 +59,15 @@ jobs:
         run: |
           shellcheck_dirs=(plugins/skill-set/scripts plugins/skill-set/tests plugins/skill-set/evals plugins/skill-set/skills)
           if [ -d plugins/skill-set/bin ]; then shellcheck_dirs+=(plugins/skill-set/bin); fi
-          mapfile -d '' shellcheck_files < <(
+          mapfile -d '' shellcheck_candidates < <(
             find "${shellcheck_dirs[@]}" -type f \
               \( -name '*.sh' -o -perm -u+x \) -print0
           )
+          shellcheck_files=()
+          for file in "${shellcheck_candidates[@]}"; do
+            first_line=$(head -n 1 -- "$file")
+            if [[ $file == *.sh || $first_line =~ ^\#![[:space:]]*(/usr/bin/env[[:space:]]+)?(/usr/bin/|/bin/)?(ba|da|k)?sh([[:space:]]|$) ]]; then
+              shellcheck_files+=("$file")
+            fi
+          done
           shellcheck -x "${shellcheck_files[@]}"

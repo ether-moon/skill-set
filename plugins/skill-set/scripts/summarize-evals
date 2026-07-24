@@ -4,10 +4,10 @@ set -euo pipefail
 
 usage() {
   printf '%s\n' \
-    'Usage: summarize-evals --candidate FILE --baseline FILE --metadata FILE --safety-contract FILE [--output FILE]' \
+    'Usage: summarize-evals --stage STAGE --candidate FILE [--baseline FILE] --metadata FILE --plan FILE --safety-contract FILE [--output FILE]' \
     '' \
-    'Summarize Claude plugin eval JSON and retained agent traces into trigger,' \
-    'explicit mutation-boundary safety, pinned-baseline, resource, and per-case evidence.'
+    'Validate staged evidence against its preflight plan. Campaign runs also' \
+    'summarize trigger, safety, pinned-baseline, resource, and per-case evidence.'
 }
 
 candidate=
@@ -15,10 +15,12 @@ baseline=
 metadata=
 safety_contract=
 output=
+stage=campaign
+plan=
 
 while (($#)); do
   case $1 in
-    --candidate|--baseline|--metadata|--safety-contract|--output)
+    --candidate|--baseline|--metadata|--safety-contract|--output|--stage|--plan)
       (($# >= 2)) || { printf '%s requires a value\n' "$1" >&2; exit 2; }
       option=$1
       value=$2
@@ -29,6 +31,8 @@ while (($#)); do
         --metadata) metadata=$value ;;
         --safety-contract) safety_contract=$value ;;
         --output) output=$value ;;
+        --stage) stage=$value ;;
+        --plan) plan=$value ;;
       esac
       ;;
     -h|--help) usage; exit 0 ;;
@@ -42,6 +46,27 @@ for dependency in git jq; do
     exit 127
   }
 done
+
+case $stage in
+  development-smoke|focused-comparison)
+    command -v python3 >/dev/null 2>&1 || {
+      printf 'Missing required command: python3\n' >&2
+      exit 127
+    }
+    for required in candidate metadata safety_contract plan; do
+      value=${!required}
+      [[ -n $value ]] || { printf 'Missing required option: --%s\n' "${required//_/-}" >&2; exit 2; }
+      [[ -s $value ]] || { printf 'Missing or empty input: %s\n' "$value" >&2; exit 2; }
+      jq -e . "$value" >/dev/null || { printf 'Invalid JSON input: %s\n' "$value" >&2; exit 2; }
+    done
+    [[ -n $output ]] || { printf 'Missing required option: --output\n' >&2; exit 2; }
+    staged_args=(--candidate "$candidate" --metadata "$metadata" --plan "$plan" --output "$output")
+    [[ -n $baseline ]] && staged_args+=(--baseline "$baseline")
+    exec python3 "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/summarize-staged-evals.py" "${staged_args[@]}"
+    ;;
+  campaign) ;;
+  *) printf 'Unknown evaluation stage: %s\n' "$stage" >&2; exit 2 ;;
+esac
 
 for required in candidate baseline metadata safety_contract; do
   value=${!required}

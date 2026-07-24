@@ -10,20 +10,26 @@ usage() {
   printf '%s\n' \
     'Usage: run-evals [options]' \
     '' \
-    'Compare the candidate plugin, its no-plugin ablation arm, and the' \
-    'post-deletion baseline at commit 95c1b2a.' \
+    'Run one explicitly selected evaluation stage after a stateless budget preflight.' \
+    'No stage expands automatically and prior approval is never reused.' \
     '' \
     'Options:' \
     '  --candidate PATH       Candidate plugin directory (default: current plugin)' \
-    '  --baseline-ref REF     Compatibility option; only 95c1b2a is accepted' \
+    '  --stage STAGE          development-smoke (default), focused-comparison, or campaign' \
+    '  --case NAME            Exact case for development smoke or focused comparison' \
+    '  --baseline MODE        none, no-plugin, or deletion-baseline' \
+    '  --reason TEXT          Required purpose for focused comparison and campaign' \
+    '  --baseline-ref REF     Compatibility option; deletion baseline is pinned to 95c1b2a' \
     '  --output-dir PATH      Result directory (default: evals/results/<timestamp>)' \
-    '  --model MODEL          Evaluated model (default: haiku)' \
-    '  --judge-model MODEL    Independent LLM grader (default: sonnet)' \
-    '  --max-cost-usd USD     Split a total target into two bounded CLI ceilings' \
-    '  --runs N               Override runs per case' \
-    '  --case GLOB            Restrict cases by name' \
-    '  --tag TAG              Restrict cases by tag; repeatable' \
-    '  --plan                 Print the two eval commands without running them' \
+    '  --model MODEL          Evaluated model identifier (default: haiku)' \
+    '  --judge-model MODEL    Qualitative grader identifier (default: sonnet)' \
+    '  --runs N               Trials; smoke/focused require 1, campaign requires an explicit value' \
+    '  --max-calls N          Preflight model-call limit (default: 4)' \
+    '  --max-total-tokens N   Conservative preflight estimate, not a runtime hard cap (default: 100000)' \
+    '  --estimated-tokens-per-call N' \
+    '                         Equivalent-trace p95 estimate (fallback: 25000)' \
+    '  --max-cost-usd USD     Optional secondary runtime ceiling for the current adapter' \
+    '  --plan                 Print the validated preflight plan without invoking a model' \
     '  -h, --help             Show this help'
 }
 
@@ -32,6 +38,11 @@ require_command() {
     printf 'Missing required command: %s\n' "$1" >&2
     exit 127
   }
+}
+
+positive_integer() {
+  case $1 in ''|*[!0-9]*) return 1 ;; esac
+  (($1 > 0))
 }
 
 snapshot_candidate() {
@@ -46,6 +57,11 @@ snapshot_candidate() {
 }
 
 candidate=$plugin_dir
+stage=development-smoke
+case_name=
+baseline=none
+baseline_explicit=false
+reason=
 deletion_baseline_ref=95c1b2a
 deletion_baseline_sha=95c1b2a56b7b972f25bb9b5ae4c3cc942734b674
 baseline_ref=$deletion_baseline_ref
@@ -54,32 +70,37 @@ model=haiku
 judge_model=sonnet
 max_cost_usd=
 runs=
-case_glob=
+runs_explicit=false
+max_calls=4
+max_calls_explicit=false
+max_total_tokens=100000
+max_total_tokens_explicit=false
+estimated_tokens_per_call=
 plan_only=false
-tags=()
 
 while (($#)); do
   case $1 in
-    --candidate|--baseline-ref|--output-dir|--model|--judge-model|--max-cost-usd|--runs|--case)
+    --candidate|--stage|--case|--baseline|--reason|--baseline-ref|--output-dir|--model|--judge-model|--max-cost-usd|--runs|--max-calls|--max-total-tokens|--estimated-tokens-per-call)
       (($# >= 2)) || { printf '%s requires a value\n' "$1" >&2; exit 2; }
       option=$1
       value=$2
       shift 2
       case $option in
         --candidate) candidate=$value ;;
+        --stage) stage=$value ;;
+        --case) case_name=$value ;;
+        --baseline) baseline=$value; baseline_explicit=true ;;
+        --reason) reason=$value ;;
         --baseline-ref) baseline_ref=$value ;;
         --output-dir) output_dir=$value ;;
         --model) model=$value ;;
         --judge-model) judge_model=$value ;;
         --max-cost-usd) max_cost_usd=$value ;;
-        --runs) runs=$value ;;
-        --case) case_glob=$value ;;
+        --runs) runs=$value; runs_explicit=true ;;
+        --max-calls) max_calls=$value; max_calls_explicit=true ;;
+        --max-total-tokens) max_total_tokens=$value; max_total_tokens_explicit=true ;;
+        --estimated-tokens-per-call) estimated_tokens_per_call=$value ;;
       esac
-      ;;
-    --tag)
-      (($# >= 2)) || { printf '%s requires a value\n' "$1" >&2; exit 2; }
-      tags+=("$2")
-      shift 2
       ;;
     --plan) plan_only=true; shift ;;
     -h|--help) usage; exit 0 ;;
@@ -87,94 +108,162 @@ while (($#)); do
   esac
 done
 
-for dependency in bash git jq claude tar; do
+for dependency in bash git jq python3 ruby tar; do
   require_command "$dependency"
 done
 [[ -n $model ]] || { printf 'The evaluated model identifier cannot be empty.\n' >&2; exit 2; }
-[[ -n $judge_model ]] || { printf 'The LLM judge model identifier cannot be empty.\n' >&2; exit 2; }
-if [[ -n $runs ]]; then
-  case $runs in ''|*[!0-9]*) printf 'Runs must be a positive integer.\n' >&2; exit 2 ;; esac
-  ((runs > 0)) || { printf 'Runs must be a positive integer.\n' >&2; exit 2; }
+[[ -n $judge_model ]] || { printf 'The qualitative grader identifier cannot be empty.\n' >&2; exit 2; }
+if [[ $runs_explicit == true ]] && ! positive_integer "$runs"; then
+  printf 'Runs must be a positive integer.\n' >&2
+  exit 2
+fi
+positive_integer "$max_calls" || { printf 'Max calls must be a positive integer.\n' >&2; exit 2; }
+positive_integer "$max_total_tokens" || { printf 'Max total tokens must be a positive integer.\n' >&2; exit 2; }
+if [[ -n $estimated_tokens_per_call ]] && ! positive_integer "$estimated_tokens_per_call"; then
+  printf 'Estimated tokens per call must be a positive integer.\n' >&2
+  exit 2
 fi
 if [[ -n $max_cost_usd ]] && ! jq -en --arg value "$max_cost_usd" \
   '$value | tonumber | isfinite and . > 0' >/dev/null 2>&1; then
-  printf 'The cost target must be a positive finite number.\n' >&2
+  printf 'The cost ceiling must be a positive finite number.\n' >&2
   exit 2
 fi
+[[ -d $candidate/evals ]] || { printf 'Candidate has no evals directory: %s\n' "$candidate" >&2; exit 2; }
+candidate=$(cd -- "$candidate" && pwd -P)
+planner=$candidate/skills/creating-skills/scripts/plan_eval_budget.py
+[[ -x $planner ]] || { printf 'Missing executable eval budget planner: %s\n' "$planner" >&2; exit 2; }
+
+case $stage in
+  development-smoke)
+    [[ -n $case_name ]] || { printf 'Development smoke requires one exact --case.\n' >&2; exit 2; }
+    [[ $baseline == none ]] || { printf 'Development smoke is candidate-only; --baseline must be none.\n' >&2; exit 2; }
+    [[ $runs_explicit == false || $runs == 1 ]] || { printf 'Development smoke requires exactly one trial.\n' >&2; exit 2; }
+    trials=1
+    arms=(candidate)
+    ;;
+  focused-comparison)
+    [[ -n $case_name ]] || { printf 'Focused comparison requires one exact --case.\n' >&2; exit 2; }
+    [[ $baseline_explicit == true && ( $baseline == no-plugin || $baseline == deletion-baseline ) ]] || {
+      printf 'Focused comparison requires --baseline no-plugin or deletion-baseline.\n' >&2
+      exit 2
+    }
+    [[ -n $reason ]] || { printf 'Focused comparison requires a non-empty --reason.\n' >&2; exit 2; }
+    [[ $max_calls_explicit == true && $max_total_tokens_explicit == true ]] || {
+      printf 'Focused comparison requires explicit --max-calls and --max-total-tokens approval.\n' >&2
+      exit 2
+    }
+    [[ $runs_explicit == false || $runs == 1 ]] || { printf 'Focused comparison requires exactly one trial.\n' >&2; exit 2; }
+    trials=1
+    arms=(candidate "$baseline")
+    ;;
+  campaign)
+    [[ -z $case_name ]] || { printf 'Campaign runs the full suite and does not accept --case.\n' >&2; exit 2; }
+    [[ $baseline_explicit == false || $baseline == none ]] || { printf 'Campaign arms are fixed; omit --baseline.\n' >&2; exit 2; }
+    [[ -n $reason ]] || { printf 'Campaign requires a non-empty --reason.\n' >&2; exit 2; }
+    [[ $runs_explicit == true ]] || { printf 'Campaign requires explicit --runs approval.\n' >&2; exit 2; }
+    [[ $max_calls_explicit == true && $max_total_tokens_explicit == true ]] || {
+      printf 'Campaign requires explicit --max-calls and --max-total-tokens approval.\n' >&2
+      exit 2
+    }
+    trials=$runs
+    arms=(candidate no-plugin deletion-baseline)
+    ;;
+  *) printf 'Unknown evaluation stage: %s\n' "$stage" >&2; exit 2 ;;
+esac
+
+case_inventory=$(ruby -rjson -ryaml -e '
+  cases = Dir.glob(File.join(ARGV.fetch(0), "**", "case.yaml")).sort.map do |file|
+    parsed = YAML.safe_load(File.read(file), permitted_classes: [], permitted_symbols: [], aliases: false)
+    graders = Array(parsed["graders"])
+    linked_graders = Dir.glob(File.join(File.dirname(file), "graders", "*.md")).count do |grader_file|
+      frontmatter = File.read(grader_file).split(/^---\s*$\n?/)[1]
+      next false unless frontmatter
+      YAML.safe_load(frontmatter, permitted_classes: [], permitted_symbols: [], aliases: false)["type"] == "llm"
+    end
+    {name: parsed["name"], qualitative_graders: graders.count { |grader| grader["type"] == "llm" } + linked_graders}
+  end
+  abort "duplicate or invalid eval case names" unless cases.all? { |item| item[:name].is_a?(String) && !item[:name].empty? } && cases.map { |item| item[:name] }.uniq.length == cases.length
+  puts JSON.generate(cases)
+' "$candidate/evals")
+if [[ $stage == campaign ]]; then
+  selected_cases=$(jq '[.[].name]' <<<"$case_inventory")
+  qualitative_graders=$(jq '[.[].qualitative_graders] | add // 0' <<<"$case_inventory")
+else
+  selected_count=$(jq --arg name "$case_name" '[.[] | select(.name == $name)] | length' <<<"$case_inventory")
+  [[ $selected_count == 1 ]] || { printf 'Unknown evaluation case: %s\n' "$case_name" >&2; exit 2; }
+  selected_cases=$(jq -nc --arg name "$case_name" '[$name]')
+  qualitative_graders=$(jq --arg name "$case_name" '[.[] | select(.name == $name) | .qualitative_graders] | add // 0' <<<"$case_inventory")
+fi
+case_count=$(jq 'length' <<<"$selected_cases")
+arm_count=${#arms[@]}
+judge_calls=$((qualitative_graders * arm_count * trials))
 normalized_model=$(printf '%s' "$model" | tr '[:upper:]' '[:lower:]')
 normalized_judge=$(printf '%s' "$judge_model" | tr '[:upper:]' '[:lower:]')
-if [[ -n $model && -n $judge_model && $normalized_model == "$normalized_judge" ]]; then
-  printf 'The evaluated model and LLM judge model must be different.\n' >&2
+if ((judge_calls > 0)) && [[ $normalized_model == "$normalized_judge" ]]; then
+  printf 'Qualitative grading must use an independent model identifier.\n' >&2
   exit 2
 fi
-case $normalized_judge in
-  *haiku*)
-    printf 'The LLM judge must be Sonnet-tier or larger; Haiku is not accepted as a trusted grader.\n' >&2
+
+planner_args=(
+  --cases "$case_count"
+  --arms "$arm_count"
+  --trials "$trials"
+  --judge-calls "$judge_calls"
+  --max-calls "$max_calls"
+  --max-total-tokens "$max_total_tokens"
+  --json
+)
+[[ -n $estimated_tokens_per_call ]] && planner_args+=(--estimated-tokens-per-call "$estimated_tokens_per_call")
+set +e
+budget_plan=$(python3 "$planner" "${planner_args[@]}")
+budget_status=$?
+set -e
+if ((budget_status != 0)); then
+  printf '%s\n' "$budget_plan"
+  exit "$budget_status"
+fi
+arms_json=$(printf '%s\n' "${arms[@]}" | jq -R . | jq -s .)
+eval_plan=$(jq -n \
+  --argjson schema_version 1 \
+  --arg stage "$stage" \
+  --arg purpose "$reason" \
+  --argjson selected_cases "$selected_cases" \
+  --argjson arms "$arms_json" \
+  --argjson trials "$trials" \
+  --argjson budget "$budget_plan" \
+  '{schema_version: $schema_version, stage: $stage, purpose: $purpose,
+    selected_cases: $selected_cases, arms: $arms, trials: $trials, budget: $budget}')
+needs_deletion_baseline=false
+if [[ $stage == campaign || $baseline == deletion-baseline ]]; then needs_deletion_baseline=true; fi
+if [[ $needs_deletion_baseline == true ]]; then
+  [[ $baseline_ref == "$deletion_baseline_ref" ]] || {
+    printf 'The deletion baseline is pinned to %s; refusing ref %s.\n' "$deletion_baseline_ref" "$baseline_ref" >&2
     exit 2
-    ;;
-esac
-[[ -d "$candidate/evals" ]] || { printf 'Candidate has no evals directory: %s\n' "$candidate" >&2; exit 2; }
-candidate=$(cd -- "$candidate" && pwd -P)
-candidate_pr_runner=$candidate/skills/shipping-pr/scripts/skill-set-pr
-[[ $baseline_ref == "$deletion_baseline_ref" ]] || {
-  printf 'The deletion baseline is pinned to %s; refusing ref %s.\n' \
-    "$deletion_baseline_ref" "$baseline_ref" >&2
-  exit 2
-}
-resolved_baseline_sha=$(git -C "$repo_dir" rev-parse --verify "$deletion_baseline_ref^{commit}")
-[[ $resolved_baseline_sha == "$deletion_baseline_sha" ]] || {
-  printf 'Deletion baseline %s resolved to %s, expected %s.\n' \
-    "$deletion_baseline_ref" "$resolved_baseline_sha" "$deletion_baseline_sha" >&2
-  exit 2
-}
-safety_contract=$candidate/evals/safety-contract.json
-[[ -s $safety_contract ]] || { printf 'Candidate has no safety contract: %s\n' "$safety_contract" >&2; exit 2; }
-jq -e '.schema_version == 1 and (.checks | type) == "array" and
-  .operator_grants == ["Bash", "Write", "Edit"]' "$safety_contract" >/dev/null || {
-  printf 'Candidate safety contract is invalid: %s\n' "$safety_contract" >&2
-  exit 2
-}
-
-if [[ -z $output_dir ]]; then
-  output_dir=$candidate/evals/results/$(date -u +%Y%m%dT%H%M%SZ)
+  }
+  resolved_baseline_sha=$(git -C "$repo_dir" rev-parse --verify "$deletion_baseline_ref^{commit}")
+  [[ $resolved_baseline_sha == "$deletion_baseline_sha" ]] || {
+    printf 'Deletion baseline %s resolved to %s, expected %s.\n' "$deletion_baseline_ref" "$resolved_baseline_sha" "$deletion_baseline_sha" >&2
+    exit 2
+  }
 fi
-
-common_args=(--scaffold --keep-temp --threshold 0 --allow-tools Bash Write Edit)
-common_args+=(--model "$model" --judge-model "$judge_model")
-[[ -n $runs ]] && common_args+=(--runs "$runs")
-[[ -n $case_glob ]] && common_args+=(--case "$case_glob")
-if ((${#tags[@]})); then
-  for tag in "${tags[@]}"; do common_args+=(--tag "$tag"); done
-fi
-
-candidate_args=("${common_args[@]}")
-baseline_args=("${common_args[@]}")
-candidate_budget=
-baseline_budget=
-if [[ -n $max_cost_usd ]]; then
-  candidate_budget=$(jq -nr --arg budget "$max_cost_usd" '$budget | tonumber * 2 / 3')
-  baseline_budget=$(jq -nr --arg budget "$max_cost_usd" '$budget | tonumber / 3')
-  candidate_args+=(--max-cost-usd "$candidate_budget")
-  baseline_args+=(--max-cost-usd "$baseline_budget")
-fi
-
-candidate_command=(claude plugin eval "$candidate" --ablation with-without "${candidate_args[@]}" --output-dir "$output_dir/candidate" --json "$output_dir/candidate.json")
-if [[ -x $candidate_pr_runner ]]; then
-  candidate_command=(env SKILL_SET_PR_RUNNER="$candidate_pr_runner" "${candidate_command[@]}")
-fi
-
 if [[ $plan_only == true ]]; then
-  printf 'Candidate/no-plugin: '
-  printf '%q ' "${candidate_command[@]}"
-  printf '\nBaseline plugin: materialize %s (%s), overlay candidate evals, then run with --ablation none.\n' \
-    "$deletion_baseline_ref" "$deletion_baseline_sha"
+  printf '%s\n' "$eval_plan"
   exit 0
 fi
 
-mkdir -p "$output_dir"
+require_command claude
+safety_contract=$candidate/evals/safety-contract.json
+[[ -s $safety_contract ]] || { printf 'Candidate has no safety contract: %s\n' "$safety_contract" >&2; exit 2; }
+jq -e '.schema_version == 1 and (.checks | type) == "array" and .operator_grants == ["Bash", "Write", "Edit"]' "$safety_contract" >/dev/null || {
+  printf 'Candidate safety contract is invalid: %s\n' "$safety_contract" >&2
+  exit 2
+}
+if [[ -z $output_dir ]]; then output_dir=$candidate/evals/results/$(date -u +%Y%m%dT%H%M%SZ); fi
+mkdir -p -- "$output_dir"
+printf '%s\n' "$eval_plan" >"$output_dir/eval-plan.json"
 : >"$output_dir/arm-status.tsv"
 temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/skill-set-evals.XXXXXX")
-trap 'rm -rf "$temporary_dir"' EXIT
+trap 'rm -rf -- "$temporary_dir"' EXIT
 
 candidate_sha=$(git -C "$candidate" rev-parse HEAD 2>/dev/null || printf 'unversioned')
 candidate_dirty=true
@@ -201,35 +290,46 @@ snapshot_safety_contract=$candidate_snapshot/evals/safety-contract.json
 safety_contract_hash=$(git hash-object --no-filters "$snapshot_safety_contract")
 cp -- "$snapshot_safety_contract" "$output_dir/safety-contract.json"
 
+common_args=(--scaffold --keep-temp --threshold 0 --allow-tools Bash Write Edit)
+common_args+=(--model "$model" --judge-model "$judge_model" --runs "$trials")
+if [[ $stage != campaign ]]; then common_args+=(--case "$case_name"); fi
+candidate_args=("${common_args[@]}")
+baseline_args=("${common_args[@]}")
+candidate_budget=
+baseline_budget=
+if [[ -n $max_cost_usd ]]; then
+  candidate_arm_count=1
+  [[ " ${arms[*]} " == *" no-plugin "* ]] && candidate_arm_count=2
+  candidate_budget=$(jq -nr --arg budget "$max_cost_usd" --argjson candidate_arms "$candidate_arm_count" --argjson total_arms "$arm_count" '$budget | tonumber * $candidate_arms / $total_arms')
+  candidate_args+=(--max-cost-usd "$candidate_budget")
+  if [[ $needs_deletion_baseline == true ]]; then
+    baseline_budget=$(jq -nr --arg budget "$max_cost_usd" --argjson total_arms "$arm_count" '$budget | tonumber / $total_arms')
+    baseline_args+=(--max-cost-usd "$baseline_budget")
+  fi
+fi
+candidate_ablation=none
+if [[ " ${arms[*]} " == *" no-plugin "* ]]; then candidate_ablation=with-without; fi
 candidate_snapshot_pr_runner=$candidate_snapshot/skills/shipping-pr/scripts/skill-set-pr
-candidate_command=(claude plugin eval "$candidate_snapshot" --ablation with-without "${candidate_args[@]}" --output-dir "$output_dir/candidate" --json "$output_dir/candidate.json")
+candidate_command=(claude plugin eval "$candidate_snapshot" --ablation "$candidate_ablation" "${candidate_args[@]}" --output-dir "$output_dir/candidate" --json "$output_dir/candidate.json")
 if [[ -x $candidate_snapshot_pr_runner ]]; then
   candidate_command=(env SKILL_SET_PR_RUNNER="$candidate_snapshot_pr_runner" "${candidate_command[@]}")
 fi
 
-git -C "$repo_dir" archive "$deletion_baseline_sha" plugins/skill-set | tar -x -C "$temporary_dir"
-baseline_plugin=$temporary_dir/plugins/skill-set
-rm -rf "$baseline_plugin/evals"
-cp -R "$candidate_snapshot/evals" "$baseline_plugin/evals"
-rm -rf "$baseline_plugin/evals/results"
-
-baseline_pr_runner=$baseline_plugin/skills/shipping-pr/scripts/skill-set-pr
-if [[ ! -x $baseline_pr_runner ]]; then
-  baseline_pr_runner=$baseline_plugin/bin/skill-set-pr
+baseline_command=()
+if [[ $needs_deletion_baseline == true ]]; then
+  git -C "$repo_dir" archive "$deletion_baseline_sha" plugins/skill-set | tar -x -C "$temporary_dir"
+  baseline_plugin=$temporary_dir/plugins/skill-set
+  rm -rf -- "$baseline_plugin/evals"
+  cp -R -- "$candidate_snapshot/evals" "$baseline_plugin/evals"
+  rm -rf -- "$baseline_plugin/evals/results"
+  baseline_pr_runner=$baseline_plugin/skills/shipping-pr/scripts/skill-set-pr
+  if [[ ! -x $baseline_pr_runner ]]; then baseline_pr_runner=$baseline_plugin/bin/skill-set-pr; fi
+  if [[ ! -x $baseline_pr_runner ]]; then baseline_pr_runner=$candidate_snapshot_pr_runner; fi
+  if [[ ! -x $baseline_pr_runner ]]; then baseline_pr_runner=$plugin_dir/skills/shipping-pr/scripts/skill-set-pr; fi
+  [[ -x $baseline_pr_runner ]] || { printf 'No executable PR runner is available for the deletion baseline.\n' >&2; exit 1; }
+  baseline_command=(claude plugin eval "$baseline_plugin" --ablation none "${baseline_args[@]}" --output-dir "$output_dir/baseline" --json "$output_dir/baseline.json")
+  baseline_command=(env SKILL_SET_PR_RUNNER="$baseline_pr_runner" "${baseline_command[@]}")
 fi
-if [[ ! -x $baseline_pr_runner ]]; then
-  baseline_pr_runner=$candidate_snapshot_pr_runner
-fi
-if [[ ! -x $baseline_pr_runner ]]; then
-  baseline_pr_runner=$plugin_dir/skills/shipping-pr/scripts/skill-set-pr
-fi
-[[ -x $baseline_pr_runner ]] || {
-  printf 'No executable PR runner is available for the deletion baseline.\n' >&2
-  exit 1
-}
-
-baseline_command=(claude plugin eval "$baseline_plugin" --ablation none "${baseline_args[@]}" --output-dir "$output_dir/baseline" --json "$output_dir/baseline.json")
-baseline_command=(env SKILL_SET_PR_RUNNER="$baseline_pr_runner" "${baseline_command[@]}")
 
 run_eval_arm() {
   local arm=$1
@@ -243,39 +343,32 @@ run_eval_arm() {
     0) printf '%s\tcomplete\n' "$arm" >>"$output_dir/arm-status.tsv" ;;
     2)
       printf '%s\tpartial-budget\n' "$arm" >>"$output_dir/arm-status.tsv"
-      printf 'Eval arm %s reached its allocated cost target; preserving partial results.\n' "$arm" >&2
+      printf 'Eval arm %s reached its adapter cost ceiling; preserving partial results.\n' "$arm" >&2
       ;;
     *)
-      jq -n --arg arm "$arm" --argjson exit_code "$status" \
-        '{error: "eval-arm-failed", arm: $arm, exit_code: $exit_code}' >&2
+      jq -n --arg arm "$arm" --argjson exit_code "$status" '{error: "eval-arm-failed", arm: $arm, exit_code: $exit_code}' >&2
       return "$status"
       ;;
   esac
 }
 
-run_eval_arm candidate-and-no-plugin "${candidate_command[@]}"
-[[ -s "$output_dir/candidate.json" ]] || { printf 'Candidate eval produced no JSON result.\n' >&2; exit 1; }
-"$script_dir/retain-eval-traces" \
-  --result "$output_dir/candidate.json" \
-  --trace-dir "$output_dir/traces" \
-  --with-arm candidate \
-  --without-arm no-plugin
-
-run_eval_arm deletion-baseline "${baseline_command[@]}"
-[[ -s "$output_dir/baseline.json" ]] || { printf 'Baseline eval produced no JSON result.\n' >&2; exit 1; }
-"$script_dir/retain-eval-traces" \
-  --result "$output_dir/baseline.json" \
-  --trace-dir "$output_dir/traces" \
-  --with-arm deletion-baseline
+run_eval_arm candidate "${candidate_command[@]}"
+[[ -s $output_dir/candidate.json ]] || { printf 'Candidate eval produced no JSON result.\n' >&2; exit 1; }
+retain_args=(--result "$output_dir/candidate.json" --trace-dir "$output_dir/traces" --with-arm candidate)
+if [[ $candidate_ablation == with-without ]]; then retain_args+=(--without-arm no-plugin); fi
+"$script_dir/retain-eval-traces" "${retain_args[@]}"
+if [[ $needs_deletion_baseline == true ]]; then
+  run_eval_arm deletion-baseline "${baseline_command[@]}"
+  [[ -s $output_dir/baseline.json ]] || { printf 'Deletion baseline produced no JSON result.\n' >&2; exit 1; }
+  "$script_dir/retain-eval-traces" --result "$output_dir/baseline.json" --trace-dir "$output_dir/traces" --with-arm deletion-baseline
+fi
 
 post_candidate_snapshot=$temporary_dir/post-candidate-plugin
 post_candidate_fingerprint=$(snapshot_candidate "$candidate" "$post_candidate_snapshot")
 post_candidate_sha=$(git -C "$candidate" rev-parse HEAD 2>/dev/null || printf 'unversioned')
 post_safety_contract=$candidate/evals/safety-contract.json
 post_safety_contract_hash=missing
-if [[ -s $post_safety_contract ]]; then
-  post_safety_contract_hash=$(git hash-object --no-filters "$post_safety_contract")
-fi
+if [[ -s $post_safety_contract ]]; then post_safety_contract_hash=$(git hash-object --no-filters "$post_safety_contract"); fi
 candidate_sha_changed=false
 candidate_fingerprint_changed=false
 safety_contract_changed=false
@@ -292,51 +385,85 @@ if [[ $candidate_sha_changed == true || $candidate_fingerprint_changed == true |
   jq . "$output_dir/provenance-drift.json" >&2
   exit 1
 fi
-baseline_sha=$deletion_baseline_sha
-claude_version=$(claude --version)
+
+adapter_version=$(claude --version)
 partial_budget=false
-if grep -Eq $'\tpartial-budget$' "$output_dir/arm-status.tsv"; then partial_budget=true; fi
+if awk -F '\t' '$2 == "partial-budget" {found=1} END {exit !found}' "$output_dir/arm-status.tsv"; then partial_budget=true; fi
+metadata_baseline_ref=
+metadata_baseline_sha=
+if [[ $needs_deletion_baseline == true ]]; then
+  metadata_baseline_ref=$deletion_baseline_ref
+  metadata_baseline_sha=$deletion_baseline_sha
+fi
 jq -n \
+  --arg stage "$stage" \
+  --arg purpose "$reason" \
+  --argjson arms "$arms_json" \
+  --argjson selected_cases "$selected_cases" \
+  --argjson trials "$trials" \
   --arg candidate_sha "$candidate_sha" \
   --argjson candidate_dirty "$candidate_dirty" \
   --arg candidate_fingerprint "$candidate_fingerprint" \
-  --arg baseline_ref "$baseline_ref" \
-  --arg baseline_sha "$baseline_sha" \
-  --arg claude_version "$claude_version" \
+  --arg baseline_ref "$metadata_baseline_ref" \
+  --arg baseline_sha "$metadata_baseline_sha" \
+  --arg adapter_version "$adapter_version" \
   --arg model "$model" \
   --arg judge_model "$judge_model" \
   --arg max_cost_usd "$max_cost_usd" \
   --arg candidate_budget "$candidate_budget" \
   --arg baseline_budget "$baseline_budget" \
-  --arg runs "$runs" \
-  --arg case_glob "$case_glob" \
-  --arg tags "$(IFS=,; printf '%s' "${tags[*]-}")" \
   --arg safety_contract_hash "$safety_contract_hash" \
   --argjson partial_budget "$partial_budget" \
   --arg generated_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  '{candidate_sha: $candidate_sha, candidate_dirty: $candidate_dirty, candidate_fingerprint: $candidate_fingerprint, baseline_ref: $baseline_ref, baseline_sha: $baseline_sha, claude_version: $claude_version, model: $model, judge_model: $judge_model, resolved_model_snapshot: null, resolved_judge_snapshot: null, model_resolution_note: "Claude plugin eval JSON schema 1 reports requested model identifiers but does not expose resolved model snapshot IDs", max_cost_usd: $max_cost_usd, cost_allocation: {candidate_and_no_plugin: $candidate_budget, deletion_baseline: $baseline_budget, semantics: "per-invocation ceilings; each Claude CLI invocation may overrun by one agent run"}, partial_budget: $partial_budget, runs: $runs, filters: {case: $case_glob, tags: ($tags | split(",") | map(select(length > 0)))}, generated_at: $generated_at, operator_tool_grants: ["Bash", "Write", "Edit"], operator_tool_grant_note: "Claude CLI applies operator grants to every case in an invocation; case allowed_tools are not an isolation boundary, so mutation acceptance also requires explicit safety graders and retained-trace policies", baseline_normalization: [], arms: ["candidate", "no-plugin", "baseline"], safety_contract: {path: "safety-contract.json", hash_algorithm: "git-hash-object", hash: $safety_contract_hash}, trace_retention: {path: "traces", source: "Claude agent stream-json", cleanup: "verified claude-eval-* roots only"}, human_review_required: true}' \
+  '{stage: $stage, purpose: $purpose, arms: $arms, selected_cases: $selected_cases, trials: $trials,
+    eval_plan: "eval-plan.json", candidate_sha: $candidate_sha, candidate_dirty: $candidate_dirty,
+    candidate_fingerprint: $candidate_fingerprint, baseline_ref: $baseline_ref, baseline_sha: $baseline_sha,
+    evaluation_adapter_version: $adapter_version, claude_version: $adapter_version,
+    model: $model, judge_model: $judge_model, resolved_model_snapshot: null, resolved_judge_snapshot: null,
+    model_resolution_note: "The active evaluation adapter reports requested identifiers but not resolved snapshot IDs",
+    max_cost_usd: $max_cost_usd,
+    cost_allocation: {candidate: $candidate_budget, deletion_baseline: $baseline_budget, semantics: "optional adapter runtime ceilings; independent from the token preflight estimate"},
+    partial_budget: $partial_budget, runs: ($trials | tostring), filters: {case: ($selected_cases | join(",")), tags: []},
+    generated_at: $generated_at, operator_tool_grants: ["Bash", "Write", "Edit"],
+    operator_tool_grant_note: "Adapter grants apply to an invocation; mutation acceptance also requires deterministic safety evidence and retained traces",
+    baseline_normalization: [], safety_contract: {path: "safety-contract.json", hash_algorithm: "git-hash-object", hash: $safety_contract_hash},
+    trace_retention: {path: "traces", source: "agent event stream", cleanup: "verified adapter temporary roots only"}, human_review_required: true}' \
   >"$output_dir/metadata.json"
 
-"$script_dir/summarize-evals" \
-  --candidate "$output_dir/candidate.json" \
-  --baseline "$output_dir/baseline.json" \
-  --metadata "$output_dir/metadata.json" \
-  --safety-contract "$output_dir/safety-contract.json" \
+summary_args=(
+  --stage "$stage"
+  --candidate "$output_dir/candidate.json"
+  --metadata "$output_dir/metadata.json"
+  --plan "$output_dir/eval-plan.json"
+  --safety-contract "$output_dir/safety-contract.json"
   --output "$output_dir/acceptance-summary.json"
+)
+if [[ $needs_deletion_baseline == true ]]; then summary_args+=(--baseline "$output_dir/baseline.json"); fi
+"$script_dir/summarize-evals" "${summary_args[@]}"
 
-jq -n \
-  --slurpfile metadata "$output_dir/metadata.json" \
-  --slurpfile candidate "$output_dir/candidate.json" \
-  --slurpfile baseline "$output_dir/baseline.json" \
-  --slurpfile acceptance "$output_dir/acceptance-summary.json" \
-  '{
-    metadata: $metadata[0],
-    candidate_and_no_plugin: $candidate[0],
-    deletion_baseline: $baseline[0],
-    acceptance_review: $acceptance[0]
-  }' >"$output_dir/combined-results.json"
+if [[ $needs_deletion_baseline == true ]]; then
+  jq -n \
+    --slurpfile plan "$output_dir/eval-plan.json" \
+    --slurpfile metadata "$output_dir/metadata.json" \
+    --slurpfile candidate "$output_dir/candidate.json" \
+    --slurpfile baseline_result "$output_dir/baseline.json" \
+    --slurpfile acceptance "$output_dir/acceptance-summary.json" \
+    '{plan: $plan[0], metadata: $metadata[0], candidate: $candidate[0], deletion_baseline: $baseline_result[0], acceptance_review: $acceptance[0]}' \
+    >"$output_dir/combined-results.json"
+else
+  jq -n \
+    --slurpfile plan "$output_dir/eval-plan.json" \
+    --slurpfile metadata "$output_dir/metadata.json" \
+    --slurpfile candidate "$output_dir/candidate.json" \
+    --slurpfile acceptance "$output_dir/acceptance-summary.json" \
+    '{plan: $plan[0], metadata: $metadata[0], candidate: $candidate[0], deletion_baseline: null, acceptance_review: $acceptance[0]}' \
+    >"$output_dir/combined-results.json"
+fi
 
+summary_status=$(jq -r '.status' "$output_dir/acceptance-summary.json")
 run_status='runs-finished'
 if [[ $partial_budget == true ]]; then run_status=partial-budget; fi
-jq -n --arg status "$run_status" --arg output_dir "$output_dir" --arg baseline_sha "$baseline_sha" \
-  '{status: $status, output_dir: $output_dir, baseline_sha: $baseline_sha, arms: ["candidate", "no-plugin", "baseline"], review_required: true}'
+if [[ $summary_status == invalid ]]; then run_status=invalid-evidence; fi
+jq -n --arg status "$run_status" --arg output_dir "$output_dir" --arg stage "$stage" --argjson arms "$arms_json" \
+  '{status: $status, output_dir: $output_dir, stage: $stage, arms: $arms, review_required: true}'
+[[ $summary_status != invalid ]]
