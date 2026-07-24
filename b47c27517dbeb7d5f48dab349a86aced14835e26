@@ -1,0 +1,29 @@
+## Decisions Made
+- Keep evaluation control stateless and stage-based: The goal is to prevent unnecessary model invocations without introducing provider adapters, token-debit state, or execution-history infrastructure.
+- Make development smoke candidate-only and single-trial: Baselines and broad matrices require a separately stated purpose and approved budget.
+- Make trigger selection deterministic: Generated trigger cases now use one run and tool-call graders instead of per-case model graders.
+- Preserve deep provenance and safety acceptance for campaigns: Focused stages use plan/result validation while campaign evidence retains the pinned deletion baseline and existing trace checks.
+
+## Problems Encountered
+- The existing runner always launched candidate, no-plugin, and deletion-baseline arms: Resolved by adding explicit development-smoke, focused-comparison, and campaign modes.
+- The old trigger test required an LLM outcome grader for every trigger case: Updated it to enforce deterministic graders and one default run.
+- The first staged mock result did not reflect linked qualitative graders: The test was moved to a deterministic trigger case and the planner was updated to count linked grader files.
+- Shellcheck was unavailable in the local environment: All shell files passed syntax checks and the complete repository test suite; CI retains shellcheck enforcement.
+
+## Constraints Identified
+- Model calls include execution arms and qualitative judge calls: Both call count and projected-token limits must pass before the model executor is required.
+- Focused comparison and campaign approval cannot be inferred or reused: The runner requires fresh purpose and explicit budget inputs for those stages.
+- Development and focused summaries are partial evidence: They must never mark the full suite complete.
+- Project-specific safety contracts, deletion-baseline pinning, and trace retention remain repository concerns outside the common creating-skills policy.
+
+## Open Questions
+- None
+
+## Context
+Implemented the stateless enforcement pass for model evaluations on top of the earlier creating-skills budget policy. The runner now preflights exact stage scope, generated trigger cases avoid blanket three-trial and LLM grading, the workflow is manual-only, and staged summaries invalidate plan/result drift. The complete deterministic suite and creating-skills validator passed without invoking a real model.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
