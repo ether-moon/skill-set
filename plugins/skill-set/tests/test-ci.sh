@@ -40,6 +40,7 @@ if grep -Eq 'schedule:|cron:' "$eval_workflow"; then
 fi
 grep -Eq 'fetch-depth: 0' "$eval_workflow"
 grep -Eq 'scripts/run-evals' "$eval_workflow"
+# shellcheck disable=SC2016 # EVAL_STAGE is literal workflow syntax.
 grep -Eq -- '--stage "\$EVAL_STAGE"' "$eval_workflow"
 grep -Eq -- '--plan' "$eval_workflow"
 grep -Eq 'MAX_CALLS:.*inputs.max_calls' "$eval_workflow"

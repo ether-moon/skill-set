@@ -130,7 +130,6 @@ if [[ -n $max_cost_usd ]] && ! jq -en --arg value "$max_cost_usd" \
 fi
 [[ -d $candidate/evals ]] || { printf 'Candidate has no evals directory: %s\n' "$candidate" >&2; exit 2; }
 candidate=$(cd -- "$candidate" && pwd -P)
-candidate_pr_runner=$candidate/skills/shipping-pr/scripts/skill-set-pr
 planner=$candidate/skills/creating-skills/scripts/plan_eval_budget.py
 [[ -x $planner ]] || { printf 'Missing executable eval budget planner: %s\n' "$planner" >&2; exit 2; }
 
@@ -462,7 +461,7 @@ else
 fi
 
 summary_status=$(jq -r '.status' "$output_dir/acceptance-summary.json")
-run_status=runs-finished
+run_status='runs-finished'
 if [[ $partial_budget == true ]]; then run_status=partial-budget; fi
 if [[ $summary_status == invalid ]]; then run_status=invalid-evidence; fi
 jq -n --arg status "$run_status" --arg output_dir "$output_dir" --arg stage "$stage" --argjson arms "$arms_json" \
