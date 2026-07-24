@@ -1,0 +1,22 @@
+## Decisions Made
+- origin/main의 현재 1.14.2 버전을 patch 수준인 1.14.3으로 올렸습니다: PR #32는 staged evaluation budget gating 개선이므로 기존 호환성을 유지하는 patch가 적절합니다.
+- 릴리스 runner의 immutable preview를 사용했습니다: base SHA와 input digest를 고정해 changelog와 plugin manifest만 변경했습니다.
+
+## Problems Encountered
+- 처음에 --base origin/main을 전달해 runner가 origin/origin/main을 조회했습니다: 변경 없이 실패했으며 runner 규약에 맞게 --base main으로 다시 실행했습니다.
+
+## Constraints Identified
+- 릴리스 커밋은 origin/main의 고정 SHA에서 준비하고 force push 없이 직접 fast-forward해야 합니다.
+- 버전 변경 범위는 CHANGELOG.md와 plugins/skill-set/.claude-plugin/plugin.json으로 제한됩니다.
+
+## Open Questions
+None
+
+## Context
+PR #32의 staged model-evaluation budget 개선을 포함한 origin/main을 1.14.2에서 1.14.3으로 올리는 작업입니다. 릴리스 runner가 격리된 worktree에서 changelog와 plugin manifest를 일관되게 갱신하고 단일 릴리스 커밋을 생성했습니다.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
