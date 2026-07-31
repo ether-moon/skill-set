@@ -54,3 +54,9 @@ graders:
       path: outputs/src/auth.js
     pattern: "[Ss]trategy"
     match: not_contains
+  - type: regex
+    name: password-validation-extracted
+    target:
+      source: file
+      path: outputs/src/auth.js
+    pattern: "function\\s+validatePassword"

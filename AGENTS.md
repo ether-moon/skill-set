@@ -15,7 +15,7 @@ Runtime totals: **11 skills, 7 legacy commands, 4 PR agents, 0 hooks, 0 MCP serv
 
 | Skill | Description |
 |---|---|
-| `autofixing-and-escalating` | Classifies actionable findings from linters, tests, security scans, audits, and PR reviews as obvious or ambiguous, then applies only explicitly authorized fixes. |
+| `autofixing-and-escalating` | Classifies actionable findings from linters, tests, security scans, audits, and PR reviews, automatically applies unambiguous fixes, and pauses only for decisions required by ambiguous findings before applying the complete chosen resolution. |
 | `bumping-version` | Inspects, previews, prepares, and direct-pushes approved semantic-version Git commits with consistent manifests and policy-driven changelog updates. |
 | `creating-skills` | This skill is the primary entry point for creating, modifying, evaluating, and governing the lifecycle of agent skills. |
 | `driving-with-tests` | Guides implementation and verification through Orient, Red/Green/Refactor, Probe, and Guard. |
