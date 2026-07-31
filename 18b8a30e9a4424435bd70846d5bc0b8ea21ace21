@@ -1,0 +1,25 @@
+## Decisions Made
+- 패치 버전을 `1.14.4`로 선택했다: 사용자가 patch 수준을 명시했고 마지막 버전 `1.14.3` 이후 변경은 호환 가능한 autofixing 및 shipping-pr 개선·수정이다.
+- 최신 `origin/main`의 `da8f387`을 불변 기준으로 사용했다: 로컬 브랜치나 작업트리 상태가 릴리스 입력에 섞이지 않도록 릴리스 러너의 compare-and-swap 흐름을 따랐다.
+- 릴리스 범위를 `CHANGELOG.md`와 plugin manifest로 제한했다: 자동 탐지된 매니페스트와 저장소 Versioning 정책이 요구하는 전체 범위다.
+
+## Problems Encountered
+- 로컬 `origin/main`이 원격보다 뒤처져 있었다: 원격 main을 fetch해 `da8f387`로 갱신한 뒤 검사와 미리보기를 다시 수행했다.
+- 로컬 `main` 브랜치가 다른 worktree에서 사용 중이었다: 사용자의 checkout을 바꾸지 않고 릴리스 러너의 격리 worktree에서 커밋을 준비했다.
+
+## Constraints Identified
+- 직접 푸시는 별도 명시적 승인이 필요하다: 준비된 커밋은 승인 전까지 `origin/main`에 게시할 수 없다.
+- 게시 시 원격 main이 `da8f387`에서 변하지 않아야 한다: 러너는 정상 fast-forward push만 허용하며 base race나 force-push를 허용하지 않는다.
+- 저장소의 릴리스 콘텐츠와 커밋 메시지는 영어로 유지한다: 사용자 대화와 memento 요약만 한국어로 작성한다.
+
+## Open Questions
+- 준비된 커밋 `18b8a30`을 지금 `origin/main`에 직접 푸시할지 사용자 승인이 필요하다.
+
+## Context
+최신 `origin/main`을 기준으로 skill-set의 패치 버전을 `1.14.3`에서 `1.14.4`로 올렸다. `CHANGELOG.md`에 PR #34와 #35 이후 변경을 분류해 추가하고 `plugins/skill-set/.claude-plugin/plugin.json`을 갱신한 격리 커밋 `18b8a30`을 준비했다. 커밋은 아직 원격 main에 게시되지 않았다.
+
+## Recorded Decisions
+- None
+
+## Vault Entries Referenced
+- None
