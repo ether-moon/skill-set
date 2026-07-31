@@ -44,6 +44,8 @@ if [[ ${1:-} == pr && ${2:-} == list ]]; then
     printf '%s\n' '[{"reviews":[{"author":{"login":"chatgpt-codex-connector[bot]"}}],"comments":[]}]'
   elif [[ $MOCK_GH_SCENARIO == claude-review ]]; then
     printf '%s\n' '[{"reviews":[{"author":{"login":"claude[bot]"}}],"comments":[]}]'
+  elif [[ $MOCK_GH_SCENARIO == signal-gated-* ]]; then
+    printf '%s\n' '[{"reviews":[{"author":{"login":"claude[bot]"}},{"author":{"login":"chatgpt-codex-connector[bot]"}}],"comments":[]}]'
   elif [[ $MOCK_GH_SCENARIO == coderabbit-* || $MOCK_GH_SCENARIO == malformed-coderabbit ]]; then
     printf '%s\n' '[{"reviews":[{"author":{"login":"coderabbitai[bot]"}}],"comments":[]}]'
   else
@@ -127,7 +129,16 @@ if [[ ${1:-} == pr && ${2:-} == checks ]]; then
   fi
   bucket=$MOCK_GH_SCENARIO
   check_name=verify
-  if [[ $MOCK_GH_SCENARIO == registration-delay ]]; then
+  workflow=CI
+  if [[ $MOCK_GH_SCENARIO == signal-gated-running ]]; then
+    bucket=pending
+    check_name=review
+    workflow='Signal-Gated PR Review'
+  elif [[ $MOCK_GH_SCENARIO == signal-gated-complete || $MOCK_GH_SCENARIO == signal-gated-thread ]]; then
+    bucket=pass
+    check_name=review
+    workflow='Signal-Gated PR Review'
+  elif [[ $MOCK_GH_SCENARIO == registration-delay ]]; then
     if [[ $count -eq 1 ]]; then
       printf "%s\n" "no required checks reported on the 'feature' branch" >&2
       exit 1
@@ -149,8 +160,8 @@ if [[ ${1:-} == pr && ${2:-} == checks ]]; then
     fail|cancel|pending|pass|skipping) ;;
     *) bucket=pass ;;
   esac
-  jq -cn --arg bucket "$bucket" --arg name "$check_name" \
-    '[{bucket:$bucket,name:$name,state:($bucket | ascii_upcase),link:("https://example.test/check/" + $name),workflow:"CI"}]'
+  jq -cn --arg bucket "$bucket" --arg name "$check_name" --arg workflow "$workflow" \
+    '[{bucket:$bucket,name:$name,state:($bucket | ascii_upcase),link:("https://example.test/check/" + $name),workflow:$workflow}]'
   case "$bucket" in
     pending) exit 8 ;;
     fail|cancel) exit 1 ;;
@@ -195,6 +206,8 @@ if [[ ${1:-} == api && ${2:-} == graphql ]]; then
     jq -cn '{data:{repository:{pullRequest:{reviewThreads:{nodes:[{id:"thread-coderabbit",isResolved:false,isOutdated:false,comments:{nodes:[{id:"comment-coderabbit",author:{login:"coderabbitai[bot]"},body:"Please fix this",path:"fixture.txt",line:1}]}}],pageInfo:{hasNextPage:false,endCursor:null}}}}}}'
   elif [[ $MOCK_GH_SCENARIO == codex-unresolved ]]; then
     jq -cn '{data:{repository:{pullRequest:{reviewThreads:{nodes:[{id:"thread-codex",isResolved:false,isOutdated:false,comments:{nodes:[{id:"comment-codex",author:{login:"chatgpt-codex-connector[bot]"},body:"Please fix this",path:"fixture.txt",line:1}]}}],pageInfo:{hasNextPage:false,endCursor:null}}}}}}'
+  elif [[ $MOCK_GH_SCENARIO == signal-gated-thread ]]; then
+    jq -cn '{data:{repository:{pullRequest:{reviewThreads:{nodes:[{id:"thread-signal-gated",isResolved:false,isOutdated:false,comments:{nodes:[{author:{login:"github-actions[bot]"},body:"Please address this review finding",path:"fixture.txt",line:1}]}}],pageInfo:{hasNextPage:false,endCursor:null}}}}}}'
   elif [[ $MOCK_GH_SCENARIO == unresolved ]]; then
     jq -cn '{data:{repository:{pullRequest:{reviewThreads:{nodes:[{id:"thread-1",isResolved:false,isOutdated:false,comments:{nodes:[{author:{login:"reviewer"},body:"Please fix this",path:"fixture.txt",line:1}]} }],pageInfo:{hasNextPage:false,endCursor:null}}}}}}'
   elif [[ $MOCK_GH_SCENARIO == praise-only ]]; then

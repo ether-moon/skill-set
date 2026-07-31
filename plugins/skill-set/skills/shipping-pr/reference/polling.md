@@ -25,6 +25,8 @@ The runner calls `gh pr checks --json bucket,name,state,link,workflow` and optio
 
 Pending at the deadline becomes `timed_out`. For a new HEAD, zero selected checks remain `polling` for a 60-second registration grace so a fresh push cannot appear clean before workflows register. After that grace, a repository with genuinely no selected checks may satisfy the check condition. If checks were observed and later disappear, polling continues until the CI deadline.
 
+Signal-gated review workflows, including `karrot-emu/signal-gated-review-action`, require no reviewer adapter. Treat the workflow job (for example, `Signal-Gated PR Review / review`) as a normal selected check and its inline findings as review threads. With the default `--required-only true`, configure that job as a required check on every target branch that must wait for it; otherwise use `--required-only false` intentionally to observe all checks.
+
 ## Review Threads
 
 The runner queries GraphQL `reviewThreads(first:100, after:$cursor)` and follows `pageInfo.endCursor` until `hasNextPage=false`. An actionable thread is unresolved, not outdated, and has a non-empty latest comment. There is no 100-thread truncation.

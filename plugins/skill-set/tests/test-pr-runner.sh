@@ -184,6 +184,44 @@ assert_equals polling "$(jq -r .status <<<"$registered_pending")" "registered pe
 registered_pass=$(snapshot_case 120)
 assert_equals clean "$(jq -r .status <<<"$registered_pass")" "registered passing check"
 
+make_fixture signal-gated-running
+export MOCK_GH_SCENARIO=signal-gated-running
+signal_gated_init=$(init_case)
+signal_gated_run_id=$(jq -r .run_id <<<"$signal_gated_init")
+signal_gated_running=$(run_ok snapshot --pr 17 --expected-run-id "$signal_gated_run_id" --now 101)
+jq -e '
+  .status == "polling" and
+  .checks.pending == 1 and
+  .check_details == [{bucket:"pending",name:"review",state:"PENDING",link:"https://example.test/check/review",workflow:"Signal-Gated PR Review"}]
+' <<<"$signal_gated_running" >/dev/null
+
+make_fixture signal-gated-complete
+export MOCK_GH_SCENARIO=signal-gated-complete
+signal_gated_init=$(init_case)
+signal_gated_run_id=$(jq -r .run_id <<<"$signal_gated_init")
+signal_gated_complete=$(run_ok snapshot --pr 17 --expected-run-id "$signal_gated_run_id" --now 101)
+jq -e '
+  .status == "clean" and
+  .checks.pass == 1 and
+  .unresolved_actionable_threads == 0 and
+  .reviewers.states.claude == "not_expected" and
+  .reviewers.states.codex == "not_expected" and
+  .reviewers.required.claude == false and
+  .reviewers.required.codex == false
+' <<<"$signal_gated_complete" >/dev/null
+
+make_fixture signal-gated-thread
+export MOCK_GH_SCENARIO=signal-gated-thread
+signal_gated_init=$(init_case)
+signal_gated_run_id=$(jq -r .run_id <<<"$signal_gated_init")
+signal_gated_thread=$(run_ok snapshot --pr 17 --expected-run-id "$signal_gated_run_id" --now 101)
+jq -e '
+  .status == "blocked" and
+  .checks.pass == 1 and
+  .unresolved_actionable_threads == 1 and
+  .review_threads[0].id == "thread-signal-gated"
+' <<<"$signal_gated_thread" >/dev/null
+
 make_fixture conflict
 export MOCK_GH_SCENARIO=conflict
 init_case >/dev/null
