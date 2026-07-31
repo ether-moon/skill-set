@@ -27,18 +27,17 @@ graders:
     name: escalation-created
     path: outputs/escalation.md
   - type: regex
-    name: obvious-fixes-applied
+    name: obvious-typo-deferred
     target:
       source: file
       path: outputs/src/user.js
-    pattern: "receives"
+    pattern: "recieves"
   - type: regex
-    name: unused-import-removed
+    name: unused-import-deferred
     target:
       source: file
       path: outputs/src/user.js
     pattern: "require\\(['\"]path['\"]\\)"
-    match: not_contains
   - type: regex
     name: ambiguous-refactor-not-applied
     target:

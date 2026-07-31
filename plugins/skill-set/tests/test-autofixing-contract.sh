@@ -10,8 +10,15 @@ source "$test_dir/test-helper.sh"
 skill=$plugin_dir/skills/autofixing-and-escalating/SKILL.md
 resolution=$plugin_dir/skills/autofixing-and-escalating/reference/resolution.md
 
-grep -Eq 'review-only' "$skill"
 grep -Eq 'resolve-authorized' "$skill"
+if grep -Eq 'review-only' "$skill" "$resolution"; then
+  fail 'review-only mode must not exist'
+fi
+grep -Eq 'Default to `edit: true`' "$skill"
+grep -Eq 'pause before any mutation' "$skill"
+grep -Eq 'after every required decision is complete, automatically apply all queued OBVIOUS fixes' "$skill"
+grep -Eq 'without another confirmation' "$skill"
+grep -Eq 'without another confirmation' "$resolution"
 for capability in edit commit push comment; do
   grep -Eq "${capability}" "$skill" || fail "missing capability: $capability"
 done
