@@ -1,0 +1,23 @@
+## Decisions Made
+- Automated reviewer telemetry is collected in a trap-safe best-effort subshell so telemetry failures cannot override settled checks and review threads.
+- Failed telemetry is exposed as telemetry_available:false with unavailable provider states instead of being silently discarded.
+
+## Problems Encountered
+- Malformed optional CodeRabbit status data caused snapshot to return invalid_github_response: the collector is now isolated from the authoritative snapshot path.
+- The first isolation attempt leaked the captured error JSON to successful stderr: stderr suppression was moved onto the isolated collector call and the regression suite was rerun cleanly.
+
+## Constraints Identified
+- Selected check and review-thread queries remain hard dependencies because they determine the clean verdict.
+- The telemetry subshell must disable inherited cleanup traps so a failed optional query cannot release the parent snapshot lock.
+
+## Open Questions
+None
+
+## Context
+The shipping-pr runner previously treated automated reviewer telemetry as advisory for verdicts but still failed the entire snapshot when a telemetry API response was malformed. This change isolates telemetry collection, reports its availability explicitly, and preserves checks plus unresolved review threads as the authoritative completion inputs. A deterministic regression now proves malformed optional telemetry still yields clean when checks pass and no actionable thread exists.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
