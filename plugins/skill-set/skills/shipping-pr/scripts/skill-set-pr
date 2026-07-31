@@ -1012,14 +1012,8 @@ command_snapshot() {
 
   collect_reviewer_states "$repo" "$PR" "$start_head" "$reviewers_active" "$cycle"
   reviewers_active=$REVIEWERS_ACTIVE
-  local reviewer_required reviewer_states reviewer_failed reviewer_pending coderabbit_state
-  reviewer_required=$(jq -cn --argjson active "$reviewers_active" --argjson cycle "$cycle" \
-    --argjson states "$REVIEWER_STATES" '
-    def active($provider): ($active | index($provider)) != null;
-    {claude:(active("claude") and ($cycle == 0 or $states.claude != "absent")),
-     coderabbit:active("coderabbit"),
-     codex:(active("codex") and ($cycle == 0 or $states.codex != "absent"))}
-  ')
+  local reviewer_required reviewer_states coderabbit_state
+  reviewer_required='{"claude":false,"coderabbit":false,"codex":false}'
   reviewer_states=$(jq -cn --argjson active "$reviewers_active" --argjson required "$reviewer_required" \
     --argjson states "$REVIEWER_STATES" '
     def normalized($provider):
@@ -1029,10 +1023,6 @@ command_snapshot() {
       else $states[$provider] end;
     {claude:normalized("claude"),coderabbit:normalized("coderabbit"),codex:normalized("codex")}
   ')
-  reviewer_failed=$(jq '[to_entries[] | select($required[.key] and .value == "failed")] | length' \
-    --argjson required "$reviewer_required" <<<"$reviewer_states")
-  reviewer_pending=$(jq '[to_entries[] | select($required[.key] and (.value == "pending" or .value == "absent"))] | length' \
-    --argjson required "$reviewer_required" <<<"$reviewer_states")
   coderabbit_state=$(jq -r .coderabbit <<<"$reviewer_states")
 
   local after_json end_head end_head_repo end_head_branch end_host after_pr_state
@@ -1094,12 +1084,11 @@ command_snapshot() {
   else
     [[ $mergeable == CONFLICTING || $merge_state == DIRTY ]] && conflict=true
     [[ $mergeable == UNKNOWN || $merge_state == UNKNOWN ]] && merge_pending=true
-    local fail_count cancel_count pending_count checks_deadline review_deadline registration_epoch
+    local fail_count cancel_count pending_count checks_deadline registration_epoch
     fail_count=$(jq -r .fail <<<"$check_counts")
     cancel_count=$(jq -r .cancel <<<"$check_counts")
     pending_count=$(jq -r .pending <<<"$check_counts")
     checks_deadline=$(jq -r .checks_epoch <<<"$deadlines")
-    review_deadline=$(jq -r .review_epoch <<<"$deadlines")
     registration_epoch=$(jq -r .registration_epoch <<<"$deadlines")
     if [[ $check_total -gt 0 ]]; then
       checks_observed=true
@@ -1109,12 +1098,10 @@ command_snapshot() {
       registration_pending=true
     fi
     if [[ $conflict == true || $fail_count -gt 0 || $cancel_count -gt 0 || \
-      $unresolved_count -gt 0 || $reviewer_failed -gt 0 ]]; then
+      $unresolved_count -gt 0 ]]; then
       status=blocked
     elif [[ $pending_count -gt 0 || $merge_pending == true || $registration_pending == true || $checks_missing == true ]]; then
       if [[ $now -ge $checks_deadline ]]; then status=timed_out; else status=polling; fi
-    elif [[ $reviewer_pending -gt 0 ]]; then
-      if [[ $now -ge $review_deadline ]]; then status=timed_out; else status=polling; fi
     else
       status=clean
     fi

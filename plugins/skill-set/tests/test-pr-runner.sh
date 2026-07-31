@@ -386,21 +386,30 @@ make_fixture coderabbit
 export MOCK_GH_SCENARIO=coderabbit-delay
 init_case >/dev/null
 cr_pending=$(snapshot_case 101)
-assert_equals polling "$(jq -r .status <<<"$cr_pending")" "CodeRabbit pending state"
-cr_done=$(snapshot_case 102)
-assert_equals clean "$(jq -r .status <<<"$cr_done")" "CodeRabbit completed state"
+jq -e '.status == "clean" and .reviewers.states.coderabbit == "pending" and
+  .reviewers.required.coderabbit == false' <<<"$cr_pending" >/dev/null
 
 make_fixture coderabbit-timeout
 export MOCK_GH_SCENARIO=coderabbit-delay
 init_case --review-timeout-seconds 5 >/dev/null
 cr_timeout=$(snapshot_case 106)
-assert_equals timed_out "$(jq -r .status <<<"$cr_timeout")" "CodeRabbit timeout state"
+jq -e '.status == "clean" and .reviewers.states.coderabbit == "pending" and
+  .reviewers.required.coderabbit == false' <<<"$cr_timeout" >/dev/null
 
 make_fixture coderabbit-auto
 export MOCK_GH_SCENARIO=coderabbit-active
 auto_init=$(init_case)
 assert_equals true "$(jq -r '.reviewers.active | index("coderabbit") != null' <<<"$auto_init")" \
   "CodeRabbit auto-detection"
+auto_run_id=$(jq -r .run_id <<<"$auto_init")
+auto_snapshot=$(run_ok snapshot --pr 17 --expected-run-id "$auto_run_id" --now 101)
+jq -e '
+  .status == "clean" and
+  .checks.pass == 1 and
+  .unresolved_actionable_threads == 0 and
+  .reviewers.states.coderabbit == "not_expected" and
+  .reviewers.required.coderabbit == false
+' <<<"$auto_snapshot" >/dev/null
 
 make_fixture reviewers-auto
 export MOCK_GH_SCENARIO=reviewers-active
@@ -438,15 +447,15 @@ make_fixture coderabbit-check
 export MOCK_GH_SCENARIO=coderabbit-check-delay
 init_case >/dev/null
 cr_check_pending=$(snapshot_case 101)
-assert_equals polling "$(jq -r .status <<<"$cr_check_pending")" "CodeRabbit check-run pending"
-cr_check_done=$(snapshot_case 102)
-assert_equals clean "$(jq -r .status <<<"$cr_check_done")" "CodeRabbit check-run complete"
+jq -e '.status == "clean" and .reviewers.states.coderabbit == "pending" and
+  .reviewers.required.coderabbit == false' <<<"$cr_check_pending" >/dev/null
 
 make_fixture coderabbit-failure
 export MOCK_GH_SCENARIO=coderabbit-failure
 init_case >/dev/null
 cr_failed=$(snapshot_case 101)
-assert_equals blocked "$(jq -r .status <<<"$cr_failed")" "CodeRabbit failure state"
+jq -e '.status == "clean" and .reviewers.states.coderabbit == "failed" and
+  .reviewers.required.coderabbit == false' <<<"$cr_failed" >/dev/null
 
 make_fixture no-progress
 export MOCK_GH_SCENARIO=fail

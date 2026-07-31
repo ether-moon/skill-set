@@ -35,11 +35,11 @@ Any unresolved actionable thread makes the snapshot `blocked`.
 
 ## Automated Reviewers
 
-Reviewer selection is always `auto`; there is no adapter-selection flag. Initialization detects CodeRabbit, Claude, and `chatgpt-codex-connector` from authors and apps found in the ten most recent merged PRs. Every snapshot unions that history with current-PR commit statuses, check-runs, reviews, comments, and reactions, so a newly introduced reviewer is discovered without restarting the run.
+Reviewer discovery is always `auto`; there is no adapter-selection flag. Initialization detects CodeRabbit, Claude, and `chatgpt-codex-connector` from authors and apps found in the ten most recent merged PRs. Every snapshot unions that history with current-PR commit statuses, check-runs, reviews, comments, and reactions, so the report and blocker fingerprint include reviewer telemetry without requiring every repository to run those reviewers.
 
-CodeRabbit completion comes from its current-HEAD commit status or check-run. Claude completion comes from its current-HEAD check-run, status, or review. Codex completion comes from a current-HEAD review or, before any resolver push, the connector's `+1` reaction. Successful or neutral completion satisfies the signal; failure, error, cancellation, timeout, or action-required is blocked. A required pending or absent signal remains `polling` until the review deadline and then becomes `timed_out`.
+CodeRabbit telemetry comes from its current-HEAD commit status or check-run. Claude telemetry comes from its current-HEAD check-run, status, or review. Codex telemetry comes from a current-HEAD review or, before any resolver push, the connector's `+1` reaction. These signals are observational and are never independently required. Their absence, pending state, or standalone failure cannot keep a snapshot `polling`, make it `timed_out`, or make it `blocked` after selected checks have settled and no actionable review thread remains.
 
-CodeRabbit remains required whenever active because it normally re-reviews a pushed HEAD. Claude and Codex are required for the initial cycle and whenever the current HEAD has their evidence. After a resolver push, their absence is `not_expected` rather than a reason to trigger a new review. Actionable comments from every provider are still governed by review-thread state.
+Reviewer results that appear as selected PR checks still use the normal check classification. Actionable comments from every provider still use review-thread state. This makes checks and unresolved conversations authoritative while preserving reviewer evidence for reports and change fingerprints.
 
 ## Mergeability
 
