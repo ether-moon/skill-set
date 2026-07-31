@@ -42,6 +42,6 @@ graders:
     name: ambiguous-refactor-not-applied
     target:
       source: file
-      path: src/order.js
+      path: outputs/src/order.js
     pattern: "function\\s+validateOrder"
     match: not_contains

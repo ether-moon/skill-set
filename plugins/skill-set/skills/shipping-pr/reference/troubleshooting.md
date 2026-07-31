@@ -14,7 +14,7 @@ The returned results were discarded intentionally. Call `snapshot` again. The ch
 
 ## Interrupted resolver run
 
-A resumed `resolving` state must use `.resolution.worktree`, `.resolution.branch`, pinned SHAs, expected agents, and `.resolution.publication`; never launch a second resolver. For `prepared`, `gate_passed`, or `commenting`, call `publish` with the same recorded files and expected local HEAD. It reconciles an already-pushed HEAD and searches the stable hidden marker before commenting. For `pending`, the resolver was interrupted before a safe result set was journaled: report the paths and transition with `--resolver-attempt --resolver-result partial-failure` to `awaiting_user`. Use `failed` only when recovery is impossible. A resumed `awaiting_user` state stays paused until the user explicitly chooses how to continue.
+A resumed `resolving` state must use `.resolution.worktree`, `.resolution.branch`, pinned SHAs, expected agents, `.resolution.decision_requirements`, `.resolution.decisions`, and `.resolution.publication`; never launch a second resolver. For `prepared`, `gate_passed`, or `commenting`, call `publish` with the same recorded files and expected local HEAD. It reconciles an already-pushed HEAD and searches the stable hidden marker before commenting. For `pending`, the resolver was interrupted before a safe result set was journaled: report the paths and transition with `--resolver-attempt --resolver-result partial-failure` to `awaiting_user`. Use `failed` only when recovery is impossible. A resumed ambiguous `awaiting_user` state stays paused until the user selects every recorded decision ID, then resumes with one `--resolver-decision '<ID>=<selected-resolution>'` per ID.
 
 ## Pending or unknown checks
 

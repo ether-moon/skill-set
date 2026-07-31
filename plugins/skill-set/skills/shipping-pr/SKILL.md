@@ -80,7 +80,7 @@ Convert minute flags to seconds, then run:
 
 Reviewer selection is always automatic. The runner detects CodeRabbit, Claude, and `chatgpt-codex-connector` from recent merged-PR activity, then incorporates current-PR evidence on every snapshot. Do not ask the user to select an adapter or pass reviewer-specific flags.
 
-Use `--resume` only when the runner reports an active run. State lives under the repository's Git common directory, so linked worktrees share one lock and one run. Branch on the returned status: snapshot only `polling`; handle `blocked`, `awaiting_user`, and `resolving` before polling again. A resumed `resolving` run must use its recorded `resolution` metadata and must never dispatch a duplicate resolver. Resume a journaled `prepared`, `gate_passed`, or `commenting` publication by calling `publish` with the unchanged files; the runner reconciles the remote HEAD and hidden comment marker. If its phase is `pending`, report the recorded worktree/branch and treat the interrupted attempt as `partial-failure`. A resumed `awaiting_user` run remains paused with its saved result and recovery paths until the user explicitly decides.
+Use `--resume` only when the runner reports an active run. State lives under the repository's Git common directory, so linked worktrees share one lock and one run. Branch on the returned status: snapshot only `polling`; handle `blocked`, `awaiting_user`, and `resolving` before polling again. A resumed `resolving` run must use its recorded `resolution` metadata, including `decision_requirements` and `decisions`, and must never dispatch a duplicate resolver. Resume a journaled `prepared`, `gate_passed`, or `commenting` publication by calling `publish` with the unchanged files; the runner reconciles the remote HEAD and hidden comment marker. If its phase is `pending`, report the recorded worktree/branch and treat the interrupted attempt as `partial-failure`. A resumed `awaiting_user` run remains paused with its saved result and recovery paths until the user explicitly decides every recorded ID.
 
 ### 3. Snapshot
 
@@ -88,7 +88,7 @@ Call `skill-set-pr snapshot --pr "$PR" --expected-run-id "$RUN_ID"`. The JSON re
 
 - `polling`: report current counts, wait 30 seconds, then call `snapshot` again with the same run ID. Do not reset the run or poll more frequently.
 - `blocked`: continue to resolution.
-- `awaiting_user`: present the unresolved decision and stop until the user responds.
+- `awaiting_user`: present only the unresolved decisions. After the user selects every resolution or skip, transition with one `--resolver-decision '<ID>=<selected-resolution>'` per recorded ID and resume the recorded resolver plan without another confirmation.
 - `clean`, `timed_out`, `closed`, or `failed`: call `finish` with the same `--from`, `--status`, and `--expected-run-id`, then report that terminal result.
 - `stalled`: report unchanged HEAD and blocker fingerprint; do not retry automatically.
 
@@ -96,7 +96,7 @@ Call `skill-set-pr snapshot --pr "$PR" --expected-run-id "$RUN_ID"`. The JSON re
 
 Read `headRefOid`, `headRefName`, `headRepository.nameWithOwner`, `baseRefOid`, `baseRefName`, and the PR URL host, then re-read them before resolution. If the PR HEAD changed before the resolver transition, return `blocked -> polling`, take a fresh snapshot, and continue automatically. Use the currently checked-out PR worktree and branch; record its absolute repository root as `$WORKTREE` and its current branch as `$RESOLVER_BRANCH`. Do not create a temporary worktree or resolver branch.
 
-Fetch the exact PR HEAD and base SHAs without checking out another branch. Preserve the complete current branch state. If new authorized working-tree changes exist, commit them through the Git runner before resolver edits. When local and remote PR history differ, reconcile it in place and continue: fast-forward the current branch when local HEAD is an ancestor of the fetched PR HEAD; keep local commits when the remote HEAD is their ancestor; otherwise merge the fetched exact PR HEAD into the current branch without rebasing. Resolve unambiguous conflicts in place and preserve genuinely ambiguous conflicts for the user's decision. Re-read a concurrently changed PR HEAD and repeat this reconciliation instead of creating another checkout or stopping merely because the SHAs differ.
+Fetch the exact PR HEAD and base SHAs without checking out another branch. Preserve the complete current branch state. If new authorized working-tree changes exist, commit them through the Git runner before resolver classification. When local and remote PR history differ, reconcile it in place and continue: fast-forward the current branch when local HEAD is an ancestor of the fetched PR HEAD; keep local commits when the remote HEAD is their ancestor; otherwise merge the fetched exact PR HEAD into the current branch without rebasing. Resolve reconciliation conflicts under the same decision gate and preserve genuinely ambiguous conflicts for the user's decision. Re-read a concurrently changed PR HEAD and repeat this reconciliation instead of creating another checkout or stopping merely because the SHAs differ.
 
 Bind `$REMOTE` to a push URL whose canonical host and `owner/repo` equal the PR head repository; for a fork PR this is normally a fork remote, not the base repository's `origin`. Select the ordered resolver plan: merge alone for a base conflict; otherwise CI first when checks failed, then review when actionable threads exist.
 
@@ -121,7 +121,7 @@ For a CI-plus-review cycle, repeat `--resolver-agent` in that order. Then invoke
 - the explicit capability contract;
 - `workspace_mode=current`, requiring every resolver to stay in the recorded current worktree and branch.
 
-Follow [blocker-resolution.md](reference/blocker-resolution.md). A conflict consumes the entire cycle. Without conflict, CI resolution runs before review resolution in the same worktree.
+Follow [blocker-resolution.md](reference/blocker-resolution.md). First classify the complete resolver plan without mutation. If any AMBIGUOUS item exists, transition `resolving -> awaiting_user` with one `--decision-request <ID>` per item. After every decision is recorded, transition `awaiting_user -> resolving` with one `--resolver-decision '<ID>=<selected-resolution>'` per item and run the resolve phase automatically. A conflict consumes the entire cycle. Without conflict, CI runs before review in both phases in the same worktree.
 
 ### 5. Publish and record the resolver outcome
 
@@ -139,7 +139,7 @@ Each attempted agent writes one ordered entry to a results file inside the resol
 
 - Successful `publish`: transition `resolving -> polling` with `--resolver-attempt` and `--resolver-result success` or `no-op`, then snapshot again. The transition is rejected unless the publication journal is `complete`.
 - PR HEAD changed before publication: preserve the reconciled current branch, transition `resolving -> polling` with `--resolver-attempt --resolver-result stale`, take a fresh snapshot, and continue automatically. `stale` never publishes the old result chain and does not require a completed publication journal.
-- AMBIGUOUS decision: transition `resolving -> awaiting_user` with `--resolver-attempt --resolver-result ambiguous`; do not push.
+- AMBIGUOUS decision: transition `resolving -> awaiting_user` with `--resolver-attempt --resolver-result ambiguous` and one `--decision-request <ID>` per unresolved item; do not edit, commit, or push before the decision gate completes.
 - Partial or failed attempt: transition to `failed` or `awaiting_user` with `--resolver-attempt` and its result; do not push and preserve the current worktree and branch.
 - No progress: return to `polling` as a `no-op`. Only the next snapshot may produce `stalled` after observing the same HEAD and blocker fingerprint.
 

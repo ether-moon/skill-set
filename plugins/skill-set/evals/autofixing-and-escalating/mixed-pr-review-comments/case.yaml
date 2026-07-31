@@ -60,3 +60,16 @@ graders:
       source: file
       path: outputs/src/auth.js
     pattern: "function\\s+validatePassword"
+  - type: regex
+    name: password-validation-invoked
+    target:
+      source: file
+      path: outputs/src/auth.js
+    pattern: "=\\s*validatePassword\\s*\\(\\s*password\\s*\\)"
+  - type: regex
+    name: inline-password-validation-removed
+    target:
+      source: file
+      path: outputs/src/auth.js
+    pattern: "provider\\s*===\\s*['\"]password['\"]\\s*\\)\\s*\\{\\s*if\\s*\\(\\s*!password"
+    match: not_contains

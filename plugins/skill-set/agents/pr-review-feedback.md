@@ -8,9 +8,9 @@ tools: ["Read", "Grep", "Glob", "Bash", "Edit", "Write"]
 
 ## Input Contract
 
-Require repository, PR number, current remote HEAD SHA, recorded current worktree/branch, `workspace_mode=current`, and `resolve-authorized` capabilities with `edit=true`, `commit=true`, `push=false`, and `comment=false`.
+Require repository, PR number, current remote HEAD SHA, recorded current worktree/branch, `workspace_mode=current`, `resolve-authorized` capabilities with `edit=true`, `commit=true`, `push=false`, and `comment=false`, `phase=classify|resolve`, and the exact selected resolution or skip for every AMBIGUOUS ID in resolve phase.
 
-Run only when the recorded resolver plan includes review. If that plan also includes CI, require the CI resolver to have succeeded or no-oped and verify its local HEAD; a review-only plan starts directly from the supplied PR HEAD. In both cases, verify the worktree remains based on that pinned HEAD.
+Run only when the recorded resolver plan includes review. In classify phase, require the planned CI classification to have completed without mutation; an AMBIGUOUS CI classification does not prevent collecting review decisions. In resolve phase, require the CI resolver to have succeeded or no-oped and verify its local HEAD. A review-only plan starts directly from the supplied PR HEAD. In every phase, verify the worktree remains based on the pinned input HEAD.
 
 ## Collect Current Review State
 
@@ -24,10 +24,11 @@ Preserve each thread's actual author/app identity. Do not select or return a pro
 
 1. Read `autofixing-and-escalating/SKILL.md` and pass the capability contract.
 2. Apply the runner's narrow whole-message acknowledgement rule before classification: normalize ASCII case/punctuation/whitespace and skip only exact praise/summary labels (`lgtm`, `looks good`, `looks good to me`, `great work`, `great job`, `nice work`, `well done`, `thanks`, `thank you`, `approved`, `all good`, `ship it`, `summary`, `review summary`, `code review summary`, `walkthrough`) or a body consisting only of `👍`, `✅`, or `🎉`. A praise phrase plus a request remains actionable. Also skip requests made obsolete by the current diff.
-3. Classify each actionable request. Public API, data/schema, dependency, security-policy, destructive, architectural, and multiple-solution requests are always AMBIGUOUS.
-4. Apply only OBVIOUS items in the shared resolver worktree, preserving prior CI edits.
-5. Resolve `skills/managing-git-workflow/scripts/skill-set-git` from the installed skill collection, run focused validation, inspect the index, and commit only explicit modified paths through that absolute runner path with `commit --path <path> --expected-index <fingerprint> --message-file <file>`.
-6. On AMBIGUOUS, return the decision with rationale and recommendation. Do not publish partial work.
+3. Classify every actionable request before any mutation. Public API, data/schema, dependency, security-policy, destructive, architectural, and multiple-solution requests are always AMBIGUOUS. Give every AMBIGUOUS item a plan-wide unique ID prefixed with `REVIEW-`.
+4. In classify phase, return the complete classification without editing, testing a proposed fix, staging, or committing. If any item is AMBIGUOUS, the caller records its IDs and completes the decision gate before resolve phase.
+5. In resolve phase, require every AMBIGUOUS ID to have an exact selected resolution or skip. Recheck the pinned HEAD and thread state, then apply all queued OBVIOUS items and selected AMBIGUOUS resolutions in one bounded pass, preserving prior authorized resolver edits.
+6. Resolve `skills/managing-git-workflow/scripts/skill-set-git` from the installed skill collection, run focused validation, inspect the index, and commit only explicit modified paths through that absolute runner path with `commit --path <path> --expected-index <fingerprint> --message-file <file>`.
+7. Do not publish partial work.
 
 ## Queue, Do Not Publish
 
