@@ -68,7 +68,10 @@ run_fail() {
   local stdout_file=$case_dir/stdout.json
   local stderr_file=$case_dir/stderr.json
   if (cd "$repo" && PATH=$test_path "$bash_bin" "$runner" "$@") >"$stdout_file" 2>"$stderr_file"; then
+    command cat "$stdout_file" >&2
+    command cat "$stderr_file" >&2
     fail "expected command to fail: $*"
+    return 1
   fi
   [[ ! -s "$stdout_file" ]] || fail "failure wrote to stdout: $*"
   jq -e '.ok == false and (.error.code | length > 0) and (.error.message | length > 0) and (.error.recovery | length > 0)' \
@@ -575,6 +578,40 @@ jq -e --arg path "$repo" '
 resumed_awaiting=$(run_ok init --pr 17 --repo owner/repo --resume)
 jq -e --arg path "$repo" '.resumed == true and .status == "awaiting_user" and .resolution.worktree == $path' \
   <<<"$resumed_awaiting" >/dev/null
+
+make_fixture ambiguous-decision-resume
+export MOCK_GH_SCENARIO=fail
+initialized=$(init_case)
+run_id=$(jq -r .run_id <<<"$initialized")
+snapshot_case 101 >/dev/null
+start_resolution "$run_id" --resolver-agent ci-failure-resolver >/dev/null
+missing_requests=$(run_fail transition --pr 17 --from resolving --to awaiting_user \
+  --expected-run-id "$run_id" --resolver-attempt --resolver-result ambiguous)
+assert_equals decision_request_required "$(jq -r .error.code <<<"$missing_requests")" \
+  "ambiguous resolver decision requirements"
+awaiting=$(run_ok transition --pr 17 --from resolving --to awaiting_user \
+  --expected-run-id "$run_id" --resolver-attempt --resolver-result ambiguous \
+  --decision-request CONTRACT-001 --decision-request EVAL-002)
+jq -e '.status == "awaiting_user" and
+  .resolution.decision_requirements == ["CONTRACT-001", "EVAL-002"] and
+  .resolution.decisions == []' <<<"$awaiting" >/dev/null
+missing_decisions=$(run_fail transition --pr 17 --from awaiting_user --to resolving \
+  --expected-run-id "$run_id")
+assert_equals resolver_decision_required "$(jq -r .error.code <<<"$missing_decisions")" \
+  "awaiting-user resume requires decisions"
+incomplete_decisions=$(run_fail transition --pr 17 --from awaiting_user --to resolving \
+  --expected-run-id "$run_id" --resolver-decision 'CONTRACT-001=align callers')
+assert_equals incomplete_resolver_decisions "$(jq -r .error.code <<<"$incomplete_decisions")" \
+  "awaiting-user resume requires every decision"
+resumed=$(run_ok transition --pr 17 --from awaiting_user --to resolving \
+  --expected-run-id "$run_id" \
+  --resolver-decision 'CONTRACT-001=align callers' \
+  --resolver-decision 'EVAL-002=strengthen deterministic graders')
+jq -e '.status == "resolving" and
+  .resolution.decisions == [
+    {id:"CONTRACT-001",selection:"align callers"},
+    {id:"EVAL-002",selection:"strengthen deterministic graders"}
+  ]' <<<"$resumed" >/dev/null
 
 make_fixture stale-resolver-retry
 export MOCK_GH_SCENARIO=fail

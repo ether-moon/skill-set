@@ -1224,6 +1224,9 @@ command_transition() {
   local worktree='' resolver_branch='' remote='' remote_branch=''
   local expected_remote_sha='' base_sha='' base_branch='' workspace_mode=''
   local resolver_agents=()
+  local decision_requests=()
+  local resolver_decisions=()
+  local decision_request_count=0 resolver_decision_count=0
   NOW_OVERRIDE=
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -1233,6 +1236,8 @@ command_transition() {
       --expected-run-id) [[ $# -ge 2 ]] || die invalid_argument "--expected-run-id requires a value." "Pass the run_id returned by init."; expected_run_id=$2; shift 2 ;;
       --resolver-result) [[ $# -ge 2 ]] || die invalid_argument "--resolver-result requires a value." "Pass success, no-op, stale, partial-failure, ambiguous, or failed."; resolver_result=$2; shift 2 ;;
       --resolver-agent) [[ $# -ge 2 ]] || die invalid_argument "--resolver-agent requires a value." "Pass a resolver agent name."; resolver_agents+=("$2"); shift 2 ;;
+      --decision-request) [[ $# -ge 2 ]] || die invalid_argument "--decision-request requires a value." "Pass a stable unresolved decision ID."; decision_requests[decision_request_count]=$2; decision_request_count=$((decision_request_count + 1)); shift 2 ;;
+      --resolver-decision) [[ $# -ge 2 ]] || die invalid_argument "--resolver-decision requires a value." "Pass ID=selected-resolution for every unresolved decision."; resolver_decisions[resolver_decision_count]=$2; resolver_decision_count=$((resolver_decision_count + 1)); shift 2 ;;
       --worktree) [[ $# -ge 2 ]] || die invalid_argument "--worktree requires a value." "Pass the planned absolute resolver worktree path."; worktree=$2; shift 2 ;;
       --resolver-branch) [[ $# -ge 2 ]] || die invalid_argument "--resolver-branch requires a value." "Pass the recorded current local branch."; resolver_branch=$2; shift 2 ;;
       --remote) [[ $# -ge 2 ]] || die invalid_argument "--remote requires a value." "Pass the Git remote name."; remote=$2; shift 2 ;;
@@ -1264,6 +1269,37 @@ command_transition() {
     die stale_state "Expected $from but state is $current_status." "Take a new snapshot and retry from the current state."
   legal_transition "$from" "$to" || \
     die illegal_transition "Transition $from -> $to is not allowed." "Use an allowed adjacent state transition."
+
+  local decision_requests_json='[]' decision_records_json='[]' decision_value decision_id selection index
+  for ((index = 0; index < decision_request_count; index++)); do
+    decision_value=${decision_requests[index]}
+    decision_id=$decision_value
+    [[ $decision_id =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || \
+      die invalid_decision_id "Decision request IDs must use letters, digits, dots, underscores, or hyphens." \
+        "Pass a stable identifier such as REVIEW-001."
+    [[ $(jq -r --arg id "$decision_id" 'index($id) != null' <<<"$decision_requests_json") == false ]] || \
+      die duplicate_decision "Decision request $decision_id was provided more than once." \
+        "Pass each unresolved decision ID once."
+    decision_requests_json=$(jq -cn --argjson requests "$decision_requests_json" --arg id "$decision_id" \
+      '$requests + [$id]')
+  done
+  for ((index = 0; index < resolver_decision_count; index++)); do
+    decision_value=${resolver_decisions[index]}
+    [[ $decision_value == *=* ]] || \
+      die invalid_resolver_decision "Resolver decisions must use ID=selected-resolution." \
+        "Pass the exact selected resolution for each unresolved decision."
+    decision_id=${decision_value%%=*}
+    selection=${decision_value#*=}
+    [[ $decision_id =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ && -n $selection && $selection != *$'\n'* ]] || \
+      die invalid_resolver_decision "Resolver decisions require a valid ID and a non-empty single-line selection." \
+        "Pass ID=selected-resolution without embedded newlines."
+    [[ $(jq -r --arg id "$decision_id" 'any(.[]; .id == $id)' <<<"$decision_records_json") == false ]] || \
+      die duplicate_decision "Resolver decision $decision_id was provided more than once." \
+        "Pass one selected resolution for each decision ID."
+    decision_records_json=$(jq -cn --argjson decisions "$decision_records_json" \
+      --arg id "$decision_id" --arg selection "$selection" \
+      '$decisions + [{id:$id,selection:$selection}]')
+  done
 
   local has_resolution_flags=false
   if [[ -n $worktree || -n $resolver_branch || -n $remote || -n $remote_branch || \
@@ -1365,7 +1401,8 @@ command_transition() {
         github_host:$github_host,head_repo:$head_repo,head_branch:$head_branch,
         base_branch:$base_branch,expected_remote_sha:$expected,base_sha:$base,
         expected_head_sha:$expected,blocker_fingerprint:$fingerprint,expected_agents:$agents,
-        started_at:$started_at,result:null,publication:{phase:"pending",pushed:false,
+        started_at:$started_at,result:null,decision_requirements:[],decisions:[],
+        publication:{phase:"pending",pushed:false,
           comments_published:0,comment_hashes:[],results_hash:"",intent_hash:"",
           summary_file:"",thread_feedback_file:"",thread_feedback_hash:"",
           thread_feedback_published:0,marker:"",coderabbit_resolve:false,final_remote_sha:""}}')
@@ -1399,6 +1436,42 @@ command_transition() {
     [[ $REMOTE_PR_STATE == OPEN && $REMOTE_HEAD == "$resumed_head" ]] || \
       die head_changed "The live PR HEAD changed while resolver recovery was awaiting user input." \
         "Preserve the worktree, take a fresh snapshot, and do not resume publication."
+
+    local decision_requirements provided_decision_ids ordered_decisions
+    decision_requirements=$(jq -c '.decision_requirements // []' <<<"$resolution_json")
+    if [[ $(jq -r 'length' <<<"$decision_requirements") -gt 0 ]]; then
+      [[ $(jq -r 'length' <<<"$decision_records_json") -gt 0 ]] || \
+        die resolver_decision_required "Resuming an ambiguous resolver requires every selected resolution." \
+          "Pass one --resolver-decision ID=selected-resolution for each recorded decision request."
+      provided_decision_ids=$(jq -c '[.[].id]' <<<"$decision_records_json")
+      jq -e --argjson required "$decision_requirements" --argjson provided "$provided_decision_ids" \
+        '($required | sort) == ($provided | sort)' >/dev/null 2>&1 <<<null || \
+        die incomplete_resolver_decisions "The selected resolutions do not exactly match the recorded decision requests." \
+          "Pass one --resolver-decision for every recorded ID and no others."
+      ordered_decisions=$(jq -cn --argjson required "$decision_requirements" \
+        --argjson decisions "$decision_records_json" \
+        '[$required[] as $id | $decisions[] | select(.id == $id)]')
+      resolution_json=$(jq -cn --argjson resolution "$resolution_json" \
+        --argjson decisions "$ordered_decisions" '$resolution + {decisions:$decisions}')
+    elif [[ $(jq -r 'length' <<<"$decision_records_json") -gt 0 ]]; then
+      die unexpected_resolver_decision "This awaiting-user recovery has no recorded ambiguous decisions." \
+        "Resume without --resolver-decision or finish the failed recovery."
+    fi
+  fi
+
+  if [[ $from == resolving && $resolver_result == ambiguous ]]; then
+    [[ $(jq -r 'length' <<<"$decision_requests_json") -gt 0 ]] || \
+      die decision_request_required "An ambiguous resolver result must record every unresolved decision ID." \
+        "Pass one --decision-request for each unresolved decision before awaiting user input."
+    [[ $(jq -r 'length' <<<"$decision_records_json") -eq 0 ]] || \
+      die unexpected_resolver_decision "Selected resolutions are valid only when resuming from awaiting_user." \
+        "Record unresolved IDs now and pass selections on awaiting_user -> resolving."
+  elif [[ $(jq -r 'length' <<<"$decision_requests_json") -gt 0 ]]; then
+    die unexpected_decision_request "Decision requests are valid only for an ambiguous resolver result." \
+      "Remove --decision-request or return ambiguous to awaiting_user."
+  elif [[ $from != awaiting_user && $(jq -r 'length' <<<"$decision_records_json") -gt 0 ]]; then
+    die unexpected_resolver_decision "Selected resolutions are valid only when resuming from awaiting_user." \
+      "Remove --resolver-decision or resume the recorded awaiting-user state."
   fi
 
   if [[ -n $resolver_result ]]; then
@@ -1461,8 +1534,15 @@ command_transition() {
   local transition_now
   transition_now=$(now_epoch)
   if [[ $from == resolving ]]; then
-    resolution_json=$(jq -c --arg result "$resolver_result" --argjson finished_at "$transition_now" \
-      '.resolution + {result:$result,finished_at:$finished_at}' <<<"$STATE")
+    if [[ $resolver_result == ambiguous ]]; then
+      resolution_json=$(jq -c --arg result "$resolver_result" --argjson finished_at "$transition_now" \
+        --argjson requests "$decision_requests_json" \
+        '.resolution + {result:$result,finished_at:$finished_at,
+          decision_requirements:$requests,decisions:[]}' <<<"$STATE")
+    else
+      resolution_json=$(jq -c --arg result "$resolver_result" --argjson finished_at "$transition_now" \
+        '.resolution + {result:$result,finished_at:$finished_at}' <<<"$STATE")
+    fi
   elif [[ $resolution_json == null ]]; then
     resolution_json=$(jq -c '.resolution // null' <<<"$STATE")
   fi

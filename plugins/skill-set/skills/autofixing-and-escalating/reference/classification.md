@@ -2,6 +2,13 @@
 
 Detailed guidance for applying the OBVIOUS vs AMBIGUOUS classification. Use this when the primary criteria in SKILL.md leave a borderline case.
 
+## Table of Contents
+
+- [Criteria Pass/Fail Examples](#criteria-passfail-examples)
+- [Domain-Specific Examples](#domain-specific-examples)
+- [Edge Cases](#edge-cases)
+- [Decision Tree](#decision-tree)
+
 ## Criteria Pass/Fail Examples
 
 ### Criterion 1: Source identified a specific issue
@@ -58,9 +65,11 @@ Detailed guidance for applying the OBVIOUS vs AMBIGUOUS classification. Use this
 
 ### Mixed Items (Part Obvious, Part Ambiguous)
 When a single issue contains both an obvious fix and an ambiguous suggestion, split them:
-- Apply the obvious portion as OBVIOUS
-- Escalate the ambiguous portion as AMBIGUOUS
+- Queue the obvious portion as OBVIOUS
+- Record the ambiguous portion as AMBIGUOUS
 - Note the relationship between the two in the escalation
+
+Because an AMBIGUOUS portion exists, complete its decision gate before applying either portion. After the decision is complete, automatically apply the queued OBVIOUS fix and the selected AMBIGUOUS resolution without another confirmation.
 
 **Example**: "Fix the null check (line 42) and also consider restructuring this into a guard clause pattern"
 - OBVIOUS: Add the null check

@@ -1,13 +1,13 @@
 ---
 name: autofixing-and-escalating
-description: Classifies actionable findings from linters, tests, security scans, audits, and PR reviews as obvious or ambiguous, then applies only explicitly authorized fixes. Use when processing one or more externally produced findings, especially when a caller needs a review-only report or a bounded resolution pass.
+description: Classifies actionable findings from linters, tests, security scans, audits, and PR reviews, automatically applies unambiguous fixes, and pauses only for decisions required by ambiguous findings before applying the complete chosen resolution. Use when processing one or more externally produced findings with the intent to resolve them.
 ---
 
 # Autofixing and Escalating
 
 ## Purpose
 
-Turn external findings into a complete decision record. This skill classifies and recommends. It mutates only within a capability contract supplied by the user or an orchestrating workflow.
+Turn external findings into verified fixes and a complete decision record. Editing within the bounded finding scope is the skill's default behavior. Commit, push, and public comment remain separately authorized capabilities.
 
 Do not use the classification ceremony for suggestions produced by the current analysis; present those normally.
 
@@ -16,24 +16,21 @@ Do not use the classification ceremony for suggestions produced by the current a
 Start every invocation with this contract:
 
 ```text
-mode: review-only | resolve-authorized
+mode: resolve-authorized
 capabilities:
-  edit: true | false
+  edit: true
   commit: true | false
   push: true | false
   comment: true | false
-scope: explicit paths, PR, or finding set
+scope: explicit paths, PR, finding set, or targets identified by the findings
 source: reviewer, tool, scan, or audit
 ```
 
-Defaults are `mode: review-only` and every capability `false`.
+The only supported mode is `resolve-authorized`. Default to `edit: true` and every publication capability `false`. A direct invocation with actionable findings authorizes edits only to the bounded targets identified by those findings.
 
-Use `resolve-authorized` only when:
+An orchestrating workflow may pass the same mode and explicit capabilities. Do not accept `edit: false` as a reporting mode; route analysis-only requests to an ordinary report without invoking this skill.
 
-- the user explicitly asks to fix, resolve, or apply the findings; or
-- `/skill-set:pr:fix`, `/skill-set:pr:ship`, or another caller explicitly passes that mode and its capabilities.
-
-A capability authorizes only itself. `edit` does not authorize commit; `commit` does not authorize push; `push` does not authorize force; `comment` does not authorize code changes. Missing or unclear scope remains review-only.
+A capability authorizes only itself. `edit` does not authorize commit; `commit` does not authorize push; `push` does not authorize force; `comment` does not authorize code changes. If the findings do not identify a bounded target, treat the missing scope as an AMBIGUOUS decision and do not mutate until it is resolved.
 
 ## Classify Every Finding
 
@@ -83,10 +80,10 @@ Severity affects ordering, never mutation authority.
 
 1. **Normalize** — deduplicate findings and record source, target, and scope.
 2. **Classify** — mark every finding OBVIOUS, AMBIGUOUS, or SKIP before mutation.
-3. **Report** — show the full classification; every AMBIGUOUS item includes `Why ambiguous`, severity, alternatives, and a recommendation.
-4. **Authorize** — in review-only mode, stop. In resolve-authorized mode, intersect requested work with each capability and scope.
-5. **Resolve** — apply authorized OBVIOUS fixes. Apply an AMBIGUOUS fix only after the user explicitly selects that resolution.
-6. **Return** — report applied, awaiting decision, failed, and skipped items plus unused capabilities.
+3. **Decide** — if any item is AMBIGUOUS, pause before any mutation. Present only the decisions required, each with `Why ambiguous`, severity, alternatives, and a recommendation. Continue the decision dialogue until every AMBIGUOUS item has a selected resolution or is explicitly skipped. Do not ask for approval of OBVIOUS fixes or for a generic proceed confirmation.
+4. **Resolve** — when no AMBIGUOUS item exists, apply all OBVIOUS fixes immediately. Otherwise, after every required decision is complete, automatically apply all queued OBVIOUS fixes and every selected AMBIGUOUS resolution in one bounded pass without another confirmation.
+5. **Verify** — run the checks needed to verify every applied fix. Keep failures bounded to the original scope.
+6. **Return** — report applied, failed, and skipped items plus verification evidence and unused publication capabilities.
 
 Read `reference/resolution.md` for the contract and output formats.
 
