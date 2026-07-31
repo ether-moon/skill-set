@@ -1,0 +1,22 @@
+## Decisions Made
+- signal-gated-review-action을 별도 reviewer adapter로 처리하지 않는다: workflow job은 selected check gate로, inline finding은 review thread gate로 처리한다.
+- check가 완료되고 미해결 actionable thread가 없으면 optional Claude/Codex telemetry가 없어도 clean으로 판정한다.
+
+## Problems Encountered
+- 일반 check/thread 구현이 액션과 호환되지만 액션 고유의 workflow와 job 조합을 고정하는 회귀 사례가 없었다: running, completed, unresolved-thread fixtures를 추가했다.
+
+## Constraints Identified
+- 기본 --required-only true에서는 Signal-Gated PR Review / review job이 대상 branch의 required check로 설정되어야 shipping이 기다린다.
+- 원격 push와 branch ruleset 변경은 요청되지 않았다: 커밋과 note는 로컬에만 유지한다.
+
+## Open Questions
+- 여러 대상 branch의 ruleset에 Signal-Gated PR Review / review를 required check로 등록하는 외부 설정은 배포 시 확인이 필요하다.
+
+## Context
+shipping-pr의 일반 check/thread 판정이 karrot-emu/signal-gated-review-action과 명시적으로 호환되도록 문서와 결정적 회귀 테스트를 추가했다. 액션 check가 진행 중이면 polling하고, 완료 후 thread가 없으면 clean이며, 미해결 inline thread가 있으면 blocked가 된다. 기존 optional reviewer telemetry는 completion gate에 다시 포함하지 않았다.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
