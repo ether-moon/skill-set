@@ -891,6 +891,34 @@ collect_reviewer_states() {
   REVIEWER_STATES=$(jq -c .states <<<"$summary")
 }
 
+collect_optional_reviewer_telemetry() {
+  local repo=$1
+  local pr=$2
+  local head_sha=$3
+  local active_reviewers=$4
+  local cycle=$5
+  local telemetry
+
+  REVIEWER_TELEMETRY_AVAILABLE=false
+  REVIEWERS_ACTIVE=$active_reviewers
+  REVIEWER_STATES='{"claude":"unavailable","coderabbit":"unavailable","codex":"unavailable"}'
+
+  if telemetry=$(
+    trap - EXIT HUP INT TERM
+    collect_reviewer_states "$repo" "$pr" "$head_sha" "$active_reviewers" "$cycle" 2>/dev/null
+    jq -cn --argjson active "$REVIEWERS_ACTIVE" --argjson states "$REVIEWER_STATES" \
+      '{active:$active,states:$states}'
+  ) && jq -e '
+    (.active | type == "array") and
+    (.states | type == "object") and
+    all([.states.claude,.states.coderabbit,.states.codex][]; type == "string")
+  ' >/dev/null 2>&1 <<<"$telemetry"; then
+    REVIEWERS_ACTIVE=$(jq -c .active <<<"$telemetry")
+    REVIEWER_STATES=$(jq -c .states <<<"$telemetry")
+    REVIEWER_TELEMETRY_AVAILABLE=true
+  fi
+}
+
 command_snapshot() {
   PR=
   local expected_run_id=''
@@ -1010,9 +1038,10 @@ command_snapshot() {
   local unresolved_count
   unresolved_count=$(jq 'length' <<<"$THREAD_DETAILS")
 
-  collect_reviewer_states "$repo" "$PR" "$start_head" "$reviewers_active" "$cycle"
+  collect_optional_reviewer_telemetry "$repo" "$PR" "$start_head" "$reviewers_active" "$cycle"
   reviewers_active=$REVIEWERS_ACTIVE
-  local reviewer_required reviewer_states coderabbit_state
+  local reviewer_required reviewer_states reviewer_telemetry_available coderabbit_state
+  reviewer_telemetry_available=$REVIEWER_TELEMETRY_AVAILABLE
   reviewer_required='{"claude":false,"coderabbit":false,"codex":false}'
   reviewer_states=$(jq -cn --argjson active "$reviewers_active" --argjson required "$reviewer_required" \
     --argjson states "$REVIEWER_STATES" '
@@ -1137,10 +1166,12 @@ command_snapshot() {
     --argjson unresolved "$unresolved_count" --argjson pages "$THREAD_PAGES" \
     --arg coderabbit "$coderabbit_state" --argjson reviewers "$reviewer_states" \
     --argjson reviewer_required "$reviewer_required" --argjson observed_at "$now" \
+    --argjson reviewer_telemetry_available "$reviewer_telemetry_available" \
     --argjson registration_pending "$registration_pending" --argjson checks_missing "$checks_missing" \
     '{checks:$checks,check_details:$check_details,conflict:$conflict,review_threads:$threads,
       unresolved_actionable_threads:$unresolved,review_thread_pages:$pages,coderabbit:$coderabbit,
-      reviewers:{states:$reviewers,required:$reviewer_required},
+      reviewers:{states:$reviewers,required:$reviewer_required,
+        telemetry_available:$reviewer_telemetry_available},
       registration_pending:$registration_pending,checks_missing:$checks_missing,observed_at:$observed_at}')
   if [[ $discarded == true ]]; then
     last_snapshot=$(jq -cn --argjson observed_at "$now" \
@@ -1164,12 +1195,14 @@ command_snapshot() {
     --argjson unresolved "$unresolved_count" --argjson pages "$THREAD_PAGES" \
     --arg coderabbit "$coderabbit_state" --argjson reviewers_active "$reviewers_active" \
     --argjson reviewer_states "$reviewer_states" --argjson reviewer_required "$reviewer_required" \
+    --argjson reviewer_telemetry_available "$reviewer_telemetry_available" \
     --argjson dry_run "$dry_run" \
     '$state + {ok:true,command:"snapshot",checks:$checks,check_details:$check_details,
       review_threads:$threads,head_changed:$head_changed,
       discarded:$discarded,unresolved_actionable_threads:$unresolved,
       review_thread_pages:$pages,coderabbit:$coderabbit,
-      reviewers:{active:$reviewers_active,states:$reviewer_states,required:$reviewer_required},dry_run:$dry_run}'
+      reviewers:{active:$reviewers_active,states:$reviewer_states,required:$reviewer_required,
+        telemetry_available:$reviewer_telemetry_available},dry_run:$dry_run}'
 }
 
 legal_transition() {

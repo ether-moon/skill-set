@@ -978,8 +978,15 @@ make_fixture malformed-coderabbit
 export MOCK_GH_SCENARIO=malformed-coderabbit
 initialized=$(init_case)
 run_id=$(jq -r .run_id <<<"$initialized")
-malformed_cr=$(run_fail snapshot --pr 17 --expected-run-id "$run_id" --now 101)
-assert_equals invalid_github_response "$(jq -r .error.code <<<"$malformed_cr")" "nested CodeRabbit response"
+malformed_cr=$(run_ok snapshot --pr 17 --expected-run-id "$run_id" --now 101)
+jq -e '
+  .status == "clean" and
+  .checks.pass == 1 and
+  .unresolved_actionable_threads == 0 and
+  .reviewers.telemetry_available == false and
+  .reviewers.states.coderabbit == "unavailable" and
+  .reviewers.required.coderabbit == false
+' <<<"$malformed_cr" >/dev/null
 
 # The command-log cases above exercise publication safety. Keep agent and command
 # contracts wired to that executable gate rather than a second mutation path.
