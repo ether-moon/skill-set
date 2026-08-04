@@ -1,0 +1,23 @@
+## Decisions Made
+- 버전 수준: 사용자가 선택한 patch를 적용해 1.14.4에서 1.14.5로 올렸다.
+- 기준 스냅샷: 최신 origin/main의 abce7d296c03fd472732e8451307a6a85fe1a542를 compare-and-swap 기준으로 고정했다.
+- 변경 범위: CHANGELOG.md와 plugins/skill-set/.claude-plugin/plugin.json만 release 커밋에 포함했다.
+
+## Problems Encountered
+- 처음 origin/main을 --base 값으로 전달해 origin/origin/main으로 해석됐다: --base main으로 수정하고 원격 SHA를 다시 검사했다.
+
+## Constraints Identified
+- release-workflow는 준비된 커밋 SHA에 결부된 별도 publication 승인을 받아야 direct push할 수 있다.
+- origin/main이 준비 기준 SHA에서 변경되면 publish를 중단해야 한다.
+
+## Open Questions
+- 준비된 커밋 6612843cb300f80ccc65989e718ca52fcd110504를 origin/main에 direct push할지 최종 승인이 필요하다.
+
+## Context
+skill-set의 최신 origin/main을 기준으로 patch 버전 범프를 준비했다. 버전은 1.14.5이며 PR #36과 #37의 변경을 Improved 항목으로 기록한 격리 커밋을 생성했다.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
