@@ -1,0 +1,26 @@
+## Decisions Made
+- `bumping-version`를 독립 공개 레포지토리 `ether-moon/release-workflow`로 분리했습니다. 일반 개발 스킬과 릴리스 자동화의 배포 주기와 정책을 분리하기 위해서입니다.
+- `skill-set` marketplace는 로컬 플러그인 복사본 대신 외부 GitHub source를 참조합니다. 중복 소스와 교차 레포 의존성을 피하기 위한 선택입니다.
+- core 제거, inventory 갱신, README와 changelog 변경을 하나의 PR로 묶었습니다. 사용자가 허용한 마이그레이션 단위를 유지하기 위해서입니다.
+
+## Problems Encountered
+- `cc-plugin-template`는 단일 플러그인 레포가 아니라 marketplace 생성기 구조였습니다. 기존 `skill-set`의 검증된 플러그인 디렉터리를 standalone 루트로 옮기는 방식으로 해결했습니다.
+- 새 레포의 첫 CI가 분리 전 ShellCheck source 경로 때문에 실패했습니다. 세 테스트 주석을 standalone 경로로 수정한 뒤 CI가 통과했습니다.
+- skill-creator 검증기의 PyYAML 의존성이 기본 Python에 없었습니다. 격리된 `uv` 실행으로 검증을 완료했습니다.
+
+## Constraints Identified
+- 외부 Claude Code 플러그인은 설치 캐시에서 레포 밖 파일을 참조할 수 없으므로 runner와 eval 검증 도구가 새 레포 안에 모두 포함되어야 합니다.
+- 릴리스 runner의 preview, compare-and-swap, 명시적 publication 승인, 복구 상태 보존 계약은 분리 후에도 그대로 유지해야 합니다.
+- 저장소 문서와 커밋 메시지는 영어로 작성해야 하며 runtime 사용자 출력만 사용자의 언어를 따릅니다.
+
+## Open Questions
+- None
+
+## Context
+`bumping-version` skill과 release runner를 core `skill-set` 플러그인에서 제거하고 독립 레포로 이전했습니다. `skill-set` marketplace와 README는 새 외부 source와 독립 버전 주기를 안내하도록 갱신했습니다. core의 192개 eval과 전체 통합 테스트, 두 플러그인의 strict validation, 새 레포 CI가 모두 통과했습니다.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
