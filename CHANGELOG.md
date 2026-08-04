@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the skill-set plugin will be documented in this file.
+All notable changes to plugins in the skill-set marketplace will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -46,6 +46,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **release-workflow plugin**: List the separately versioned `ether-moon/release-workflow` repository as an installable external marketplace plugin.
+
 ### Fixed
 
 - **shipping-pr**: Restore unattended initial commits and pushes. Invoking the shipping workflow now authorizes committing the complete inspected working-tree scope, publishing the branch, and publishing successful resolver commits without a redundant confirmation prompt.
@@ -59,6 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- Removed `bumping-version` and its release runner from the core `skill-set` plugin. Install `release-workflow` to retain version-bump automation.
 - Removed the `applying-coding-baseline`, `building-shared-vocabulary`, `consulting-peer-llms`, `ralph`, `understanding-code-context`, and `using-skill-set` skills.
 - Removed the peer-review and Ralph slash commands that depended on the deleted skills.
 - Removed the broken `using-skill-set` SessionStart hook and its static skill registry.

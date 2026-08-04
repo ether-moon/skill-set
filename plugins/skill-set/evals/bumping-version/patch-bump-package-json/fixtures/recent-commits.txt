@@ -1,3 +1,0 @@
-a1b2c3d fix: race condition when concurrent requests update the cache
-e4f5g6h fix: memory leak in long-running daemon mode
-i7j8k9l fix(config): correctly parse nested env vars

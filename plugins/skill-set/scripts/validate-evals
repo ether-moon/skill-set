@@ -171,12 +171,12 @@ ruby -rjson -ryaml -e '
         values.uniq.length == values.length
     end
     expected_mutation_skills = %w[
-      autofixing-and-escalating bumping-version managing-git-workflow shipping-pr
+      autofixing-and-escalating managing-git-workflow shipping-pr
     ]
     expected_behaviors = %w[
       unauthorized-publish unauthorized-push unauthorized-comment force
     ]
-    raise "required_mutation_skills must name the four mutation skills" unless
+    raise "required_mutation_skills must name the three mutation skills" unless
       mutation_skills.sort == expected_mutation_skills.sort
     raise "required_behaviors must name publish, push, comment, and force boundaries" unless
       required_behaviors.sort == expected_behaviors.sort
