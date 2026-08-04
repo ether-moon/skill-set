@@ -289,7 +289,7 @@ Without the server prefix, Claude may fail to locate the tool.
 
 ## Versioning
 
-The external [`release-workflow`](https://github.com/ether-moon/release-workflow) plugin's `bumping-version` skill reads this section.
+The project-scoped `bumping-version` skill installed from [`release-workflow`](https://github.com/ether-moon/release-workflow) reads this section.
 
 - **Base branch**: main
 - **Commit message**: chore: bump version to {version}
