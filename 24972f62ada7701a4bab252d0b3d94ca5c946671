@@ -1,0 +1,26 @@
+## Decisions Made
+- 리뷰어 선택은 항상 자동 탐지로 고정하고 호출자가 provider 또는 adapter를 지정하지 못하게 했습니다.
+- CodeRabbit 항목이 모두 해결된 경우에만 공식 `@coderabbitai resolve` 명령을 생성하고, Claude와 Codex에는 재리뷰 또는 수정 위임 명령을 보내지 않기로 했습니다.
+- 해결 피드백의 provider는 저장된 리뷰 스레드 작성자에서 러너가 파생하도록 했습니다.
+
+## Problems Encountered
+- 자연어 CodeRabbit 멘션은 해결 명령으로 보장되지 않아 공식 resolve 명령만 생성하도록 회귀 테스트를 추가했습니다.
+- Claude가 check-run이 아닌 현재 HEAD 리뷰를 남긴 경우 완료로 인식하지 못하던 문제를 리뷰 완료 신호로 보완했습니다.
+- 관리형 Git 미리보기의 임시 index 생성이 sandbox에서 거부되어 승인된 Git 메타데이터 접근으로 재실행했습니다.
+
+## Constraints Identified
+- 모든 리뷰 피드백과 thread resolve는 publication gate를 통과한 뒤에만 게시해야 합니다.
+- shipping 과정은 dirty working tree를 자동 커밋할 수 없으며 사용자의 명시적 커밋 승인이 필요합니다.
+- CodeRabbit은 push 이후에도 재리뷰 신호를 기다리지만 Claude와 Codex의 신호가 없으면 새 리뷰를 트리거하지 않습니다.
+
+## Open Questions
+- None
+
+## Context
+shipping-pr가 CodeRabbit뿐 아니라 Claude와 chatgpt-codex-connector 리뷰도 동적으로 탐지하고 적절한 해결 피드백을 게시하도록 개선했습니다. PR 상태 러너, resolver agent 계약, 문서, mock 및 회귀 평가를 함께 갱신했으며 전체 플러그인 테스트를 통과했습니다.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None

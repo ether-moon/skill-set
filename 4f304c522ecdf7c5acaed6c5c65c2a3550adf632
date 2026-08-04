@@ -1,0 +1,23 @@
+## Decisions Made
+- PR clean 판정은 선택된 checks와 미해결 actionable review thread를 기준으로 한다: optional reviewer telemetry는 보고용으로만 유지한다.
+
+## Problems Encountered
+- 레포지토리에 존재하지 않는 Claude/Codex reviewer 신호를 기다리며 timeout까지 polling했다: reviewer telemetry를 completion gate에서 제거해 해결했다.
+- 기존 브랜치에 다른 주제의 변경이 섞여 있었다: origin/main 기반 독립 브랜치에 scoped commit 하나만 체리픽했다.
+
+## Constraints Identified
+- signal-gated-review-action은 workflow check와 PR review thread를 노출한다: shipping은 이 check와 thread를 authoritative input으로 사용한다.
+- shipping 기본값은 required checks만 선택한다: 해당 workflow를 기다리려면 대상 branch ruleset에서 check를 required로 등록해야 한다.
+- 원격 push는 요청되지 않았다: branch와 notes는 로컬에만 유지한다.
+
+## Open Questions
+- 대상 여러 브랜치의 ruleset에 Signal-Gated PR Review check를 required로 등록할지는 배포 시 확인이 필요하다.
+
+## Context
+shipping-pr이 레포지토리에 없는 Claude/Codex review 신호를 기다리다 timeout 되는 문제를 수정했다. 선택된 checks가 정착되고 미해결 actionable review thread가 없으면 clean으로 판정하며, reviewer telemetry는 보고용으로 유지한다. 변경은 네 파일로 제한해 origin/main 기반 독립 worktree branch에 체리픽했다.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None

@@ -1,0 +1,34 @@
+## Decisions Made
+- Single skill `shipping-pr` + single command `/skill-set:pr:ship`: keeps the surface area small; users have one verb for "ship the PR" instead of multi-step orchestration.
+- CodeRabbit detection via most recent merged PR (`--limit 1`): cheaper than scanning history and acts as a recency signal — if the most recent merge had no CodeRabbit activity, the repo is treated as not currently using it.
+- macOS `timeout` vs `gtimeout` auto-detection in Step 0: macOS lacks GNU coreutils by default; resolving once at start avoids per-step branches and fails fast with install guidance.
+- Convergence via single signal "did fix produce a new commit?" plus `HARD_BLOCKERS` flag: replaces blocker-set diffing; the flag disambiguates "no commit because nothing to fix" (clean exit) from "no commit because fix failed" (stuck exit).
+- Split SKILL.md into 3 reference files (polling.md, blocker-resolution.md, troubleshooting.md): brings SKILL.md to 168 lines (under the 200 recommended cap), keeps reference depth at one level per creating-skills guardrails.
+- Add `sleep 2` buffer before reading POST_SHA: GitHub's PR view may briefly return the old headRefOid right after the resolver's push; matches the existing `mergeable == UNKNOWN` 3-second retry convention.
+- Add explicit Examples section: trigger-clarity gain with minimal token cost; covers default invocation, single-cycle fail-fast, and advisory-checks-enabled cases.
+
+## Problems Encountered
+- Peer LLM review prompt initially fired against `git diff origin/main...HEAD` while the work was uncommitted — review came back empty. Resolved by re-running with prompt that explicitly listed uncommitted file paths.
+- Three critical bugs surfaced by peer reviewers (PR_JSON re-fetch missing after delegated PR creation; convergence check falsely exiting 1 on a truly-clean PR; `--required-only` flag syntax mismatched between SKILL.md and ship.md). All fixed inline.
+- Direct `git commit` blocked by project pre-commit hook. Resolved by routing through `/knowledge-distillery:memento-commit` instead of `/skill-set:git:pr`'s built-in commit step.
+
+## Constraints Identified
+- Bash tool's ~10-minute hard limit forces chunked CI watching at 540s with model re-entry between chunks; longer waits would lose state otherwise.
+- GitHub computes `mergeable` lazily — first query after push commonly returns `UNKNOWN`, requiring a 3-second retry to disambiguate from CONFLICTING.
+- GitHub `gh pr view` may return the old `headRefOid` for a brief window after a push; reading immediately produces false convergence.
+- `gh pr checks --watch` blocks indefinitely on advisory checks (codecov pending, preview deploys); `--required` is the only safe default.
+- CodeRabbit GitHub App can be installed at the org level without a repo-local `.coderabbit.yaml` — config-file detection misses these cases.
+- Project pre-commit hook (pre-commit-memento.sh) rejects any direct `git commit`; commit operations must route through memento-commit.
+
+## Open Questions
+- End-to-end trigger test with a real PR not yet performed (would exercise the full poll → fix → re-poll loop against live CI).
+- File-length optimization beyond the SKILL.md split was not pursued — user explicitly deferred further skill optimization for separate work.
+
+## Context
+Designed and implemented the `shipping-pr` skill plus its `/skill-set:pr:ship` slash command, completing the PR-lifecycle gap between `git:pr` (create only) and `pr:fix` (one-shot blocker resolution). Iteratively refined via parallel peer LLM review (Gemini, Codex, Claude); fixed 3 critical bugs and applied 4 of 5 ambiguous recommendations per user direction. Final structure: `SKILL.md` (168 lines) + `reference/{polling,blocker-resolution,troubleshooting}.md`, fully passing `creating-skills` guardrails. Plugin auto-discovery means no `plugin.json`/`marketplace.json` edits were needed.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None

@@ -1,0 +1,22 @@
+## Decisions Made
+- Rewrote Workflow section with imperative Skill tool invocation instead of passive suggestion: passive phrasing ("use when available") does not cause Claude to make a second Skill tool call after loading a skill
+- Kept creating-skills as the single entry point with skill-creator as delegated executor: user explicitly wants this routing pattern
+
+## Problems Encountered
+- creating-skills description says "Prefer this over other skill creation tools" which wins the triggering competition, but the body's passive instruction to chain to skill-creator was never followed: resolved by rewriting to explicit "invoke it now via the Skill tool — do not skip this step"
+
+## Constraints Identified
+- Skills cannot programmatically invoke other skills — chaining relies entirely on Claude interpreting text instructions and making another Skill tool call
+- Once a skill is loaded, Claude has instructions to follow and weak motivation to load additional skills unless explicitly directed
+
+## Open Questions
+- Whether the stronger imperative language is sufficient to reliably trigger skill-creator invocation across different models (Haiku, Sonnet, Opus)
+
+## Context
+User reported that creating-skills was not invoking skill-creator despite instructions to do so. Diagnosed the root cause as passive language in the Workflow section. Modified SKILL.md to use imperative directives for Skill tool invocation while preserving the fallback standalone workflow.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None

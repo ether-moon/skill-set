@@ -1,0 +1,26 @@
+## Decisions Made
+- 현재 브랜치 우선 게시: 베이스 브랜치의 지연 또는 분기를 초기 커밋·푸시 차단 조건에서 제외하고, 현재 브랜치 상태를 먼저 게시하도록 결정했다.
+- 현재 worktree에서 blocker 해결: 임시 worktree와 resolver 브랜치를 만들지 않고, 체크아웃된 브랜치에서 fast-forward 또는 정확한 원격 커밋 merge로 정합화하도록 결정했다.
+- stale 상태 자동 재시도: 게시 직전 원격 HEAD 변경은 사용자 대기 상태가 아니라 새 snapshot을 얻는 polling 상태로 되돌리도록 결정했다.
+
+## Problems Encountered
+- 기존 shipping-pr 정책이 base lag/divergence를 중단 조건으로 취급했다: 준비 단계의 차단 규칙을 제거하고 회귀 평가를 추가했다.
+- 기존 resolver가 격리 worktree 생명주기를 강제했다: current-worktree 계약과 in-place reconciliation 규칙으로 대체했다.
+- Git runner의 dry-run이 sandbox에서 index.lock을 만들지 못했다: 승인된 제약 runner를 확장 권한으로 다시 실행해 범위를 검증했다.
+
+## Constraints Identified
+- 현재 브랜치 및 worktree를 유지해야 한다: resolver는 브랜치 전환, 임시 worktree, rebase, force-push를 수행하지 않는다.
+- 원격 안전성은 유지해야 한다: push는 관찰한 원격 SHA를 기준으로 하고, 원격 변경은 새 snapshot과 in-place reconciliation으로 처리한다.
+- 모호한 충돌은 자동 선택할 수 없다: 명확한 해결만 자동화하고 의미 선택이 필요한 충돌은 현재 상태를 보존한다.
+
+## Open Questions
+- None
+
+## Context
+shipping-pr가 베이스 브랜치 상태와 무관하게 현재 브랜치를 커밋·푸시하고, blocker 해결을 같은 checkout에서 수행하도록 정책과 실행 계약을 수정했다. 관련 agent 지침, runner 상태 전이, 회귀 테스트와 평가 케이스를 함께 갱신했으며 전체 테스트 및 평가 검증을 통과했다.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None

@@ -1,0 +1,24 @@
+## Decisions Made
+- shipping 요청을 초기 브랜치 커밋과 푸시의 복합 승인으로 취급한다: 반복 확인 없이 자동화를 복원하기 위해서다.
+- 모호한 코드 결정과 stale/diverged 상태는 계속 중단 조건으로 유지한다: 편의성 변경이 publication 안전 경계를 약화시키지 않도록 한다.
+- 승인 계약을 결정적 회귀 테스트로 고정한다: 이후 스킬 수정에서 자동 커밋·푸시가 다시 사라지는 것을 방지한다.
+
+## Problems Encountered
+- 최근 워크플로 재구축에서 dirty changes 자동 커밋 금지 규칙이 추가되었다: 해당 규칙과 중복 승인 문구를 shipping 전용 복합 승인으로 교체했다.
+- 로컬 sandbox가 Git metadata와 GitHub 네트워크 접근을 차단했다: 승인된 constrained runner와 GitHub 조회로 안전하게 진행했다.
+
+## Constraints Identified
+- force-push, merge, partial resolver publication은 shipping 승인 범위에 포함되지 않는다: 원격 이력과 불완전한 수정 게시를 보호해야 한다.
+- managed commit message와 PR body 경로에는 제한된 Edit 권한이 필요하다: 추가 permission prompt 없이 안전한 파일 입력을 사용하기 위해서다.
+
+## Open Questions
+- None
+
+## Context
+shipping 과정에서 최근 도입된 중복 사용자 승인을 제거하고 기존의 자동 커밋·푸시 동작을 복원했다. shipping-pr 지침, resolver 승인 계약, legacy command 문서, changelog를 갱신하고 전용 회귀 테스트를 추가했다. 전체 테스트와 플러그인·eval·reference·inventory 검증이 통과했다.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None

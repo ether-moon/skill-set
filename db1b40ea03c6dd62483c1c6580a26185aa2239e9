@@ -1,0 +1,20 @@
+Decisions Made
+- Bumped the Claude plugin package version from 1.9.0 to 1.9.1.
+- Removed plugins/skill-set/.codex-plugin/plugin.json because the current Codex marketplace/plugin system cannot consume it yet.
+- Rewrote the 1.9.1 changelog entry to reflect the actual workflow and skill changes shipped since 1.9.0.
+
+Problems Encountered
+- The initial 1.9.1 changelog draft was too generic and did not reflect the actual commits included after 1.9.0.
+- The workspace branch had no upstream and was not main, so origin/main had to be merged locally before finalizing the release commit.
+
+Constraints Identified
+- The repository requires English commit messages and changelog content.
+- A memento summary must be attached as a git note after every commit on refs/notes/commits.
+- The user requested a direct push to origin/main.
+
+Open Questions
+- Whether Codex plugin metadata should be reintroduced later as a full plugin package or in a different integration format once marketplace support is ready.
+
+Context
+- Base state was merged with origin/main before the release bump.
+- The resulting release commit updates CHANGELOG.md, plugins/skill-set/.claude-plugin/plugin.json, and removes plugins/skill-set/.codex-plugin/plugin.json.

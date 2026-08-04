@@ -1,0 +1,33 @@
+## Decisions Made
+
+- 모든 resolver가 전체 항목을 먼저 분류하고, 하나라도 AMBIGUOUS이면 어떤 수정도 하기 전에 공통 decision gate에서 멈추도록 계약을 통일했다.
+- PR 상태 러너에 `decision_requirements`와 선택된 `decisions`를 영속화해 `awaiting_user` 재개 시 정확한 결정 집합을 검증하도록 했다.
+- 평가 인프라를 넓히는 대신 기존 eval에 결정론적 grader와 계약 테스트를 추가해 회귀를 방지했다.
+
+## Problems Encountered
+
+- CI의 ShellCheck SC2016이 백틱이 포함된 작은따옴표 grep 패턴을 지적해, 리터럴 백틱을 안전하게 검사하도록 수정했다.
+- macOS 기본 Bash 3에서 `set -u`와 빈 배열 확장이 충돌해, 명시적인 인덱스 카운터와 루프로 대체했다.
+- 실패를 기대하는 테스트 헬퍼가 명령의 예상 밖 성공을 숨겨 후속 검증이 계속되던 문제를 발견해, 출력 노출과 즉시 실패 반환을 추가했다.
+
+## Constraints Identified
+
+- 저장소 콘텐츠와 커밋 메시지는 영어로 유지하고 사용자 대화는 한국어로 진행한다.
+- 이 작업은 일반 push와 PR 상태 게시만 허용하며 force-push, merge, PR close는 허용하지 않는다.
+- 모델 기반 eval 예산과 로컬 ShellCheck 실행 파일이 없어 해당 검증은 GitHub CI에 맡긴다.
+
+## Open Questions
+
+- GitHub Actions에서 ShellCheck를 포함한 전체 워크플로가 새 HEAD에서 최종 통과하는지 확인해야 한다.
+
+## Context
+
+PR #34의 새 `autofixing-and-escalating` 구현을 실제 리뷰 결과에 적용했다. 직접 resolver 진입점의 부분 수정 가능성, PR 러너의 결정 상태 비영속성, eval의 잘못된 대상 및 약한 검증을 함께 수정했으며, PR runner·계약·eval/reference·inventory 검증을 로컬에서 통과시켰다.
+
+## Recorded Decisions
+
+- None.
+
+## Vault Entries Referenced
+
+- None.

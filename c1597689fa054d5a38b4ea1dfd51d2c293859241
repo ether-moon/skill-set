@@ -1,0 +1,22 @@
+## Decisions Made
+- 정확한 base SHA merge: 브랜치 전환이나 rebase 없이 fetch한 `main` 커밋 `40364aa`를 현재 브랜치에 merge해 새 PR의 ancestry를 정리했다.
+- Tree-identical merge 보존: 파일 내용이 동일해도 이전 PR의 squash merge 이력을 연결하기 위해 제약 runner의 ancestry-only merge 경로를 사용했다.
+
+## Problems Encountered
+- 기존 PR #30이 이미 merge되어 같은 브랜치의 새 PR 범위에 과거 커밋이 다시 포함됐다: 최신 main을 현재 브랜치에 clean merge해 해결했다.
+
+## Constraints Identified
+- 현재 checkout을 유지해야 한다: 임시 worktree, 새 resolver 브랜치, checkout, rebase는 사용하지 않았다.
+- 현재 브랜치를 먼저 게시해야 한다: shipping-pr 정책 변경 커밋을 원격에 올린 뒤 base ancestry를 후속 merge로 정리했다.
+
+## Open Questions
+- None
+
+## Context
+이미 merge된 PR #30의 head 브랜치에 shipping-pr 정책 변경이 추가된 상태였다. 원격 main을 fetch한 뒤 현재 브랜치에서 충돌 없는 tree-identical merge를 기록해 새 PR이 정책 변경만 나타내도록 ancestry를 정리했다.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None

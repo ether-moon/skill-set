@@ -1,0 +1,17 @@
+## Decisions Made
+- Restrict review.md allowed-tools to `Bash(command:bash *peer-review.sh*)`: The wildcard `Bash(command:*)` was the root cause allowing agents to bypass the script and call `codex -p` directly. Matching SKILL.md's restriction structurally prevents bypass.
+- Use codex `--output-last-message` (`-o`) flag instead of stdout redirection: Codex CLI may emit progress/status to stdout; `-o` captures only the final response to a file, which is more reliable.
+- Rewrite review.md execution instructions to reference only the script: The old step-by-step ("Detect CLIs", "Execute in parallel") led agents to construct their own CLI commands instead of using the bundled script.
+
+## Problems Encountered
+- Agents repeatedly bypassed peer-review.sh despite 6+ previous fix attempts (v1.5.2 through v1.8.0): Root cause was the slash command granting unrestricted bash permissions, not the SKILL.md instructions which were already correct.
+- Peer review of the fix itself was used to validate the changes: All 3 CLIs (Gemini, Codex, Claude) confirmed the fix and identified cli-commands.md was out of sync, which was then corrected.
+
+## Constraints Identified
+- allowed-tools glob pattern `bash *peer-review.sh*` is not airtight (could theoretically match crafted commands): Accepted as sufficient since explicit body instructions and SKILL.md reinforce the restriction. All 3 peer reviewers agreed this is academic, not practical risk.
+
+## Open Questions
+- None
+
+## Context
+Fixed a persistent issue where the consulting:review slash command allowed agents to bypass the bundled peer-review.sh script and call `codex -p` directly, which fails because `-p` means `--profile` in Codex CLI. The root cause was review.md's `allowed-tools: "Bash(command:*)"` granting unrestricted bash permissions. Changed 4 files: review.md (permissions + instructions), peer-review.sh (codex -o flag), cli-commands.md and SKILL.md (docs sync). Validated via peer review from all 3 CLIs.

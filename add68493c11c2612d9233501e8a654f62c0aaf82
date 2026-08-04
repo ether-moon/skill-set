@@ -1,0 +1,23 @@
+## Decisions Made
+- Patch release: 사용자가 지정한 patch 수준에 따라 plugin version을 1.14.1에서 1.14.2로 올렸다.
+- Main snapshot publication: merge된 `origin/main`의 정확한 SHA `01ac708`을 기준으로 release commit을 준비하고 direct push한다.
+- Changelog grouping: PR #30과 #31의 변경을 기존 정책의 `Improved` 범주에 기록했다.
+
+## Problems Encountered
+- None
+
+## Constraints Identified
+- Release commit은 기능 변경과 분리되어야 한다: manifest와 CHANGELOG.md 두 파일만 포함했다.
+- Push는 remote base SHA가 preview 이후 바뀌지 않았을 때만 허용된다: release runner의 compare-and-swap gate를 사용했다.
+
+## Open Questions
+- None
+
+## Context
+Merge된 main 브랜치 위에서 skill-set plugin의 patch release를 준비했다. 버전 1.14.2, changelog 날짜 2026-07-23, 커밋 메시지 `chore: bump version to 1.14.2`로 일관된 release commit을 생성했다.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None

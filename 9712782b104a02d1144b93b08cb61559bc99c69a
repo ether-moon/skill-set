@@ -1,0 +1,17 @@
+## Decisions Made
+- Used `/knowledge-distillery:init` skill to bootstrap the full pipeline: Ensures all components (vault, workflows, directives, permissions) are created in a consistent, idempotent manner rather than manual setup.
+- Target directive file is AGENTS.md (not CLAUDE.md): CLAUDE.md contains `@AGENTS.md`, so per the init skill's detection logic, AGENTS.md is the correct target.
+- All four GitHub Actions workflows created from skill templates: mark-evidence (Stage A on PR merge), batch-refine (Stage B weekly), curate-report (comment-triggered curation), apply-changeset (post-merge vault update).
+
+## Problems Encountered
+- None
+
+## Constraints Identified
+- Vault initialization must go through the bundled CLI (`knowledge-gate init-db`): Schema asset lookup stays inside the plugin package, cannot be done manually.
+- Direct `git commit` is blocked by a pre-commit hook: The project requires `/knowledge-distillery:memento-commit` workflow to ensure session context is attached as git notes for the evidence pipeline.
+
+## Open Questions
+- Repository secrets (ANTHROPIC_API_KEY, LINEAR_API_KEY, SLACK_API_KEY, NOTION_API_KEY) need to be configured for the GitHub Actions workflows to function.
+
+## Context
+Initialized Knowledge Distillery in the skill-set project on the gwangju branch. Created .knowledge/vault.db via the bundled CLI, four GitHub Actions workflows under .github/workflows/, added Knowledge Vault and Memento sections to AGENTS.md, updated .gitignore, and added CLI permissions to .claude/settings.json. All 9 doctor checks passed successfully.

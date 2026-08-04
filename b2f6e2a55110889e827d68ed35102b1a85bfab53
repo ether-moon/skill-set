@@ -1,0 +1,23 @@
+## Decisions Made
+- Apply all four CodeRabbit suggestions verbatim: each was a concrete, well-scoped correction with the source file and exact replacement specified — no ambiguity, fits the autofixing-and-escalating "obvious fix" classification.
+- Use `text` as the markdown fence language for the three command examples in shipping-pr/SKILL.md: matches CodeRabbit's suggestion, satisfies markdownlint MD040, and stays neutral (the fences contain slash commands, not a real language).
+- Trust the skill contract over the command-doc examples for `--ci-timeout`/`--review-timeout`: SKILL.md explicitly documents `--ci-timeout MIN` (integer minutes), so the `30m`/`10m` strings in ship.md were the bug.
+
+## Problems Encountered
+- Pre-commit hook blocked direct `git commit` and required routing through `/knowledge-distillery:memento-commit`: invoked the skill as instructed.
+
+## Constraints Identified
+- Skill contract for shipping-pr defines flag values as integer minutes — any documentation example must match: ensures users don't pass invalid duration strings to the skill.
+- This project requires all commits to flow through memento-commit so the knowledge-distillery pipeline receives session evidence.
+
+## Open Questions
+- None
+
+## Context
+Cycle 1 of the shipping-pr orchestrator on PR #18 (its own implementation skill). CodeRabbit posted review 4137971945 with 4 unresolved threads on AGENTS.md, plugins/skill-set/commands/pr/ship.md, plugins/skill-set/skills/shipping-pr/SKILL.md, and plugins/skill-set/skills/shipping-pr/reference/blocker-resolution.md. All four were verified against current code and applied; no CI failures or merge conflicts existed, so only review-comment resolution ran.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None

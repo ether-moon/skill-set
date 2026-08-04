@@ -1,0 +1,21 @@
+## Decisions Made
+- Back-fill CHANGELOG as a follow-up commit rather than amending the already-pushed b78d029. Rationale: b78d029 is on `origin/main` — amending would require a force-push to main, which is both riskier and disallowed for shared branches. A separate `docs:` commit is the clean path.
+- Use `Added` category with a single entry covering both the `shipping-pr` skill and the `/skill-set:pr:ship` command. Rationale: they ship together as one feature; splitting into two bullets would overstate the change.
+
+## Problems Encountered
+- Version bump b78d029 was committed and pushed to main without the accompanying CHANGELOG entry. Noticed when the user asked about changelog; resolved with this follow-up commit.
+
+## Constraints Identified
+- The `bumping-version` skill prescribes that CHANGELOG.md and plugin.json ship in the SAME commit. A future bump should bundle both to avoid this back-fill pattern.
+
+## Open Questions
+None
+
+## Context
+One-line addition to the top of CHANGELOG.md on branch `pr-ship-skill` (already tracking `origin/main`). Documents the 1.10.0 release that introduced the shipping-pr skill. Will be pushed directly to `origin/main`.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None

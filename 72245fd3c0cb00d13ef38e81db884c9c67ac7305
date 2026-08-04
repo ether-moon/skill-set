@@ -1,0 +1,24 @@
+## Decisions Made
+- Classify CodeRabbit's outside-diff comment as OBVIOUS: criteria pass — single correct fix (CodeRabbit provided exact bash), mechanical transcription of existing prose into bash, low-risk (documentation file, no runtime path change), no design trade-off.
+- Use literal `@coderabbitai resolve` in the grep pattern (not the backtick-escaped form CodeRabbit suggested): the verifier must match what Step 5.2 would actually post, and Step 5.2 prepends the literal handle.
+- Exit non-zero after a failed retry rather than just warning: a missing resolve header after retry is a real failure of the contract on line 248 and should surface as a script error so the orchestrator notices.
+
+## Problems Encountered
+- Direct `git commit` is blocked by project policy: switched to the knowledge-distillery memento-commit workflow as required by AGENTS.md.
+- `gh pr view --json reviewThreads` is not supported by the gh CLI: used GraphQL via `gh api graphql` to collect reviews, comments, and review threads in one call.
+
+## Constraints Identified
+- Project enforces memento-commit for all commits — every commit on this repo must attach a 7-section session note on refs/notes/commits.
+- pr-review-feedback CodeRabbit detection must use the GitHub API (reviews + comments + reviewThreads), not the post-filter collected items, so the resolve header still fires when all CodeRabbit threads are already-resolved.
+
+## Open Questions
+- None.
+
+## Context
+Processing PR #25 blockers as the resolving-pr-blockers orchestrator. No CI failures, no merge conflicts; only one actionable CodeRabbit outside-diff review comment targeting Step 5.3 of plugins/skill-set/agents/pr-review-feedback.md, asking to make the verify-and-retry bash match the prose on line 248. The fix transcribes the prose into executable bash and is committed via memento-commit; the orchestrator (parent agent) will push and the PR summary comment with @coderabbitai resolve header is posted next.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None

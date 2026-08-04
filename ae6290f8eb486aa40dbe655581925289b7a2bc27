@@ -1,0 +1,25 @@
+## Decisions Made
+- Named Claude model tiers were restored only as documentation examples because the repository explicitly requires cross-model testing and the examples do not create an execution dependency.
+- Assertion-specific `fail` diagnostics were added to the three portable runner JSON checks so failures explain the violated contract.
+- Static runner permissions were not broadened because an arbitrary installation path cannot be safely represented by a narrow, host-neutral Bash allow-list.
+
+## Problems Encountered
+- The portable runner's initial remote inspection was blocked by sandboxed network access; rerunning with approved network access completed the inspection.
+- Static permission syntax offers either a host-specific runner path or a broad wildcard for an arbitrary install root; this authorization design remains unresolved.
+
+## Constraints Identified
+- Resolution was limited to the three supplied review threads with edit and commit capabilities only; push and comment publication were prohibited.
+- The resolver must not introduce a Claude-specific plugin-root execution dependency or an unsafe broad Bash allowance.
+- Git mutation had to use the constrained runner with an index compare-and-swap check.
+
+## Open Questions
+- Which host-neutral permission mechanism should pre-authorize dynamically installed runner paths without granting broad shell execution?
+
+## Context
+This shipping resolver verified three review findings against PR #28 at the pinned input head. It updated cross-model documentation examples and portable test diagnostics, left the runner permission policy unresolved, and validated the focused tests plus the full skill-set suite before committing.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None

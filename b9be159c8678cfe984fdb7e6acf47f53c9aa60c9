@@ -1,0 +1,25 @@
+## Decisions Made
+- Deferred execution model: Register items as tasks during classification, batch-execute after all decisions — rationale: user sees full picture before any code changes, maximizes parallel execution efficiency
+- Task status mapping: Skipped items marked as `completed` (with skip annotation), failed items marked as `completed` (with failure details) — rationale: task system only has pending/in_progress/completed/deleted, `completed` is closest fit
+- Phase 2/3 boundary: Full AMBIGUOUS analysis presented in Phase 2 (Report), Phase 3 only handles user decisions — rationale: user sees everything at once, then decides
+
+## Problems Encountered
+- "Stopping on Single Failure" common mistake referenced old workflow behavior (move failed OBVIOUS to AMBIGUOUS) — resolved by updating to match new batch execution model
+- SKILL.md Phase 3 said "Present AMBIGUOUS items" duplicating Phase 2 — resolved by changing to "Resolve AMBIGUOUS items (already presented in Phase 2)"
+- Edge case: zero approved tasks after all skips not handled in Phase 4 — resolved by adding guard clause to skip to Phase 5
+
+## Constraints Identified
+- Task system limited to pending/in_progress/completed/deleted statuses — no native "skipped" or "failed" status, requires annotation in description
+- Files grouped per subagent: tasks touching the same file must be sequential within one subagent to avoid edit conflicts
+
+## Open Questions
+- None
+
+## Context
+Modified the autofixing-and-escalating skill to adopt a classify-then-execute workflow. Key files: SKILL.md (workflow table, common mistakes) and reference/resolution.md (full 5-phase workflow rewrite). Changes verified against both creating-skills and skill-creator quality criteria. All issues found during review were fixed inline.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None

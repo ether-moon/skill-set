@@ -1,0 +1,20 @@
+## Decisions Made
+- SC2016 directive를 각 GraphQL dispatch `if` compound command 바로 앞에 둔다: ShellCheck가 개별 `elif` branch directive를 허용하지 않기 때문이다.
+
+## Problems Encountered
+- 첫 suppression 위치가 SC1123/SC1072/SC1073을 새로 발생시켰다: current-HEAD CI 로그를 근거로 directive 위치를 compound command 앞으로 이동했다.
+
+## Constraints Identified
+- ShellCheck directive는 완전한 compound command 앞에서만 유효하다: 개별 `elif` 앞에서는 parser 오류가 발생한다.
+
+## Open Questions
+- None
+
+## Context
+PR #27의 두 mock fixture에서 intentional literal GraphQL match를 suppress하는 위치를 수정했다. Bash syntax와 shipping happy-path eval을 다시 통과시켰으며 변경 범위는 두 fixture 파일뿐이다.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
