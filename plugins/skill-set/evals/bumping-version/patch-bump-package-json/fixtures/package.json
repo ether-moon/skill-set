@@ -1,9 +1,0 @@
-{
-  "name": "example-project",
-  "version": "1.0.0",
-  "description": "Example project for bumping-version skill eval",
-  "main": "src/index.js",
-  "scripts": {
-    "test": "echo 'test'"
-  }
-}
