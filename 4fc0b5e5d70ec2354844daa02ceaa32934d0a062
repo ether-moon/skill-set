@@ -1,0 +1,23 @@
+## Decisions Made
+- shipping-pr resolver cycle의 기본값을 3회에서 5회로 늘렸습니다: 실행기, 이전 상태 fallback, 스킬 문서, 레거시 명령 설명을 동일하게 유지하기 위함입니다.
+- 기본 초기화 결과에 `max_cycles == 5`를 단언하는 회귀 테스트를 추가했습니다: 기본값 드리프트를 결정론적으로 방지합니다.
+
+## Problems Encountered
+- 처음 작업 위치가 `main` 브랜치였습니다: shipping-pr 안전 규칙에 따라 중단하고 사용자 승인 후 기능 브랜치를 만들었습니다.
+- 변경 전 회귀 테스트가 기대대로 실패했습니다: 실행기 기본값을 5로 수정한 뒤 관련 검증을 모두 통과시켰습니다.
+
+## Constraints Identified
+- PR shipping은 전용 runner의 index 및 remote SHA compare-and-swap 게이트를 사용해야 합니다: 범위 확대와 원격 경합을 방지합니다.
+- force-push, merge, pull, rebase는 승인 범위 밖입니다: 일반 fast-forward 게시와 resolver cycle만 허용됩니다.
+
+## Open Questions
+- None
+
+## Context
+shipping-pr의 기본 resolver cycle을 5회로 늘리고 실행기, 문서, 테스트를 일치시켰습니다. PR runner, happy-path 평가, 패키징, 참조 및 평가 validator, 셸 문법 검사가 모두 통과했습니다. 변경은 네 파일에 한정되었습니다.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
