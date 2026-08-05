@@ -10,14 +10,10 @@ execution:
   timeout_seconds: 180
   allowed_tools:
     - Skill
-runs: 3
+runs: 1
 graders:
   - type: tool_used
     name: selected-creating-skills
     tool: Skill
     input_match: "creating-skills"
     min: 1
-  - type: llm
-    name: workflow-outcome
-    criteria: "Pass only if the response applies the complete skill lifecycle: define use cases and triggers, design the structure and scripts, create representative evaluations, benchmark, and iterate without depending on another authoring skill."
-    focus: last_message

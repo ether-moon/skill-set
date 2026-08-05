@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-mkdir -p outputs/skills/deploying-safely .claude/skills/mock-skill-creator
+mkdir -p outputs/skills/deploying-safely optional-creator
 
 cat >outputs/skills/deploying-safely/SKILL.md <<'SKILL'
 ---
@@ -15,15 +15,15 @@ description: Manages deployments. Use when the user asks about releases, deploym
 Inspect the current release, prepare a reversible rollout, verify health checks, and stop on ambiguous production state.
 SKILL
 
-cat >.claude/skills/mock-skill-creator/SKILL.md <<'CREATOR'
+cat >optional-creator/SKILL.md <<'CREATOR'
 ---
 name: mock-skill-creator
-description: Offers optional second-opinion advice for a skill artifact. Use only when explicitly told this helper is available while authoring a skill.
+description: Executes a delegated end-to-end skill revision and evaluation-preparation loop. Use when an orchestration skill supplies a bounded skill contract.
 ---
 
 # Mock Skill Creator
 
-Suggest one discriminating positive trigger and one plausible near miss. Return advice only; the calling workflow owns files, validation, and acceptance.
+Own the artifact-producing work in the delegated contract: inspect and revise the existing skill, create its positive and near-miss negative evaluation cases, and return the artifacts for policy review. Do not make the final acceptance decision.
 CREATOR
 
 cat >validate-skill.sh <<'VALIDATOR'

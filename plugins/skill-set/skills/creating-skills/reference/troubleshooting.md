@@ -1,257 +1,59 @@
-# Troubleshooting Guide
+# Orchestration Troubleshooting
 
-## Table of Contents
+## `skill-creator` Wins the Entry Point
 
-- [Skill Won't Upload](#skill-wont-upload) (SKILL.md not found, invalid frontmatter, invalid name)
-- [Skill Doesn't Trigger](#skill-doesnt-trigger)
-- [Skill Triggers Too Often](#skill-triggers-too-often)
-- [Evaluations Fail or Cannot Run](#evaluations-fail-or-cannot-run)
-- [MCP Connection Issues](#mcp-connection-issues)
-- [Instructions Not Followed](#instructions-not-followed) (verbosity, buried instructions, ambiguity, validation scripts, model laziness)
-- [Large Context Issues](#large-context-issues)
-- [Common Error Messages](#common-error-messages)
+**Symptom:** An overlapping skill-authoring request selects `skill-creator` directly and bypasses project policy.
 
----
+**Response:** Strengthen the `creating-skills` description as the primary entry point, keep the creator described as its execution engine, and add a competitive trigger case. Do not narrow `skill-creator` globally; other environments may use it directly without this orchestrator.
 
-## Skill Won't Upload
+## Creator Is Available but Not Delegated
 
-### Error: "Could not find SKILL.md in uploaded folder"
+**Symptom:** The run reads creator guidance as optional advice, then recreates the entire loop locally.
 
-**Cause**: File not named exactly SKILL.md
+**Response:** Require creator invocation before artifact-producing work, pass the orchestration contract and accepted preflight envelope, and inspect returned artifacts before filling gaps. Review traces for duplicated drafting, test generation, or model invocation.
 
-**Solution**:
-- Rename to SKILL.md (case-sensitive)
-- Verify with: `ls -la` should show SKILL.md
+## Creator Capability Is Partial
 
-### Error: "Invalid frontmatter"
+**Symptom:** The creator can draft artifacts but cannot run a model, viewer, validator, or host-specific stage.
 
-**Cause**: YAML formatting issue
+**Response:** Preserve valid output and execute only the unsupported work through an available evaluation adapter. Record the missing capability; do not require a provider-specific adapter or rerun supported work from scratch.
 
-**Common mistakes**:
+## Preflight Blocks the Plan
 
-```yaml
-# Wrong - missing delimiters
-name: my-skill
-description: Does things
+**Symptom:** `scripts/plan_eval_budget.py` exits with code 2 because total calls or projected tokens exceed the selected limits.
 
-# Wrong - unclosed quotes
-name: my-skill
-description: "Does things
+**Response:** Do not start any model invocation. Report execution calls, additional calls, projected tokens, limits, and every reason returned by the planner. Reduce the current stage's scope or request a separately purposed budget; do not reuse an earlier approval.
 
-# Correct
----
-name: my-skill
-description: Does things
----
-```
+Remember that `max-total-tokens` is a conservative preflight estimate, not a runtime hard cap. The planner is stateless and does not debit tokens after calls.
 
-### Error: "Invalid skill name"
+## Model Usage Grows Unexpectedly
 
-**Cause**: Name has spaces or capitals
+**Symptom:** A plan combines cases, baseline arms, trials, graders, optimizers, or models into a larger batch than intended.
 
-```yaml
-# Wrong
-name: My Cool Skill
+**Response:** Stop before the next model invocation. Return to deterministic validation, then define a development smoke with changed or highest-signal cases, candidate-only, and one trial. A focused comparison or campaign requires a new purpose, approval, and preflight; never add retries or iterations automatically.
 
-# Correct
-name: my-cool-skill
-```
+## Creator Is Unavailable
 
----
+Use the local fallback without asking the user to install a particular creator. Run deterministic validation, retain runnable cases, and report unavailable model evaluation exactly.
 
-## Skill Doesn't Trigger
+## Working and Durable Formats Differ
 
-**Symptom**: Skill never loads automatically
+**Symptom:** The creator returns a single-file evaluation manifest, a sibling workspace, `references/`, or another supported temporary layout while the project expects case directories or `reference/`.
 
-**Fix**: Revise your description field.
+**Response:** Translate the returned artifacts and evidence at the adapter boundary. Preserve raw results for audit, validate the durable repository layout, and avoid embedding creator-private paths in the skill.
 
-**Quick checklist**:
-- Is it too generic? ("Helps with projects" won't work)
-- Does it include trigger phrases users would actually say?
-- Does it mention relevant file types if applicable?
+## Aggregate Scores Hide a Problem
 
-**Debugging approach**:
-Ask Claude: "When would you use the [skill name] skill?" Claude will quote the description back. Adjust based on what's missing.
+Inspect approved outputs, raw traces, safety violations, and grader evidence. Treat missing metrics as unavailable, not zero. Repair non-discriminating graders or contaminated fixtures before editing instructions. Rerun only affected cases.
 
-**Example fix**:
+## Trigger Metrics Improve but Behavior Regresses
 
-```yaml
-# Too vague
-description: Processes documents
+Hold functional instructions constant during description optimization. Recheck outcome, conformance, safety, and efficiency after trigger changes; selection accuracy alone cannot approve the skill.
 
-# More specific
-description: Processes PDF legal documents for contract review. Use when user asks to "review contract", "analyze agreement", or uploads PDF legal documents.
-```
+## Cases or Instructions Keep Growing
 
----
+Classify the failure first. Make the smallest general correction, move objective checks into deterministic tests, merge overlapping expectations, and remove cases or guidance that duplicate existing coverage. A repeated failure may be a grader, fixture, environment, or use-case defect rather than an instruction gap.
 
-## Skill Triggers Too Often
+## Post-Release Value Declines
 
-**Symptom**: Skill loads for unrelated queries
-
-**Solutions**:
-
-### 1. Add Negative Triggers
-
-```yaml
-description: Advanced data analysis for CSV files. Use for statistical modeling, regression, clustering. Do NOT use for simple data exploration (use data-viz skill instead).
-```
-
-### 2. Be More Specific
-
-```yaml
-# Too broad
-description: Processes documents
-
-# More specific
-description: Processes PDF legal documents for contract review
-```
-
-### 3. Clarify Scope
-
-```yaml
-description: PayFlow payment processing for e-commerce. Use specifically for online payment workflows, not for general financial queries.
-```
-
----
-
-## MCP Connection Issues
-
-**Symptom**: Skill loads but MCP calls fail
-
-**Checklist**:
-
-1. **Verify MCP server is connected**
-   - Claude.ai: Settings > Extensions > [Your Service]
-   - Should show "Connected" status
-
-2. **Check authentication**
-   - API keys valid and not expired
-   - Proper permissions/scopes granted
-   - OAuth tokens refreshed
-
-3. **Test MCP independently**
-   - Ask Claude to call MCP directly (without skill)
-   - "Use [Service] MCP to fetch my projects"
-   - If this fails, issue is MCP not skill
-
-4. **Verify tool names**
-   - Skill references correct MCP tool names
-   - Check MCP server documentation
-   - Tool names are case-sensitive
-
----
-
-## Evaluations Fail or Cannot Run
-
-### Layout or schema failure
-
-- Parse every `case.yaml` and grader frontmatter as YAML rather than relying on text patterns.
-- Verify the case has a non-empty prompt, at least one grader, a bounded timeout, and valid fixture paths.
-- Keep fixtures and scaffold scripts within their case directory.
-- Run deterministic generators with `--check` so generated trigger cases cannot drift from their catalog.
-
-### Trigger metrics look better than behavior
-
-- Confirm all 8-10 positive and 8-10 negative cases ran for every skill.
-- Compute precision and recall per skill, not only across the plugin.
-- Use near misses rather than unrelated negatives.
-- Inspect actual Skill calls; do not infer triggering only from a plausible final answer.
-
-### Baseline comparison is misleading
-
-- Materialize the exact baseline commit or prior skill version.
-- Use the same prompts, fixtures, model, judge, tool grants, and run count in each arm.
-- Treat missing baseline cases or partial-budget results as incomplete, not as zero or a pass.
-- Keep the evaluated model and LLM judge different; use a Sonnet-tier or larger judge.
-
-### `claude plugin eval` is feature-gated
-
-Preserve the exact CLI diagnostic. Keep official cases, deterministic graders, fixture execution, and plugin validation green so the model run is ready when access is enabled. Report the run as blocked or unavailable; never estimate scores from manual inspection.
-
----
-
-## Instructions Not Followed
-
-**Symptom**: Skill loads but Claude doesn't follow instructions
-
-**Common causes**:
-
-### 1. Instructions Too Verbose
-
-- Keep instructions concise
-- Use bullet points and numbered lists
-- Move detailed reference to separate files
-
-### 2. Instructions Buried
-
-- Put critical instructions at the top
-- Use `## Important` or `## Critical` headers
-- Repeat key points if needed
-
-### 3. Ambiguous Language
-
-```markdown
-# Bad
-Make sure to validate things properly
-
-# Good
-CRITICAL: Before calling create_project, verify:
-- Project name is non-empty
-- At least one team member assigned
-- Start date is not in the past
-```
-
-### 4. Consider Validation Scripts
-
-For critical validations, consider bundling a script that performs checks programmatically rather than relying on language instructions. Code is deterministic; language interpretation isn't.
-
-### 5. Model "Laziness"
-
-Add explicit encouragement:
-
-```markdown
-## Performance Notes
-- Take your time to do this thoroughly
-- Quality is more important than speed
-- Do not skip validation steps
-```
-
-Note: Adding this to user prompts is more effective than in SKILL.md
-
----
-
-## Large Context Issues
-
-**Symptom**: Skill seems slow or responses degraded
-
-**Causes**:
-- Skill content too large
-- Too many skills enabled simultaneously
-- All content loaded instead of progressive disclosure
-
-**Solutions**:
-
-### 1. Optimize SKILL.md Size
-
-- Move detailed docs to `reference/`
-- Link to references instead of inline
-- Keep SKILL.md under 200 lines
-
-### 2. Reduce Enabled Skills
-
-- Evaluate if you have more than 20-50 skills enabled simultaneously
-- Recommend selective enablement
-- Consider skill "packs" for related capabilities
-
----
-
-## Common Error Messages
-
-| Error | Cause | Solution |
-|-------|-------|----------|
-| "Could not find SKILL.md" | Wrong filename | Rename to exactly SKILL.md |
-| "Invalid frontmatter" | YAML syntax error | Check `---` delimiters and quotes |
-| "Invalid skill name" | Spaces/capitals in name | Use kebab-case only |
-| "Description too long" | Over 1024 chars | Shorten description |
-| "Forbidden characters" | XML tags in frontmatter | Remove `<` and `>` |
+Scope a focused comparison only when retirement or workflow drift is the explicit question. Use a pinned baseline, stated acceptance criteria, and a new preflight budget; do not launch a periodic comparison automatically.

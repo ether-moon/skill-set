@@ -1,9 +1,49 @@
 # Changelog
 
-All notable changes to the skill-set plugin will be documented in this file.
+All notable changes to plugins in the skill-set marketplace will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.14.5] - 2026-08-04
+
+### Improved
+
+- chore: add project-scoped bumping-version skill (#37)
+- refactor: extract release workflow plugin (#36)
+
+## [1.14.4] - 2026-07-31
+
+### Improved
+
+- Enable automatic finding resolution (#34)
+- test(shipping-pr): cover signal-gated review workflows
+
+### Fixed
+
+- fix(shipping-pr): tolerate reviewer telemetry failures (#35)
+- fix(shipping-pr): stop waiting for optional reviewers
+
+## [1.14.3] - 2026-07-24
+
+### Improved
+
+- Gate skill evals with staged budgets (#32)
+
+## [1.14.2] - 2026-07-23
+
+### Improved
+
+- Resolve PR blockers in the current worktree (#31)
+- Restore creating-skills content policies (#30)
+
+## [1.14.1] - 2026-07-22
+
+### Improved
+
+- Refactor creating-skills as skill-creator orchestrator (#29)
+- refactor: make skill execution host-neutral (#28)
+- Auto-detect PR reviewers and publish resolution feedback (#27)
 
 ## [1.14.0] - 2026-07-20
 
@@ -13,8 +53,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **release-workflow plugin**: List the separately versioned `ether-moon/release-workflow` repository as an installable external marketplace plugin.
+
+### Fixed
+
+- **shipping-pr**: Restore unattended initial commits and pushes. Invoking the shipping workflow now authorizes committing the complete inspected working-tree scope, publishing the branch, and publishing successful resolver commits without a redundant confirmation prompt.
+- **portable runners**: Bundle Git, PR, and release executors inside their owning skill directories and resolve them relative to `SKILL.md`, removing the runtime dependency on Claude's `CLAUDE_PLUGIN_ROOT`. Legacy plugin `bin/` paths remain as compatibility wrappers.
+- **host-neutral skills**: Make `creating-skills` use validator/evaluation adapters instead of requiring the Claude CLI or Claude-specific discovery paths, and make release policy discovery use the standard `AGENTS.md` contract instead of preferring `CLAUDE.md`.
+- **shipping-pr**: Honor `--required-only=false` when snapshotting checks so failed advisory workflows are included instead of being silently treated as clean.
+
+### Improved
+
+- **shipping-pr**: Always auto-detect CodeRabbit, Claude, and Codex reviewers, track their current-HEAD completion signals without reviewer-specific flags, and publish idempotent per-thread resolution feedback after the publication gate. Resolved CodeRabbit feedback emits the official `@coderabbitai resolve` command; Claude and Codex feedback never triggers a new review or delegates edits.
+
 ### Removed
 
+- Removed `bumping-version` and its release runner from the core `skill-set` plugin. Install `release-workflow` to retain version-bump automation.
 - Removed the `applying-coding-baseline`, `building-shared-vocabulary`, `consulting-peer-llms`, `ralph`, `understanding-code-context`, and `using-skill-set` skills.
 - Removed the peer-review and Ralph slash commands that depended on the deleted skills.
 - Removed the broken `using-skill-set` SessionStart hook and its static skill registry.

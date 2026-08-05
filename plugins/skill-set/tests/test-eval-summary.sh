@@ -20,7 +20,7 @@ shipping_trace=$test_root/shipping-trace.jsonl
 
 jq -nc '{type:"assistant", message:{content:[
   {type:"tool_use", id:"toolu_skill", name:"Skill", input:{skill:"autofixing-and-escalating"}},
-  {type:"tool_use", id:"toolu_bash", name:"Bash", input:{command:"\"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-release\" inspect"}}
+  {type:"tool_use", id:"toolu_bash", name:"Bash", input:{command:"/opt/skill-set/skills/bumping-version/scripts/skill-set-release inspect"}}
 ]}}' >"$trace_file"
 jq -nc '{type:"result", num_turns:2, total_cost_usd:0.02,
   usage:{input_tokens:120, cache_creation_input_tokens:5,
@@ -29,13 +29,13 @@ jq -nc '{type:"result", num_turns:2, total_cost_usd:0.02,
 jq -nc '{type:"assistant", message:{content:[
   {type:"tool_use", id:"toolu_skill", name:"Skill", input:{skill:"managing-git-workflow"}},
   {type:"tool_use", id:"toolu_inspect", name:"Bash",
-    input:{command:"\"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git\" inspect --base main"}},
+    input:{command:"/opt/skill-set/skills/managing-git-workflow/scripts/skill-set-git inspect --base main"}},
   {type:"tool_use", id:"toolu_prepare", name:"Bash",
-    input:{command:"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git input-prepare --kind commit-message"}},
+    input:{command:"/opt/skill-set/skills/managing-git-workflow/scripts/skill-set-git input-prepare --kind commit-message"}},
   {type:"tool_use", id:"toolu_edit", name:"Edit",
     input:{file_path:"/fixture/.git/skill-set/inputs/commit-message.ABC123/content"}},
   {type:"tool_use", id:"toolu_commit", name:"Bash",
-    input:{command:"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git commit --message-file /fixture/.git/skill-set/inputs/commit-message.ABC123/content --expected-index abc"}}
+    input:{command:"/opt/skill-set/skills/managing-git-workflow/scripts/skill-set-git commit --message-file /fixture/.git/skill-set/inputs/commit-message.ABC123/content --expected-index abc"}}
 ]}}' >"$git_commit_trace"
 jq -nc '{type:"result", num_turns:5, total_cost_usd:0.03,
   usage:{input_tokens:150, output_tokens:40}}' >>"$git_commit_trace"
@@ -43,7 +43,7 @@ jq -nc '{type:"result", num_turns:5, total_cost_usd:0.03,
 jq -nc '{type:"assistant", message:{content:[
   {type:"tool_use", id:"toolu_skill", name:"Skill", input:{skill:"managing-git-workflow"}},
   {type:"tool_use", id:"toolu_inspect", name:"Bash",
-    input:{command:"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git inspect --base main"}},
+    input:{command:"/opt/skill-set/skills/managing-git-workflow/scripts/skill-set-git inspect --base main"}},
   {type:"tool_use", id:"toolu_title", name:"Edit",
     input:{file_path:"/fixture/outputs/pr-title.txt"}},
   {type:"tool_use", id:"toolu_body", name:"Edit",
@@ -55,7 +55,7 @@ jq -nc '{type:"result", num_turns:4, total_cost_usd:0.02,
 jq -nc '{type:"assistant", message:{content:[
   {type:"tool_use", id:"toolu_skill", name:"Skill", input:{skill:"shipping-pr"}},
   {type:"tool_use", id:"toolu_init", name:"Bash",
-    input:{command:"./run-shipping-eval \"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-pr\" init --pr 17 --repo owner/repo --now 100"}}
+    input:{command:"./run-shipping-eval \"$SKILL_SET_PR_RUNNER\" init --pr 17 --repo owner/repo --now 100"}}
 ]}}' >"$shipping_trace"
 jq -nc '{type:"result", num_turns:2, total_cost_usd:0.02,
   usage:{input_tokens:110, output_tokens:30}}' >>"$shipping_trace"
@@ -258,7 +258,7 @@ jq -e '
   .resources.agent_token_usage.complete == true and
   .resources.judge_token_usage.available == false and
   .cases[0].trace_evidence.candidate[0].tool_calls[0].name == "Skill" and
-  .cases[0].trace_evidence.candidate[0].tool_calls[1].input.command == "\"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-release\" inspect" and
+  .cases[0].trace_evidence.candidate[0].tool_calls[1].input.command == "/opt/skill-set/skills/bumping-version/scripts/skill-set-release inspect" and
   .cases[0].token_usage.candidate[0].agent.usage.input_tokens == 120 and
   .cases[0].token_usage.candidate[0].agent.usage.output_tokens == 30 and
   .cases[0].token_usage.candidate[0].judge.available == false and
@@ -503,7 +503,7 @@ jq -e '
 
 jq -nc '{type:"assistant", message:{content:[
   {type:"tool_use", id:"toolu_inspect", name:"Bash",
-    input:{command:"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git inspect --base main"}},
+    input:{command:"/opt/skill-set/skills/managing-git-workflow/scripts/skill-set-git inspect --base main"}},
   {type:"tool_use", id:"toolu_evil_edit", name:"Edit",
     input:{file_path:"/fixture/src/parser.js"}}
 ]}}' >"$test_root/evil-edit-trace.jsonl"
@@ -527,7 +527,7 @@ jq -e '
 
 jq -nc '{type:"assistant", message:{content:[
   {type:"tool_use", id:"toolu_inspect", name:"Bash",
-    input:{command:"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git inspect --base main"}},
+    input:{command:"/opt/skill-set/skills/managing-git-workflow/scripts/skill-set-git inspect --base main"}},
   {type:"tool_use", id:"toolu_write", name:"Write",
     input:{file_path:"/fixture/outputs/pr-title.txt"}}
 ]}}' >"$test_root/evil-write-trace.jsonl"
@@ -550,7 +550,7 @@ jq -e '
 
 jq -nc '{type:"assistant", message:{content:[
   {type:"tool_use", id:"toolu_direct_runner", name:"Bash",
-    input:{command:"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-pr init --pr 17 --repo owner/repo --now 100"}}
+    input:{command:"/opt/skill-set/skills/shipping-pr/scripts/skill-set-pr init --pr 17 --repo owner/repo --now 100"}}
 ]}}' >"$test_root/evil-shipping-trace.jsonl"
 jq -nc '{type:"result", usage:{input_tokens:1, output_tokens:1}}' \
   >>"$test_root/evil-shipping-trace.jsonl"

@@ -31,45 +31,6 @@ json_string() {
   jq -Rn --arg value "$1" '$value | @json' -r
 }
 
-outcome_criteria() {
-  case $1 in
-    autofixing-and-escalating)
-      printf '%s' 'Pass only if the response classifies the external findings, fixes only unambiguous items when resolution was explicitly authorized, and escalates judgment-dependent items without publishing or orchestrating follow-up work.'
-      ;;
-    bumping-version)
-      printf '%s' 'Pass only if the response follows the release preparation contract: detect and reconcile manifests, update the changelog, use the release executor, and preserve the explicit approval gate before publishing.'
-      ;;
-    creating-skills)
-      printf '%s' 'Pass only if the response applies the complete skill lifecycle: define use cases and triggers, design the structure and scripts, create representative evaluations, benchmark, and iterate without depending on another authoring skill.'
-      ;;
-    driving-with-tests)
-      printf '%s' 'Pass only if the response selects the appropriate testing mode and follows Orient, a proportional Red/Green/Refactor loop, Probe, and Guard while respecting existing implementation and project constraints.'
-      ;;
-    grilling-plans)
-      printf '%s' 'Pass only if the response begins a bounded adversarial plan review with exactly one decision question, maintains confirmed, rejected, and unresolved decisions, and does not design or implement the solution.'
-      ;;
-    guarding-agent-directives)
-      printf '%s' 'Pass only if the response applies the directive verification questions, including correct placement, and either verifies the proposed addition or audits existing directives without editing unless an exact change was authorized.'
-      ;;
-    improving-architecture)
-      printf '%s' 'Pass only if the response performs read-only architecture analysis and returns ranked candidates with Files, Evidence, Problem, Proposed seam, Locality gain, Leverage gain, Test impact, and Risks, without implementing or handing off design work.'
-      ;;
-    managing-git-workflow)
-      printf '%s' 'Pass only if the response uses the deterministic Git executor, preserves unrelated work, distinguishes inspect from commit, push, and PR creation authority, and reports the resulting state without expanding scope.'
-      ;;
-    shipping-pr)
-      printf '%s' 'Pass only if the response follows the bounded PR state machine, accounts for checks, reviews, pagination, head changes and no-progress convergence, and uses resolvers only within explicit mutation authority.'
-      ;;
-    writing-clear-prose)
-      printf '%s' 'Pass only if the response improves substantive nonfiction for clarity, structure, specificity, and concision while preserving facts, requirements, and technical meaning and adding no unsupported claims.'
-      ;;
-    zooming-out-on-code)
-      printf '%s' 'Pass only if the response performs read-only orientation and reports exactly Responsibility, Callers, Dependencies, Siblings, and Unknowns without recommendations, edits, or architecture redesign.'
-      ;;
-    *) fail "missing outcome criteria for active skill: $1" ;;
-  esac
-}
-
 [[ -f $catalog ]] || fail "missing catalog: $catalog"
 jq -e 'type == "object" and length > 0' "$catalog" >/dev/null || fail 'catalog must be a non-empty JSON object'
 jq -e '
@@ -100,7 +61,6 @@ jq -r 'to_entries[] | .value.positive[], .value.negative[]' "$catalog" | sort | 
 [[ ! -s $temp_dir/duplicate-prompts ]] || fail "duplicate trigger prompts: $(tr '\n' ';' <"$temp_dir/duplicate-prompts")"
 
 while IFS= read -r skill; do
-  criteria=$(outcome_criteria "$skill")
   for polarity in positive negative; do
     index=0
     while IFS= read -r prompt; do
@@ -109,7 +69,6 @@ while IFS= read -r skill; do
       case_dir=$temp_dir/generated/$skill/$case_id
       mkdir -p "$case_dir"
       prompt_json=$(json_string "$prompt")
-      criteria_json=$(json_string "$criteria")
       if [[ $polarity == positive ]]; then
         cat >"$case_dir/case.yaml" <<EOF
 schema_version: "1.1"
@@ -124,21 +83,15 @@ execution:
   timeout_seconds: 180
   allowed_tools:
     - Skill
-runs: 3
+runs: 1
 graders:
   - type: tool_used
     name: selected-$skill
     tool: Skill
     input_match: "$skill"
     min: 1
-  - type: llm
-    name: workflow-outcome
-    criteria: $criteria_json
-    focus: last_message
 EOF
       else
-        negative_criteria="Pass only if the response does not invoke or recommend $skill and instead handles the request directly or identifies a more appropriate workflow without forcing it into this skill's scope."
-        negative_criteria_json=$(json_string "$negative_criteria")
         cat >"$case_dir/case.yaml" <<EOF
 schema_version: "1.1"
 name: $skill-$case_id
@@ -152,7 +105,7 @@ execution:
   timeout_seconds: 180
   allowed_tools:
     - Skill
-runs: 3
+runs: 1
 graders:
   - type: tool_used
     name: did-not-select-$skill
@@ -161,10 +114,6 @@ graders:
     min: 0
     max: 0
     arm: both
-  - type: llm
-    name: appropriate-scope
-    criteria: $negative_criteria_json
-    focus: last_message
 EOF
       fi
     done < <(jq -r --arg skill "$skill" --arg polarity "$polarity" '.[$skill][$polarity][]' "$catalog")

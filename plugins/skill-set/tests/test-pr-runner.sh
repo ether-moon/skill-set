@@ -68,7 +68,10 @@ run_fail() {
   local stdout_file=$case_dir/stdout.json
   local stderr_file=$case_dir/stderr.json
   if (cd "$repo" && PATH=$test_path "$bash_bin" "$runner" "$@") >"$stdout_file" 2>"$stderr_file"; then
+    command cat "$stdout_file" >&2
+    command cat "$stderr_file" >&2
     fail "expected command to fail: $*"
+    return 1
   fi
   [[ ! -s "$stdout_file" ]] || fail "failure wrote to stdout: $*"
   jq -e '.ok == false and (.error.code | length > 0) and (.error.message | length > 0) and (.error.recovery | length > 0)' \
@@ -97,7 +100,7 @@ start_resolution() {
   run_ok transition --pr 17 --from blocked --to resolving --expected-run-id "$run_id" \
     --increment-cycle --worktree "$target" --resolver-branch "$branch" --remote origin \
     --remote-branch feature --expected-remote-sha "$head_sha" --base-sha "$head_sha" \
-    --base-branch main "$@"
+    --base-branch main --workspace-mode current "$@"
 }
 
 write_single_result() {
@@ -132,7 +135,7 @@ init_case >/dev/null
 first=$(snapshot_case 101)
 assert_equals polling "$(jq -r .status <<<"$first")" "delayed check state"
 jq -e '
-  (.schema_version == 1) and
+  (.schema_version == 2) and
   (["schema_version","run_id","repo","github_host","head_repo","head_branch","pr","head_sha",
       "cycle","deadlines","blocker_fingerprint","status"]
     - (keys) | length == 0)
@@ -150,6 +153,15 @@ for scenario in fail cancel pending; do
   assert_equals "$expected" "$(jq -r .status <<<"$result")" "$scenario state"
   jq -e --arg bucket "$scenario" '.checks[$bucket] == 1' <<<"$result" >/dev/null
 done
+
+make_fixture all-checks
+export MOCK_GH_SCENARIO=fail
+init_case --required-only false >/dev/null
+all_checks=$(snapshot_case 101)
+assert_equals blocked "$(jq -r .status <<<"$all_checks")" "all-check failure state"
+if grep -Eq '^pr checks .* --required( |$)' "$MOCK_GH_LOG"; then
+  fail "--required-only false still passed --required to gh pr checks"
+fi
 
 make_fixture skipping
 export MOCK_GH_SCENARIO=skipping
@@ -175,6 +187,44 @@ assert_equals polling "$(jq -r .status <<<"$registered_pending")" "registered pe
 registered_pass=$(snapshot_case 120)
 assert_equals clean "$(jq -r .status <<<"$registered_pass")" "registered passing check"
 
+make_fixture signal-gated-running
+export MOCK_GH_SCENARIO=signal-gated-running
+signal_gated_init=$(init_case)
+signal_gated_run_id=$(jq -r .run_id <<<"$signal_gated_init")
+signal_gated_running=$(run_ok snapshot --pr 17 --expected-run-id "$signal_gated_run_id" --now 101)
+jq -e '
+  .status == "polling" and
+  .checks.pending == 1 and
+  .check_details == [{bucket:"pending",name:"review",state:"PENDING",link:"https://example.test/check/review",workflow:"Signal-Gated PR Review"}]
+' <<<"$signal_gated_running" >/dev/null
+
+make_fixture signal-gated-complete
+export MOCK_GH_SCENARIO=signal-gated-complete
+signal_gated_init=$(init_case)
+signal_gated_run_id=$(jq -r .run_id <<<"$signal_gated_init")
+signal_gated_complete=$(run_ok snapshot --pr 17 --expected-run-id "$signal_gated_run_id" --now 101)
+jq -e '
+  .status == "clean" and
+  .checks.pass == 1 and
+  .unresolved_actionable_threads == 0 and
+  .reviewers.states.claude == "not_expected" and
+  .reviewers.states.codex == "not_expected" and
+  .reviewers.required.claude == false and
+  .reviewers.required.codex == false
+' <<<"$signal_gated_complete" >/dev/null
+
+make_fixture signal-gated-thread
+export MOCK_GH_SCENARIO=signal-gated-thread
+signal_gated_init=$(init_case)
+signal_gated_run_id=$(jq -r .run_id <<<"$signal_gated_init")
+signal_gated_thread=$(run_ok snapshot --pr 17 --expected-run-id "$signal_gated_run_id" --now 101)
+jq -e '
+  .status == "blocked" and
+  .checks.pass == 1 and
+  .unresolved_actionable_threads == 1 and
+  .review_threads[0].id == "thread-signal-gated"
+' <<<"$signal_gated_thread" >/dev/null
+
 make_fixture conflict
 export MOCK_GH_SCENARIO=conflict
 init_case >/dev/null
@@ -187,9 +237,14 @@ closed=$(init_case)
 assert_equals closed "$(jq -r .status <<<"$closed")" "closed PR initialization"
 
 make_fixture default-timeouts
-defaults=$(run_ok init --pr 17 --repo owner/repo --now 100 --coderabbit-required false)
+defaults=$(run_ok init --pr 17 --repo owner/repo --now 100)
 jq -e '.options.max_cycles == 5 and .options.review_timeout_seconds == 600 and .deadlines.review_epoch == 700' \
   <<<"$defaults" >/dev/null
+
+make_fixture reviewer-override-rejected
+reviewer_override=$(run_fail init --pr 17 --repo owner/repo --now 100 --coderabbit-required false)
+assert_equals invalid_argument "$(jq -r .error.code <<<"$reviewer_override")" \
+  "reviewer adapters are always auto-detected"
 
 make_fixture timeout
 export MOCK_GH_SCENARIO=pending
@@ -261,11 +316,57 @@ wrong_remote=$(run_fail transition --pr 17 --from blocked --to resolving \
   --expected-run-id "$run_id" --increment-cycle --worktree "$repo" \
   --resolver-branch "$resolver_branch" --remote wrong --remote-branch feature \
   --expected-remote-sha "$head_sha" --base-sha "$head_sha" --base-branch main \
+  --workspace-mode current \
   --resolver-agent ci-failure-resolver)
 assert_equals remote_binding_mismatch "$(jq -r .error.code <<<"$wrong_remote")" \
   "wrong remote repository binding"
 assert_equals 0 "$(count_log '^push ')" "wrong remote push count"
 assert_equals 0 "$(count_log '^pr comment ')" "wrong remote comment count"
+
+make_fixture workspace-mode-required
+export MOCK_GH_SCENARIO=fail
+initialized=$(init_case)
+run_id=$(jq -r .run_id <<<"$initialized")
+snapshot_case 101 >/dev/null
+resolver_branch=$(git -C "$repo" branch --show-current)
+missing_workspace_mode=$(run_fail transition --pr 17 --from blocked --to resolving \
+  --expected-run-id "$run_id" --increment-cycle --worktree "$repo" \
+  --resolver-branch "$resolver_branch" --remote origin --remote-branch feature \
+  --expected-remote-sha "$head_sha" --base-sha "$head_sha" --base-branch main \
+  --resolver-agent ci-failure-resolver)
+assert_equals resolution_metadata_required "$(jq -r .error.code <<<"$missing_workspace_mode")" \
+  "workspace mode requirement"
+
+invalid_workspace_mode=$(run_fail transition --pr 17 --from blocked --to resolving \
+  --expected-run-id "$run_id" --increment-cycle --worktree "$repo" \
+  --resolver-branch "$resolver_branch" --remote origin --remote-branch feature \
+  --expected-remote-sha "$head_sha" --base-sha "$head_sha" --base-branch main \
+  --workspace-mode temporary \
+  --resolver-agent ci-failure-resolver)
+assert_equals invalid_workspace_mode "$(jq -r .error.code <<<"$invalid_workspace_mode")" \
+  "workspace mode validation"
+
+workspace_resolution=$(run_ok transition --pr 17 --from blocked --to resolving \
+  --expected-run-id "$run_id" --increment-cycle --worktree "$repo" \
+  --resolver-branch "$resolver_branch" --remote origin --remote-branch feature \
+  --expected-remote-sha "$head_sha" --base-sha "$head_sha" --base-branch main \
+  --workspace-mode current \
+  --resolver-agent ci-failure-resolver)
+assert_equals current "$(jq -r .resolution.workspace_mode <<<"$workspace_resolution")" \
+  "persisted workspace mode"
+
+state_file=$(git -C "$repo" rev-parse --git-common-dir)/skill-set/shipping-pr/17.json
+jq 'del(.resolution.workspace_mode)' "$repo/$state_file" >"$repo/$state_file.tmp"
+mv "$repo/$state_file.tmp" "$repo/$state_file"
+legacy_workspace_resume=$(run_ok init --pr 17 --repo owner/repo --resume)
+assert_equals current "$(jq -r .resolution.workspace_mode <<<"$legacy_workspace_resume")" \
+  "legacy current-worktree recovery"
+
+jq '.resolution.workspace_mode = "temporary"' "$repo/$state_file" >"$repo/$state_file.tmp"
+mv "$repo/$state_file.tmp" "$repo/$state_file"
+invalid_workspace_resume=$(run_fail init --pr 17 --repo owner/repo --resume)
+assert_equals invalid_state "$(jq -r .error.code <<<"$invalid_workspace_resume")" \
+  "recovery workspace mode enforcement"
 
 make_fixture wrong-branch-binding
 export MOCK_GH_SCENARIO=fail
@@ -278,6 +379,7 @@ wrong_branch=$(run_fail transition --pr 17 --from blocked --to resolving \
   --expected-run-id "$run_id" --increment-cycle --worktree "$repo" \
   --resolver-branch "$resolver_branch" --remote origin --remote-branch different-feature \
   --expected-remote-sha "$head_sha" --base-sha "$head_sha" --base-branch main \
+  --workspace-mode current \
   --resolver-agent ci-failure-resolver)
 assert_equals head_branch_mismatch "$(jq -r .error.code <<<"$wrong_branch")" \
   "wrong PR head branch binding"
@@ -296,6 +398,7 @@ live_branch_drift=$(run_fail transition --pr 17 --from blocked --to resolving \
   --expected-run-id "$run_id" --increment-cycle --worktree "$repo" \
   --resolver-branch "$resolver_branch" --remote origin --remote-branch feature \
   --expected-remote-sha "$head_sha" --base-sha "$head_sha" --base-branch main \
+  --workspace-mode current \
   --resolver-agent ci-failure-resolver)
 assert_equals pr_head_binding_changed "$(jq -r .error.code <<<"$live_branch_drift")" \
   "live PR head branch revalidation"
@@ -314,6 +417,7 @@ fork_resolution=$(run_ok transition --pr 17 --from blocked --to resolving \
   --expected-run-id "$run_id" --increment-cycle --worktree "$repo" \
   --resolver-branch "$resolver_branch" --remote fork --remote-branch feature \
   --expected-remote-sha "$head_sha" --base-sha "$head_sha" --base-branch main \
+  --workspace-mode current \
   --resolver-agent ci-failure-resolver)
 jq -e '.head_repo == "contributor/repo" and .head_branch == "feature" and
   .resolution.head_repo == "contributor/repo" and .resolution.remote == "fork" and
@@ -321,36 +425,78 @@ jq -e '.head_repo == "contributor/repo" and .head_branch == "feature" and
 
 make_fixture coderabbit
 export MOCK_GH_SCENARIO=coderabbit-delay
-init_case --coderabbit-required true >/dev/null
+init_case >/dev/null
 cr_pending=$(snapshot_case 101)
-assert_equals polling "$(jq -r .status <<<"$cr_pending")" "CodeRabbit pending state"
-cr_done=$(snapshot_case 102)
-assert_equals clean "$(jq -r .status <<<"$cr_done")" "CodeRabbit completed state"
+jq -e '.status == "clean" and .reviewers.states.coderabbit == "pending" and
+  .reviewers.required.coderabbit == false' <<<"$cr_pending" >/dev/null
 
 make_fixture coderabbit-timeout
 export MOCK_GH_SCENARIO=coderabbit-delay
-init_case --coderabbit-required true --review-timeout-seconds 5 >/dev/null
+init_case --review-timeout-seconds 5 >/dev/null
 cr_timeout=$(snapshot_case 106)
-assert_equals timed_out "$(jq -r .status <<<"$cr_timeout")" "CodeRabbit timeout state"
+jq -e '.status == "clean" and .reviewers.states.coderabbit == "pending" and
+  .reviewers.required.coderabbit == false' <<<"$cr_timeout" >/dev/null
 
 make_fixture coderabbit-auto
 export MOCK_GH_SCENARIO=coderabbit-active
 auto_init=$(init_case)
-assert_equals true "$(jq -r .options.coderabbit_required <<<"$auto_init")" "CodeRabbit auto-detection"
+assert_equals true "$(jq -r '.reviewers.active | index("coderabbit") != null' <<<"$auto_init")" \
+  "CodeRabbit auto-detection"
+auto_run_id=$(jq -r .run_id <<<"$auto_init")
+auto_snapshot=$(run_ok snapshot --pr 17 --expected-run-id "$auto_run_id" --now 101)
+jq -e '
+  .status == "clean" and
+  .checks.pass == 1 and
+  .unresolved_actionable_threads == 0 and
+  .reviewers.states.coderabbit == "not_expected" and
+  .reviewers.required.coderabbit == false
+' <<<"$auto_snapshot" >/dev/null
+
+make_fixture reviewers-auto
+export MOCK_GH_SCENARIO=reviewers-active
+reviewers_init=$(init_case)
+jq -e '
+  .options.reviewer_detection == "auto" and
+  .reviewers.active == ["claude","coderabbit","codex"]
+' <<<"$reviewers_init" >/dev/null
+reviewers_run_id=$(jq -r .run_id <<<"$reviewers_init")
+reviewers_snapshot=$(run_ok snapshot --pr 17 --expected-run-id "$reviewers_run_id" --now 101)
+jq -e '
+  .status == "clean" and
+  .reviewers.states.claude == "success" and
+  .reviewers.states.coderabbit == "success" and
+  .reviewers.states.codex == "success"
+' <<<"$reviewers_snapshot" >/dev/null
+
+make_fixture codex-reaction
+export MOCK_GH_SCENARIO=codex-reaction
+codex_reaction_init=$(init_case)
+codex_reaction_run_id=$(jq -r .run_id <<<"$codex_reaction_init")
+codex_reaction_snapshot=$(run_ok snapshot --pr 17 --expected-run-id "$codex_reaction_run_id" --now 101)
+jq -e '.status == "clean" and .reviewers.states.codex == "success"' \
+  <<<"$codex_reaction_snapshot" >/dev/null
+
+make_fixture claude-review
+export MOCK_GH_SCENARIO=claude-review
+claude_review_init=$(init_case)
+claude_review_run_id=$(jq -r .run_id <<<"$claude_review_init")
+claude_review_snapshot=$(run_ok snapshot --pr 17 --expected-run-id "$claude_review_run_id" --now 101)
+jq -e '.status == "clean" and .reviewers.states.claude == "success"' \
+  <<<"$claude_review_snapshot" >/dev/null
 
 make_fixture coderabbit-check
 export MOCK_GH_SCENARIO=coderabbit-check-delay
-init_case --coderabbit-required true >/dev/null
+init_case >/dev/null
 cr_check_pending=$(snapshot_case 101)
-assert_equals polling "$(jq -r .status <<<"$cr_check_pending")" "CodeRabbit check-run pending"
-cr_check_done=$(snapshot_case 102)
-assert_equals clean "$(jq -r .status <<<"$cr_check_done")" "CodeRabbit check-run complete"
+jq -e '.status == "clean" and .reviewers.states.coderabbit == "pending" and
+  .reviewers.required.coderabbit == false' <<<"$cr_check_pending" >/dev/null
 
 make_fixture coderabbit-failure
 export MOCK_GH_SCENARIO=coderabbit-failure
-init_case --coderabbit-required true >/dev/null
+init_case >/dev/null
 cr_failed=$(snapshot_case 101)
-assert_equals blocked "$(jq -r .status <<<"$cr_failed")" "CodeRabbit failure state"
+jq -e '.status == "clean" and .reviewers.states.coderabbit == "failed" and
+  .reviewers.required.coderabbit == false' <<<"$cr_failed" >/dev/null
 
 make_fixture no-progress
 export MOCK_GH_SCENARIO=fail
@@ -376,8 +522,12 @@ blocked=$(snapshot_case 101)
 fingerprint=$(jq -r .blocker_fingerprint <<<"$blocked")
 start_resolution "$run_id" --resolver-agent pr-review-feedback >/dev/null
 results_file=$repo/resolver-results.json
+thread_feedback_file=$repo/thread-feedback.json
 write_single_result "$results_file" pr-review-feedback no-op "$head_sha" "$head_sha"
-publish_single_result "$run_id" "$head_sha" "$head_sha" "$results_file" >/dev/null
+jq -cn '{threads:[{id:"thread-1",outcome:"unresolved",body:"This request remains unresolved."}]}' \
+  >"$thread_feedback_file"
+publish_single_result "$run_id" "$head_sha" "$head_sha" "$results_file" \
+  --thread-feedback-file "$thread_feedback_file" >/dev/null
 run_ok transition --pr 17 --from resolving --to polling --expected-run-id "$run_id" \
   --resolver-attempt --resolver-result no-op >/dev/null
 review_progress=$(snapshot_case 102)
@@ -428,6 +578,52 @@ jq -e --arg path "$repo" '
 resumed_awaiting=$(run_ok init --pr 17 --repo owner/repo --resume)
 jq -e --arg path "$repo" '.resumed == true and .status == "awaiting_user" and .resolution.worktree == $path' \
   <<<"$resumed_awaiting" >/dev/null
+
+make_fixture ambiguous-decision-resume
+export MOCK_GH_SCENARIO=fail
+initialized=$(init_case)
+run_id=$(jq -r .run_id <<<"$initialized")
+snapshot_case 101 >/dev/null
+start_resolution "$run_id" --resolver-agent ci-failure-resolver >/dev/null
+missing_requests=$(run_fail transition --pr 17 --from resolving --to awaiting_user \
+  --expected-run-id "$run_id" --resolver-attempt --resolver-result ambiguous)
+assert_equals decision_request_required "$(jq -r .error.code <<<"$missing_requests")" \
+  "ambiguous resolver decision requirements"
+awaiting=$(run_ok transition --pr 17 --from resolving --to awaiting_user \
+  --expected-run-id "$run_id" --resolver-attempt --resolver-result ambiguous \
+  --decision-request CONTRACT-001 --decision-request EVAL-002)
+jq -e '.status == "awaiting_user" and
+  .resolution.decision_requirements == ["CONTRACT-001", "EVAL-002"] and
+  .resolution.decisions == []' <<<"$awaiting" >/dev/null
+missing_decisions=$(run_fail transition --pr 17 --from awaiting_user --to resolving \
+  --expected-run-id "$run_id")
+assert_equals resolver_decision_required "$(jq -r .error.code <<<"$missing_decisions")" \
+  "awaiting-user resume requires decisions"
+incomplete_decisions=$(run_fail transition --pr 17 --from awaiting_user --to resolving \
+  --expected-run-id "$run_id" --resolver-decision 'CONTRACT-001=align callers')
+assert_equals incomplete_resolver_decisions "$(jq -r .error.code <<<"$incomplete_decisions")" \
+  "awaiting-user resume requires every decision"
+resumed=$(run_ok transition --pr 17 --from awaiting_user --to resolving \
+  --expected-run-id "$run_id" \
+  --resolver-decision 'CONTRACT-001=align callers' \
+  --resolver-decision 'EVAL-002=strengthen deterministic graders')
+jq -e '.status == "resolving" and
+  .resolution.decisions == [
+    {id:"CONTRACT-001",selection:"align callers"},
+    {id:"EVAL-002",selection:"strengthen deterministic graders"}
+  ]' <<<"$resumed" >/dev/null
+
+make_fixture stale-resolver-retry
+export MOCK_GH_SCENARIO=fail
+initialized=$(init_case)
+run_id=$(jq -r .run_id <<<"$initialized")
+snapshot_case 101 >/dev/null
+start_resolution "$run_id" --resolver-agent ci-failure-resolver >/dev/null
+stale_retry=$(run_ok transition --pr 17 --from resolving --to polling \
+  --expected-run-id "$run_id" --resolver-attempt --resolver-result stale)
+jq -e '.status == "polling" and .resolver_attempt.result == "stale" and
+  .resolution.result == "stale" and .resolution.publication.phase == "pending"' \
+  <<<"$stale_retry" >/dev/null
 
 for dirty_kind in untracked unstaged staged metachar; do
   make_fixture "publication-dirty-$dirty_kind"
@@ -542,7 +738,7 @@ assert_equals publication_required "$(jq -r .error.code <<<"$publication_require
 export MOCK_GH_SCENARIO=publication
 : >"$MOCK_GH_LOG"
 published=$(publish_single_result "$run_id" "$head_sha" "$local_head" "$results_file" \
-  --summary-file "$summary_file" --coderabbit-resolve)
+  --summary-file "$summary_file")
 jq -e --arg sha "$local_head" '
   .resolution.publication.phase == "complete" and
   .resolution.publication.pushed == true and
@@ -556,10 +752,9 @@ push_line=$(grep -En '^push ' "$MOCK_GH_LOG" | cut -d: -f1)
 comment_line=$(grep -En '^pr comment ' "$MOCK_GH_LOG" | cut -d: -f1)
 [[ $push_line -lt $comment_line ]] || fail "comment was published before the expected-SHA push"
 grep -Eq '^<!-- skill-set-pr:' "$MOCK_GH_DIR/comment.body"
-grep -Eq '^@coderabbitai resolve$' "$MOCK_GH_DIR/comment.body"
 log_lines=$(wc -l <"$MOCK_GH_LOG" | tr -d ' ')
 publish_single_result "$run_id" "$head_sha" "$local_head" "$results_file" \
-  --summary-file "$summary_file" --coderabbit-resolve >/dev/null
+  --summary-file "$summary_file" >/dev/null
 assert_equals "$log_lines" "$(wc -l <"$MOCK_GH_LOG" | tr -d ' ')" "completed publication idempotency"
 state_file=$(git -C "$repo" rev-parse --git-common-dir)/skill-set/shipping-pr/17.json
 jq '.resolution.publication.phase = "commenting"' "$repo/$state_file" >"$repo/$state_file.tmp"
@@ -567,7 +762,7 @@ mv "$repo/$state_file.tmp" "$repo/$state_file"
 push_count=$(count_log '^push ')
 comment_count=$(count_log '^pr comment ')
 publish_single_result "$run_id" "$head_sha" "$local_head" "$results_file" \
-  --summary-file "$summary_file" --coderabbit-resolve >/dev/null
+  --summary-file "$summary_file" >/dev/null
 assert_equals "$push_count" "$(count_log '^push ')" "crash recovery duplicate push"
 assert_equals "$comment_count" "$(count_log '^pr comment ')" "crash recovery duplicate comment"
 run_ok transition --pr 17 --from resolving --to polling --expected-run-id "$run_id" \
@@ -581,25 +776,110 @@ snapshot_case 101 >/dev/null
 start_resolution "$run_id" --resolver-agent pr-review-feedback >/dev/null
 results_file=$repo/resolver-results.json
 summary_file=$repo/summary.md
+thread_feedback_file=$repo/thread-feedback.json
 write_single_result "$results_file" pr-review-feedback no-op "$head_sha" "$head_sha"
 printf 'Reviewed with no code change.\n' >"$summary_file"
+jq -cn '{threads:[{id:"thread-1",outcome:"accepted_as_is",body:"Reviewed and accepted as-is."}]}' \
+  >"$thread_feedback_file"
 export MOCK_GH_SCENARIO=publication
 : >"$MOCK_GH_LOG"
 publish_dry=$(run_ok publish --pr 17 --expected-run-id "$run_id" --expected-head-sha "$head_sha" \
   --expected-local-head-sha "$head_sha" --results-file "$results_file" \
-  --summary-file "$summary_file" --dry-run)
+  --summary-file "$summary_file" --thread-feedback-file "$thread_feedback_file" --dry-run)
 jq -e '.dry_run == true and .would_push == false and .comment_requested == true' <<<"$publish_dry" >/dev/null
 state_file=$(git -C "$repo" rev-parse --git-common-dir)/skill-set/shipping-pr/17.json
 jq -e '.resolution.publication.phase == "pending"' "$repo/$state_file" >/dev/null
 assert_equals 0 "$(count_log '^push |^pr comment ')" "publication dry-run mutation count"
 : >"$MOCK_GH_LOG"
 publish_single_result "$run_id" "$head_sha" "$head_sha" "$results_file" \
-  --summary-file "$summary_file" >/dev/null
+  --summary-file "$summary_file" --thread-feedback-file "$thread_feedback_file" >/dev/null
 assert_equals 0 "$(count_log '^push ')" "no-code push count"
 assert_equals 1 "$(count_log '^pr comment ')" "no-code comment count"
 last_view_line=$(grep -En '^pr view ' "$MOCK_GH_LOG" | tail -1 | cut -d: -f1)
 comment_line=$(grep -En '^pr comment ' "$MOCK_GH_LOG" | cut -d: -f1)
 [[ $last_view_line -lt $comment_line ]] || fail "no-code comment did not follow a fresh remote HEAD check"
+
+make_fixture publication-codex-feedback
+export MOCK_GH_SCENARIO=codex-unresolved
+initialized=$(init_case)
+run_id=$(jq -r .run_id <<<"$initialized")
+snapshot_case 101 >/dev/null
+start_resolution "$run_id" --resolver-agent pr-review-feedback >/dev/null
+results_file=$repo/resolver-results.json
+summary_file=$repo/summary.md
+thread_feedback_file=$repo/thread-feedback.json
+write_single_result "$results_file" pr-review-feedback no-op "$head_sha" "$head_sha"
+printf 'Resolved automated review feedback.\n' >"$summary_file"
+jq -cn '{threads:[{id:"thread-codex",outcome:"fixed",body:"Resolved in the current publication."}]}' \
+  >"$thread_feedback_file"
+export MOCK_GH_SCENARIO=publication
+: >"$MOCK_GH_LOG"
+publish_single_result "$run_id" "$head_sha" "$head_sha" "$results_file" \
+  --summary-file "$summary_file" --thread-feedback-file "$thread_feedback_file" >/dev/null
+assert_equals 1 "$(count_log 'addPullRequestReviewThreadReply')" "Codex resolution reply count"
+assert_equals 1 "$(count_log 'resolveReviewThread')" "Codex thread resolve count"
+if grep -Eiq '@codex|@claude|review once|address that feedback' "$MOCK_GH_DIR/comment.body"; then
+  fail "resolution summary triggered a new automated review or delegated edit"
+fi
+
+make_fixture publication-coderabbit-feedback
+export MOCK_GH_SCENARIO=coderabbit-unresolved
+initialized=$(init_case)
+run_id=$(jq -r .run_id <<<"$initialized")
+snapshot_case 101 >/dev/null
+start_resolution "$run_id" --resolver-agent pr-review-feedback >/dev/null
+results_file=$repo/resolver-results.json
+summary_file=$repo/summary.md
+thread_feedback_file=$repo/thread-feedback.json
+write_single_result "$results_file" pr-review-feedback no-op "$head_sha" "$head_sha"
+printf 'Resolved CodeRabbit feedback.\n' >"$summary_file"
+jq -cn '{threads:[{id:"thread-coderabbit",provider:"other",outcome:"fixed",body:"Resolved in the current publication."}]}' \
+  >"$thread_feedback_file"
+explicit_adapter=$(run_fail publish --pr 17 --expected-run-id "$run_id" --expected-head-sha "$head_sha" \
+  --expected-local-head-sha "$head_sha" --results-file "$results_file" \
+  --summary-file "$summary_file" --thread-feedback-file "$thread_feedback_file")
+assert_equals invalid_publication_input "$(jq -r .error.code <<<"$explicit_adapter")" \
+  "explicit reviewer adapter rejection"
+jq -cn '{threads:[{id:"thread-coderabbit",outcome:"fixed",body:"Resolved in the current publication."}]}' \
+  >"$thread_feedback_file"
+export MOCK_GH_SCENARIO=publication
+: >"$MOCK_GH_LOG"
+publish_single_result "$run_id" "$head_sha" "$head_sha" "$results_file" \
+  --summary-file "$summary_file" --thread-feedback-file "$thread_feedback_file" >/dev/null
+grep -Eq '^@coderabbitai resolve$' "$MOCK_GH_DIR/comment.body" || \
+  fail "resolved CodeRabbit feedback did not emit the explicit resolve command"
+if grep -Eiq '@coderabbitai (review|full review|autofix)' "$MOCK_GH_DIR/comment.body"; then
+  fail "CodeRabbit resolution feedback triggered a new review or edit"
+fi
+
+make_fixture publication-coderabbit-unresolved
+export MOCK_GH_SCENARIO=coderabbit-unresolved
+initialized=$(init_case)
+run_id=$(jq -r .run_id <<<"$initialized")
+snapshot_case 101 >/dev/null
+start_resolution "$run_id" --resolver-agent pr-review-feedback >/dev/null
+results_file=$repo/resolver-results.json
+summary_file=$repo/summary.md
+thread_feedback_file=$repo/thread-feedback.json
+write_single_result "$results_file" pr-review-feedback no-op "$head_sha" "$head_sha"
+printf '@coderabbitai this item still needs follow-up.\n' >"$summary_file"
+jq -cn '{threads:[{id:"thread-coderabbit",outcome:"unresolved",body:"This item still needs follow-up."}]}' \
+  >"$thread_feedback_file"
+unsafe_summary=$(run_fail publish --pr 17 --expected-run-id "$run_id" --expected-head-sha "$head_sha" \
+  --expected-local-head-sha "$head_sha" --results-file "$results_file" \
+  --summary-file "$summary_file" --thread-feedback-file "$thread_feedback_file")
+assert_equals invalid_publication_input "$(jq -r .error.code <<<"$unsafe_summary")" \
+  "free-form CodeRabbit mention rejection"
+printf 'This item still needs follow-up.\n' >"$summary_file"
+export MOCK_GH_SCENARIO=publication
+: >"$MOCK_GH_LOG"
+publish_single_result "$run_id" "$head_sha" "$head_sha" "$results_file" \
+  --summary-file "$summary_file" --thread-feedback-file "$thread_feedback_file" >/dev/null
+assert_equals 1 "$(count_log 'addPullRequestReviewThreadReply')" "unresolved CodeRabbit reply count"
+assert_equals 0 "$(count_log 'resolveReviewThread')" "unresolved CodeRabbit resolve count"
+if grep -Eiq '@coderabbitai resolve' "$MOCK_GH_DIR/comment.body"; then
+  fail "unresolved CodeRabbit feedback emitted the resolve command"
+fi
 
 make_fixture publication-push-failure
 export MOCK_GH_SCENARIO=fail
@@ -725,7 +1005,7 @@ assert_equals invalid_github_response "$(jq -r .error.code <<<"$malformed_list")
 for scenario in malformed-checks malformed-threads; do
   make_fixture "$scenario"
   export MOCK_GH_SCENARIO=$scenario
-  initialized=$(init_case --coderabbit-required false)
+  initialized=$(init_case)
   run_id=$(jq -r .run_id <<<"$initialized")
   malformed_nested=$(run_fail snapshot --pr 17 --expected-run-id "$run_id" --now 101)
   assert_equals invalid_github_response "$(jq -r .error.code <<<"$malformed_nested")" "$scenario response"
@@ -733,15 +1013,26 @@ done
 
 make_fixture malformed-coderabbit
 export MOCK_GH_SCENARIO=malformed-coderabbit
-initialized=$(init_case --coderabbit-required true)
+initialized=$(init_case)
 run_id=$(jq -r .run_id <<<"$initialized")
-malformed_cr=$(run_fail snapshot --pr 17 --expected-run-id "$run_id" --now 101)
-assert_equals invalid_github_response "$(jq -r .error.code <<<"$malformed_cr")" "nested CodeRabbit response"
+malformed_cr=$(run_ok snapshot --pr 17 --expected-run-id "$run_id" --now 101)
+jq -e '
+  .status == "clean" and
+  .checks.pass == 1 and
+  .unresolved_actionable_threads == 0 and
+  .reviewers.telemetry_available == false and
+  .reviewers.states.coderabbit == "unavailable" and
+  .reviewers.required.coderabbit == false
+' <<<"$malformed_cr" >/dev/null
 
 # The command-log cases above exercise publication safety. Keep agent and command
 # contracts wired to that executable gate rather than a second mutation path.
 resolver=$plugin_dir/agents/resolving-pr-blockers.md
-grep -Eq 'isolated worktree' "$resolver"
+grep -Eq 'current worktree' "$resolver"
+grep -Fq 'workspace_mode=current' "$resolver"
+if grep -Eq 'Create the recorded temporary local branch|Clean up the isolated worktree' "$resolver"; then
+  fail "resolver still requires temporary worktree lifecycle management"
+fi
 grep -Eq 'conflict.*sole cycle|sole cycle.*conflict' "$resolver"
 grep -Eq 'CI.*then.*review|CI.*review.*sequential' "$resolver"
 grep -Eq 'expected-SHA push' "$resolver"
@@ -756,7 +1047,8 @@ fix_command=$plugin_dir/commands/pr/fix.md
 grep -Eq 'headRefOid.*baseRefOid|baseRefOid.*headRefOid' "$fix_command"
 grep -Eq 'headRepository' "$fix_command"
 grep -Eq 'Re-read.*metadata|re-read.*metadata' "$fix_command"
-grep -Eq 'Require the HEAD still equals the snapshot' "$fix_command"
+grep -Eq 'If the HEAD changed.*fresh snapshot|fresh snapshot.*If the HEAD changed' "$fix_command"
+grep -Fq 'workspace_mode=current' "$fix_command"
 grep -Eq 'canonical.*push URL|canonical host' "$plugin_dir/skills/shipping-pr/SKILL.md" \
   "$plugin_dir/skills/shipping-pr/reference/blocker-resolution.md"
 grep -Eq 'praise phrase followed by any request remains actionable' \

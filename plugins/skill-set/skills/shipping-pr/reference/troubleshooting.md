@@ -14,15 +14,15 @@ The returned results were discarded intentionally. Call `snapshot` again. The ch
 
 ## Interrupted resolver run
 
-A resumed `resolving` state must use `.resolution.worktree`, `.resolution.branch`, pinned SHAs, expected agents, and `.resolution.publication`; never launch a second resolver. For `prepared`, `gate_passed`, or `commenting`, call `publish` with the same recorded files and expected local HEAD. It reconciles an already-pushed HEAD and searches the stable hidden marker before commenting. For `pending`, the resolver was interrupted before a safe result set was journaled: report the paths and transition with `--resolver-attempt --resolver-result partial-failure` to `awaiting_user`. Use `failed` only when recovery is impossible. A resumed `awaiting_user` state stays paused until the user explicitly chooses how to continue.
+A resumed `resolving` state must use `.resolution.worktree`, `.resolution.branch`, pinned SHAs, expected agents, `.resolution.decision_requirements`, `.resolution.decisions`, and `.resolution.publication`; never launch a second resolver. For `prepared`, `gate_passed`, or `commenting`, call `publish` with the same recorded files and expected local HEAD. It reconciles an already-pushed HEAD and searches the stable hidden marker before commenting. For `pending`, the resolver was interrupted before a safe result set was journaled: report the paths and transition with `--resolver-attempt --resolver-result partial-failure` to `awaiting_user`. Use `failed` only when recovery is impossible. A resumed ambiguous `awaiting_user` state stays paused until the user selects every recorded decision ID, then resumes with one `--resolver-decision '<ID>=<selected-resolution>'` per ID.
 
 ## Pending or unknown checks
 
 Pending, cancelled, unknown, and timed-out checks are never clean. Report their buckets and deadline. Do not dispatch a code resolver for a merely pending check.
 
-## CodeRabbit absent
+## Automated reviewer absent
 
-When CodeRabbit is required, an absent current-HEAD status is treated as not yet registered until the review deadline. If auto-detection was wrong, start a new run with an explicit `--coderabbit-required false`; do not mutate active state.
+Reviewer detection cannot be overridden. Report the detected provider, its current state, and the review deadline. An active CodeRabbit reviewer without current-HEAD status/check evidence remains pending until that deadline. On later cycles, absent Claude or Codex evidence becomes `not_expected`; do not post a review command to manufacture a completion signal.
 
 ## Resolver failure
 
@@ -34,7 +34,7 @@ The recorded PR head repository, branch, and host are compare-and-swap inputs, n
 
 ## Publication failure
 
-Keep the worktree, results file, summary file, and publication journal. Never bypass `skill-set-pr publish`. A `prepared` state may safely reconcile whether the expected-SHA push took effect; `gate_passed` and `commenting` never push again. If the remote is neither the pinned old HEAD nor recorded local HEAD, stop for user inspection.
+Keep the worktree, results file, summary file, thread-feedback file, and publication journal. Never bypass `skill-set-pr publish`. A `prepared` state may safely reconcile whether the expected-SHA push took effect; `gate_passed` and `commenting` never push again. If the remote is neither the pinned old HEAD nor recorded local HEAD, stop for user inspection.
 
 ## Structured runner error
 

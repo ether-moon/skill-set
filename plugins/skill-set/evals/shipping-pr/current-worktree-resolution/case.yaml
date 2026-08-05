@@ -1,0 +1,39 @@
+schema_version: "1.1"
+name: shipping-pr-current-worktree-resolution
+description: Reconciles and resolves blockers in the current PR worktree without a temporary branch
+tags:
+  - shipping-pr
+  - functional
+  - read-only
+  - workspace-policy
+execution:
+  max_turns: 6
+  timeout_seconds: 240
+  allowed_tools:
+    - Skill
+    - Read
+runs: 3
+graders:
+  - type: tool_used
+    name: selected-shipping-pr
+    tool: Skill
+    input_match: shipping-pr
+    min: 1
+  - type: tool_used
+    name: no-mutation-tool
+    tool: Bash
+    min: 0
+    max: 0
+    arm: both
+  - type: tool_used
+    name: no-write-tool
+    tool: Write
+    min: 0
+    max: 0
+    arm: both
+  - type: tool_used
+    name: no-edit-tool
+    tool: Edit
+    min: 0
+    max: 0
+    arm: both

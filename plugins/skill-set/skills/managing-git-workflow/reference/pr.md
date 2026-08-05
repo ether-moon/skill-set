@@ -7,7 +7,7 @@ Create a PR from committed work only, or return the existing PR URL.
 Run with the intended base:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git" inspect --base "<base-branch>"
+<git-runner> inspect --base "<base-branch>"
 ```
 
 Use only `pr_scope.range`, `pr_scope.files`, and committed history to generate the title and body. The range is `origin/<base>...HEAD`. Never describe dirty changes as part of the PR.
@@ -19,7 +19,7 @@ Show staged, unstaged, and untracked paths as **excluded from the PR**. If any e
 Generate a concrete title and body in the user's language while preserving technical identifiers. Allocate the body file first:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git" input-prepare --kind pr-body
+<git-runner> input-prepare --kind pr-body
 ```
 
 The allocated file contains exactly `SKILL_SET_INPUT_REPLACE_ME`. Use the scoped Edit capability on the returned `path`, replacing that exact `old_string` with the complete body as `new_string`. Do not interpolate it into a shell command. The runner rejects an empty body or a remaining sentinel before any push or PR operation, consumes a managed body after successful creation or existing-PR discovery, and preserves it on recoverable failure. Use `input-discard` if the user cancels.
@@ -29,7 +29,7 @@ Suggested body sections are Summary, Changes, and Test Plan when the committed e
 ## 3. Preview
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git" pr-create \
+<git-runner> pr-create \
   --base "<base-branch>" \
   --title "<pull-request-title>" \
   --body-file /tmp/pull-request-body.md \

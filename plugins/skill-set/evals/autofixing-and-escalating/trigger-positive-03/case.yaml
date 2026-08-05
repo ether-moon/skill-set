@@ -10,14 +10,10 @@ execution:
   timeout_seconds: 180
   allowed_tools:
     - Skill
-runs: 3
+runs: 1
 graders:
   - type: tool_used
     name: selected-autofixing-and-escalating
     tool: Skill
     input_match: "autofixing-and-escalating"
     min: 1
-  - type: llm
-    name: workflow-outcome
-    criteria: "Pass only if the response classifies the external findings, fixes only unambiguous items when resolution was explicitly authorized, and escalates judgment-dependent items without publishing or orchestrating follow-up work."
-    focus: last_message

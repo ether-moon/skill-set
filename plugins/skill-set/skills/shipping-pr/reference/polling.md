@@ -4,7 +4,7 @@
 
 ## Stable-HEAD Read
 
-Each snapshot reads the PR HEAD SHA, repository, branch, and host before and after checks, review threads, and CodeRabbit status. If that binding differs, the runner:
+Each snapshot reads the PR HEAD SHA, repository, branch, and host before and after checks, review threads, and automated-review evidence. If that binding differs, the runner:
 
 1. discards every intermediate result;
 2. stores the new HEAD;
@@ -25,6 +25,8 @@ The runner calls `gh pr checks --json bucket,name,state,link,workflow` and optio
 
 Pending at the deadline becomes `timed_out`. For a new HEAD, zero selected checks remain `polling` for a 60-second registration grace so a fresh push cannot appear clean before workflows register. After that grace, a repository with genuinely no selected checks may satisfy the check condition. If checks were observed and later disappear, polling continues until the CI deadline.
 
+Signal-gated review workflows, including `karrot-emu/signal-gated-review-action`, require no reviewer adapter. Treat the workflow job (for example, `Signal-Gated PR Review / review`) as a normal selected check and its inline findings as review threads. With the default `--required-only true`, configure that job as a required check on every target branch that must wait for it; otherwise use `--required-only false` intentionally to observe all checks.
+
 ## Review Threads
 
 The runner queries GraphQL `reviewThreads(first:100, after:$cursor)` and follows `pageInfo.endCursor` until `hasNextPage=false`. An actionable thread is unresolved, not outdated, and has a non-empty latest comment. There is no 100-thread truncation.
@@ -33,11 +35,13 @@ Praise and summary-only acknowledgements are filtered by one deliberately narrow
 
 Any unresolved actionable thread makes the snapshot `blocked`.
 
-## CodeRabbit
+## Automated Reviewers
 
-Initialization accepts `--coderabbit-required auto|true|false`. Auto mode detects recent repository use. When required, snapshots query both commit statuses and check-runs for the current HEAD and match CodeRabbit by context, name, or app.
+Reviewer discovery is always `auto`; there is no adapter-selection flag. Initialization detects CodeRabbit, Claude, and `chatgpt-codex-connector` from authors and apps found in the ten most recent merged PRs. Every snapshot unions that history with current-PR commit statuses, check-runs, reviews, comments, and reactions, so the report and blocker fingerprint include reviewer telemetry without requiring every repository to run those reviewers.
 
-Successful or neutral completion satisfies the completion signal; actionable comments are still evaluated through review threads. Failure, error, cancellation, timeout, or action-required is blocked. Pending or absent remains `polling` until the review deadline, then becomes `timed_out`.
+CodeRabbit telemetry comes from its current-HEAD commit status or check-run. Claude telemetry comes from its current-HEAD check-run, status, or review. Codex telemetry comes from a current-HEAD review or, before any resolver push, the connector's `+1` reaction. These signals are observational and are never independently required. Their absence, pending state, or standalone failure cannot keep a snapshot `polling`, make it `timed_out`, or make it `blocked` after selected checks have settled and no actionable review thread remains. A telemetry query or normalization failure is reported as `telemetry_available:false` with `unavailable` provider states and does not change the snapshot verdict.
+
+Reviewer results that appear as selected PR checks still use the normal check classification. Actionable comments from every provider still use review-thread state. This makes checks and unresolved conversations authoritative while preserving reviewer evidence for reports and change fingerprints.
 
 ## Mergeability
 
@@ -45,4 +49,4 @@ Successful or neutral completion satisfies the completion signal; actionable com
 
 ## Fingerprint
 
-The blocker fingerprint covers the observed HEAD; normalized check identities, states, and buckets; conflict state; unresolved thread IDs and latest-comment content; and CodeRabbit state. After a resolver returns to polling, only a fresh snapshot can declare `stalled`, and only when both HEAD and fingerprint remain unchanged.
+The blocker fingerprint covers the observed HEAD; normalized check identities, states, and buckets; conflict state; unresolved thread IDs and latest-comment content; and all active reviewer states. After a resolver returns to polling, only a fresh snapshot can declare `stalled`, and only when both HEAD and fingerprint remain unchanged.

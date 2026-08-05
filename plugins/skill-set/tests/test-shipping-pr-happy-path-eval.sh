@@ -92,21 +92,21 @@ printf '%s\n' '#!/bin/sh' \
   "printf '%s\\n' '{\"ok\":true,\"status\":\"polling\",\"cycle\":0}'" \
   >"$evil_runner"
 chmod +x "$evil_runner"
-if (cd -- "$test_root" && CLAUDE_PLUGIN_ROOT="$plugin_dir" \
+if (cd -- "$test_root" && SKILL_SET_PR_RUNNER="$runner" \
   "$eval_runner" "$evil_runner" init --pr 17 --repo owner/repo --now 100) >/dev/null 2>&1; then
   fail "shipping eval wrapper accepted an evil path ending in bin/skill-set-pr"
 fi
-if (cd -- "$test_root" && CLAUDE_PLUGIN_ROOT="$plugin_dir" "$eval_runner" "$runner" snapshot \
+if (cd -- "$test_root" && SKILL_SET_PR_RUNNER="$runner" "$eval_runner" "$runner" snapshot \
   --pr 17 --expected-run-id premature --now 101) >/dev/null 2>&1; then
   fail "shipping eval wrapper accepted an out-of-order snapshot"
 fi
 
 run_stage() {
-  (cd -- "$test_root" && CLAUDE_PLUGIN_ROOT="$plugin_dir" "$eval_runner" "$runner" "$@")
+  (cd -- "$test_root" && SKILL_SET_PR_RUNNER="$runner" "$eval_runner" "$runner" "$@")
 }
 
 initialized=$(run_stage init --pr 17 --repo owner/repo --ci-timeout-seconds 30 \
-  --review-timeout-seconds 30 --coderabbit-required false --now 100)
+  --review-timeout-seconds 30 --now 100)
 run_id=$(jq -r .run_id <<<"$initialized")
 head_sha=$(jq -r .head_sha <<<"$initialized")
 jq -e '.status == "polling" and .cycle == 0' <<<"$initialized" >/dev/null
@@ -119,15 +119,18 @@ resolving=$(run_stage transition --pr 17 --from blocked --to resolving \
   --expected-run-id "$run_id" --increment-cycle --worktree "$test_root" \
   --resolver-branch main --remote origin --remote-branch feature \
   --expected-remote-sha "$head_sha" --base-sha "$head_sha" --base-branch main \
+  --workspace-mode current \
   --resolver-agent pr-review-feedback)
 jq -e '.status == "resolving" and .cycle == 1 and
+  .resolution.workspace_mode == "current" and
   .resolution.expected_agents == ["pr-review-feedback"] and
   .resolution.publication.phase == "pending"' <<<"$resolving" >/dev/null
 
 published=$(run_stage publish --pr 17 --expected-run-id "$run_id" \
   --expected-head-sha "$head_sha" --expected-local-head-sha "$head_sha" \
   --results-file "$test_root/resolver-results.json" \
-  --summary-file "$test_root/summary.md" --now 101)
+  --summary-file "$test_root/summary.md" \
+  --thread-feedback-file "$test_root/thread-feedback.json" --now 101)
 jq -e '.status == "resolving" and .resolution.publication.phase == "complete" and
   .resolution.publication.pushed == false and
   .resolution.publication.comments_published == 1' <<<"$published" >/dev/null

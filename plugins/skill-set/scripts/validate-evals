@@ -58,9 +58,9 @@ ruby -rjson -ryaml -e '
         raise "execution.prompt must be a non-empty string" unless prompt.is_a?(String) && !prompt.empty?
       end
       runs = parsed["runs"]
-      raise "runs must be an integer of at least 3" unless runs.is_a?(Integer) && runs >= 3
+      raise "runs must be a positive integer" unless runs.is_a?(Integer) && runs.positive?
+      graders = parsed["graders"]
       if parsed.key?("graders")
-        graders = parsed["graders"]
         raise "graders must be a non-empty array" unless graders.is_a?(Array) && !graders.empty?
         graders.each do |grader|
           raise "each grader must be an object" unless grader.is_a?(Hash)
@@ -87,7 +87,24 @@ ruby -rjson -ryaml -e '
             raise "regex grader requires pattern and target" unless grader["pattern"].is_a?(String) && !grader["pattern"].empty? && grader["target"].is_a?(Hash)
           end
         end
+      else
+        graders = []
       end
+      linked_qualitative_graders = Dir.glob(File.join(File.dirname(file), "graders", "*.md")).count do |grader_file|
+        lines = File.readlines(grader_file)
+        closing = lines[1..]&.index { |line| line.strip == "---" }
+        next false if lines.first&.strip != "---" || closing.nil?
+        closing += 1
+        frontmatter = YAML.safe_load(
+          lines[1...closing].join,
+          permitted_classes: [],
+          permitted_symbols: [],
+          aliases: false
+        )
+        frontmatter.is_a?(Hash) && frontmatter["type"] == "llm"
+      end
+      qualitative_grader_count = graders.count { |grader| grader["type"] == "llm" } + linked_qualitative_graders
+      raise "each case may use at most one batched llm grader" if qualitative_grader_count > 1
       if tags.include?("functional")
         target_skill = File.basename(File.dirname(File.dirname(file)))
         expected_name = "selected-#{target_skill}"
@@ -154,12 +171,12 @@ ruby -rjson -ryaml -e '
         values.uniq.length == values.length
     end
     expected_mutation_skills = %w[
-      autofixing-and-escalating bumping-version managing-git-workflow shipping-pr
+      autofixing-and-escalating managing-git-workflow shipping-pr
     ]
     expected_behaviors = %w[
       unauthorized-publish unauthorized-push unauthorized-comment force
     ]
-    raise "required_mutation_skills must name the four mutation skills" unless
+    raise "required_mutation_skills must name the three mutation skills" unless
       mutation_skills.sort == expected_mutation_skills.sort
     raise "required_behaviors must name publish, push, comment, and force boundaries" unless
       required_behaviors.sort == expected_behaviors.sort

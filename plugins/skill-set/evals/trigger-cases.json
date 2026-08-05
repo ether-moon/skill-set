@@ -21,31 +21,9 @@
       "Prepare a minor version bump and changelog entry."
     ]
   },
-  "bumping-version": {
-    "positive": [
-      "Prepare a patch version bump for this project, including the changelog, but wait for approval before publishing.",
-      "Inspect all version manifests and tell me whether they agree before we cut a release.",
-      "The last release added features and fixes. Prepare the appropriate semantic version bump in an isolated worktree.",
-      "Create a minor release preparation and show the exact files and diff before any direct base push.",
-      "Publish the already prepared release only if origin/main still matches the recorded base SHA.",
-      "Clean up the successful release worktree and temporary release branch.",
-      "The release push was rejected by branch protection; report the preserved recovery state without opening a PR.",
-      "Compare package.json, pyproject.toml, and the plugin manifest, then prepare one consistent release version."
-    ],
-    "negative": [
-      "Update the lodash dependency to its newest compatible version.",
-      "Write release notes from these commits without changing any version.",
-      "Commit my currently staged source changes.",
-      "Deploy version 2.4.0 to production now.",
-      "Explain how semantic versioning distinguishes major and minor releases.",
-      "Create a pull request for the commits already on this branch.",
-      "Add a missing changelog sentence to the current unreleased section only.",
-      "Tag the existing HEAD as v2.4.0; all manifests are already published."
-    ]
-  },
   "creating-skills": {
     "positive": [
-      "Create a new Claude skill for incident triage, including trigger cases and functional evals.",
+      "I have skill-creator installed. Create a new agent skill for incident triage, including trigger cases and functional evals, while preserving the project's policy and final acceptance gate.",
       "Improve this existing SKILL.md because it over-triggers on nearby documentation requests.",
       "Benchmark the current skill against a no-skill baseline and iterate on the failures.",
       "Design positive and negative trigger cases for my deployment skill.",

@@ -7,7 +7,7 @@ Create one authorized commit without publishing it.
 Run:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git" inspect
+<git-runner> inspect
 ```
 
 Report `working_tree.staged`, `working_tree.unstaged`, and `working_tree.untracked` separately. Retain `index_fingerprint` for the commit compare-and-swap check.
@@ -29,7 +29,7 @@ If no staged files and no scope are available, ask the user for paths. Never wid
 Preview without a message file or mutation:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git" commit --dry-run --path path/to/file
+<git-runner> commit --dry-run --path path/to/file
 ```
 
 Repeat `--path` as needed, omit scope flags for the current index, or use explicit `--all`. Generate the message from `staged_preview.diff` and `staged_preview.stat`. For an existing index, `inspect.commit_context` contains the same message-generation context.
@@ -41,7 +41,7 @@ Match the repository's recent subject style and the user's language. Describe on
 Allocate a private file owned by the runner:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git" input-prepare --kind commit-message
+<git-runner> input-prepare --kind commit-message
 ```
 
 The allocated file contains exactly `SKILL_SET_INPUT_REPLACE_ME`. Use the scoped Edit capability on the returned `path`, with that sentinel as `old_string` and the exact commit message as `new_string`. This works without broad file-write permission and keeps the file inside worktree-specific Git metadata, where it cannot enter a commit scope. Do not interpolate the message into a shell command.
@@ -53,7 +53,7 @@ The runner rejects an empty file or any file where the sentinel remains, before 
 Use the fingerprint returned by the latest inspection:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git" commit \
+<git-runner> commit \
   --expected-index "<index-fingerprint>" \
   --path path/to/file \
   --message-file /tmp/commit-message.txt
@@ -64,6 +64,20 @@ Use the same scope selected and previewed earlier. On success, report `commit.sh
 The runner consumes the managed message allocation after a successful commit. If the user cancels first, call `input-discard --input-file <managed-path>`.
 
 If the runner returns `index_changed`, inspect again and re-confirm the scope. If it returns `nothing_staged` or `nothing_to_commit`, stop without creating an empty commit.
+
+## Tree-Identical Merge Exception
+
+A merge resolver may need a merge commit whose tree is identical to `HEAD` solely to record the pinned base commit as a second parent. Use this exception only after the user has authorized conflict resolution and the resolver has already resolved every conflict:
+
+```bash
+<git-runner> commit --dry-run --allow-tree-identical-merge
+<git-runner> commit \
+  --allow-tree-identical-merge \
+  --expected-index "<index-fingerprint>" \
+  --message-file "<managed-message-file>"
+```
+
+The runner permits this only for an active single-parent merge with no unmerged paths, an index tree exactly equal to the current `HEAD` tree, and no unstaged or untracked files. It rejects the flag outside that narrow state and never permits a general empty commit. A merge whose resolved tree differs from `HEAD` must use the normal indexed commit path.
 
 ## Dry-Run Guarantee
 

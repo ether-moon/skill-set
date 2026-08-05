@@ -56,7 +56,10 @@ while IFS= read -r case_file; do
     grep -Eq '^    max: 0$' "$case_file" || fail "negative trigger lacks zero maximum: $case_file"
     grep -Eq '^    arm: both$' "$case_file" || fail "negative trigger is not enforced in both arms: $case_file"
   fi
-  grep -Eq '^  - type: llm$' "$case_file" || fail "trigger case lacks an outcome grader: $case_file"
+  grep -Eq '^runs: 1$' "$case_file" || fail "trigger case must default to one run: $case_file"
+  if grep -Eq '^  - type: llm$' "$case_file"; then
+    fail "trigger selection must use deterministic graders only: $case_file"
+  fi
 done < <(find "$plugin_dir/evals" -type f -name case.yaml \( -path '*/trigger-positive-*/*' -o -path '*/trigger-negative-*/*' \) | sort)
 
 printf 'PASS: generated trigger eval matrix\n'

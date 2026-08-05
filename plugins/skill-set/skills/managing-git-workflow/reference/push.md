@@ -7,7 +7,7 @@ Publish existing commits without creating or rewriting commits.
 Run:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git" inspect
+<git-runner> inspect
 ```
 
 Confirm that the user requested a push. Dirty staged, unstaged, and untracked files are reported as excluded; they do not become part of the publication.
@@ -17,7 +17,7 @@ Record `branch.remote_sha`. Use the literal value `absent` when it is `null`.
 ## 2. Preview
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git" push \
+<git-runner> push \
   --expected-remote-sha "<sha-or-absent>" \
   --dry-run
 ```
@@ -29,7 +29,7 @@ Report `commits_to_push`, the destination, and `dirty_excluded`. A dry-run reads
 After confirming the destination:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/bin/skill-set-git" push \
+<git-runner> push \
   --expected-remote-sha "<sha-or-absent>"
 ```
 

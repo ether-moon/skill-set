@@ -15,11 +15,15 @@ fi
 ablation=
 json_output=
 output_dir=
+case_name=sample-functional
+runs=1
 while (($#)); do
   case $1 in
     --ablation) ablation=${2:-}; shift 2 ;;
     --json) json_output=${2:-}; shift 2 ;;
     --output-dir) output_dir=${2:-}; shift 2 ;;
+    --case) case_name=${2:-}; shift 2 ;;
+    --runs) runs=${2:-}; shift 2 ;;
     *) shift ;;
   esac
 done
@@ -28,6 +32,13 @@ done
   printf 'mock eval requires --ablation, --json, and --output-dir\n' >&2
   exit 2
 }
+
+if [[ ${FAKE_CLAUDE_REQUIRE_PR_RUNNER:-false} == true ]]; then
+  [[ ${SKILL_SET_PR_RUNNER:-} == /* && -x $SKILL_SET_PR_RUNNER ]] || {
+    printf 'mock eval requires an executable absolute SKILL_SET_PR_RUNNER\n' >&2
+    exit 1
+  }
+fi
 
 make_trace() {
   local label=$1
@@ -43,15 +54,23 @@ make_trace() {
   printf '%s\n' "$sandbox/out/trace.jsonl"
 }
 
-with_trace=$(make_trace with)
-without_trace=
-if [[ $ablation == with-without ]]; then without_trace=$(make_trace without); fi
+with_traces=()
+without_traces=()
+for ((run = 1; run <= runs; run++)); do
+  with_traces+=("$(make_trace "with-$run")")
+  if [[ $ablation == with-without ]]; then
+    without_traces+=("$(make_trace "without-$run")")
+  fi
+done
 mkdir -p -- "$output_dir" "$(dirname -- "$json_output")"
 
 jq -n \
   --arg ablation "$ablation" \
-  --arg with_trace "$with_trace" \
-  --arg without_trace "$without_trace" '
+  --arg case_name "$case_name" \
+  --argjson runs "$runs" \
+  --args '
+  ($ARGS.positional[0:$runs]) as $with_traces |
+  ($ARGS.positional[$runs:]) as $without_traces |
   def run($trace): {
     score:1, passed:true, turns:1, costUsd:0.01, judgeCostUsd:0,
     durationSeconds:1, startedAt:"2026-07-20T00:00:00Z", error:null,
@@ -65,13 +84,13 @@ jq -n \
     suite:{root:"/mock", ablation:$ablation, modelOverride:"haiku",
       judgeModel:"sonnet", threshold:0, plugins:[{name:"skill-set",path:"/mock"}]},
     cases:[{
-      name:"sample-functional", dir:"sample-functional", source:"case_yaml",
-      promptMarkdown:"prompt", runsPerCase:1, timeoutSeconds:60, maxTurns:2,
+      name:$case_name, dir:$case_name, source:"case_yaml",
+      promptMarkdown:"prompt", runsPerCase:$runs, timeoutSeconds:60, maxTurns:2,
       graders:[{name:"sample-tool",type:"tool_used",weight:1,
         config:{tool:"Skill",min:1}}],
       arms:(if $ablation == "with-without" then
-        {with:[run($with_trace)],without:[run($without_trace)]}
-      else {with:[run($with_trace)]} end),
+        {with:($with_traces | map(run(.))),without:($without_traces | map(run(.)))}
+      else {with:($with_traces | map(run(.)))} end),
       aggregates:(if $ablation == "with-without" then
         {score:1,passRate:1,scoreWithout:1,passRateWithout:1,delta:0}
       else {score:1,passRate:1} end)
@@ -79,10 +98,10 @@ jq -n \
     aggregates:{casesTotal:1,casesPassed:1,overallScore:1,overallPassRate:1,
       meanDelta:(if $ablation == "with-without" then 0 else null end)}
   }
-' >"$json_output"
+' "${with_traces[@]}" "${without_traces[@]}" >"$json_output"
 cp -- "$json_output" "$output_dir/aggregate-result.json"
 
-if [[ $ablation == with-without && -n ${FAKE_CLAUDE_MUTATE_FILE:-} ]]; then
+if [[ -n ${FAKE_CLAUDE_MUTATE_FILE:-} ]]; then
   [[ -f $FAKE_CLAUDE_MUTATE_FILE ]] || {
     printf 'mock mutation target is missing: %s\n' "$FAKE_CLAUDE_MUTATE_FILE" >&2
     exit 2

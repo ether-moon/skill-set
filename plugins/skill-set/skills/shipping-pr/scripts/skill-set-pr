@@ -1,0 +1,2063 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+PROGRAM=skill-set-pr
+SCHEMA_VERSION=2
+REGISTRATION_GRACE_SECONDS=60
+SCRIPT_PATH=${BASH_SOURCE[0]}
+case "$SCRIPT_PATH" in
+  */*) SCRIPT_PARENT=${SCRIPT_PATH%/*} ;;
+  *) SCRIPT_PARENT=. ;;
+esac
+SCRIPT_DIR=$(cd -- "$SCRIPT_PARENT" && pwd -P)
+SKILLS_DIR=$(cd -- "$SCRIPT_DIR/../.." && pwd -P)
+GIT_RUNNER=${SKILL_SET_GIT_RUNNER:-$SKILLS_DIR/managing-git-workflow/scripts/skill-set-git}
+LOCK_HELD=false
+LOCK_DIR=
+TEMP_STATE=
+TEMP_BODY=
+
+cleanup() {
+  [[ -z $TEMP_STATE ]] || rm -f -- "$TEMP_STATE"
+  [[ -z $TEMP_BODY ]] || rm -f -- "$TEMP_BODY"
+  if [[ $LOCK_HELD == true && -n $LOCK_DIR ]]; then
+    rmdir -- "$LOCK_DIR" 2>/dev/null || true
+  fi
+}
+trap cleanup EXIT HUP INT TERM
+
+json_error() {
+  local code=$1
+  local message=$2
+  local recovery=$3
+  if command -v jq >/dev/null 2>&1; then
+    jq -cn --arg code "$code" --arg message "$message" --arg recovery "$recovery" \
+      '{ok:false,error:{code:$code,message:$message,recovery:$recovery}}' >&2
+  else
+    printf '{"ok":false,"error":{"code":"dependency_missing","message":"jq is required","recovery":"Install jq and retry."}}\n' >&2
+  fi
+}
+
+die() {
+  json_error "$1" "$2" "$3"
+  exit "${4:-1}"
+}
+
+preflight() {
+  local dependency
+  for dependency in bash git gh jq tr; do
+    command -v "$dependency" >/dev/null 2>&1 || \
+      die dependency_missing "$dependency is required." "Install $dependency, then retry."
+  done
+  [[ ${BASH_VERSINFO[0]} -ge 3 ]] || \
+    die unsupported_bash "Bash 3.0 or newer is required." "Run $PROGRAM with a supported Bash version."
+  git rev-parse --git-dir >/dev/null 2>&1 || \
+    die not_a_repository "The current directory is not inside a Git repository." "Change to the PR repository and retry."
+}
+
+validate_pr() {
+  [[ $1 =~ ^[1-9][0-9]*$ ]] || \
+    die invalid_pr "PR number must be a positive integer." "Pass --pr <number>."
+}
+
+validate_boolean() {
+  [[ $2 == true || $2 == false ]] || \
+    die invalid_argument "$1 must be true or false." "Pass $1 true or $1 false."
+}
+
+validate_repo() {
+  [[ $1 =~ ^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9_.-]+$ ]] || \
+    die invalid_repo "Repository must use a valid owner/name form." "Pass --repo owner/name."
+}
+
+validate_sha() {
+  [[ $2 =~ ^[0-9a-fA-F]{40}$ ]] || \
+    die invalid_sha "$1 must be a 40-character GitHub commit SHA." "Reload the PR HEAD and retry."
+}
+
+validate_nonnegative_integer() {
+  [[ $2 =~ ^(0|[1-9][0-9]*)$ ]] || \
+    die invalid_argument "$1 must be a non-negative integer." "Pass a whole number for $1."
+}
+
+validate_branch() {
+  git check-ref-format --branch "$2" >/dev/null 2>&1 || \
+    die invalid_branch "$1 is not a valid branch name." "Pass a short, valid Git branch name."
+}
+
+validate_absolute_path() {
+  [[ $2 == /* && $2 != *$'\n'* ]] || \
+    die invalid_path "$1 must be an absolute path without newlines." "Pass an absolute resolver worktree path."
+}
+
+validate_workspace_mode() {
+  [[ $2 == current ]] || \
+    die invalid_workspace_mode "$1 must be current." \
+      "Pass $1 current; resolver publication does not support temporary worktrees."
+}
+
+lowercase() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
+
+parse_pr_host() {
+  local url=$1
+  local rest authority
+  case "$url" in
+    https://*/*|http://*/*)
+      rest=${url#*://}
+      authority=${rest%%/*}
+      ;;
+    *) die invalid_github_response "PR data returned an unsupported URL." \
+      "Use a gh host with an HTTP(S) PR URL and retry." ;;
+  esac
+  authority=${authority##*@}
+  PR_HOST=${authority%%:*}
+  [[ $PR_HOST =~ ^[A-Za-z0-9.-]+$ ]] || \
+    die invalid_github_response "PR URL did not contain a valid GitHub host." "Update gh and retry."
+  PR_HOST=$(lowercase "$PR_HOST")
+}
+
+canonicalize_remote_url() {
+  local url=$1
+  local rest authority path host
+  case "$url" in
+    *://*/*)
+      rest=${url#*://}
+      authority=${rest%%/*}
+      path=${rest#*/}
+      authority=${authority##*@}
+      host=${authority%%:*}
+      ;;
+    *@*:*/*)
+      rest=${url#*@}
+      host=${rest%%:*}
+      path=${rest#*:}
+      ;;
+    *) die invalid_remote_url "The Git remote push URL cannot be bound to a GitHub repository." \
+      "Configure an HTTP(S), SSH, or git GitHub remote URL and retry." ;;
+  esac
+  path=${path#/}
+  path=${path%/}
+  path=${path%.git}
+  validate_repo "$path"
+  [[ $host =~ ^[A-Za-z0-9.-]+$ ]] || \
+    die invalid_remote_url "The Git remote push URL has an invalid host." \
+      "Configure the remote for the PR head repository and retry."
+  CANONICAL_REMOTE_HOST=$(lowercase "$host")
+  CANONICAL_REMOTE_REPO=$(lowercase "$path")
+}
+
+validate_remote_binding() {
+  local git_worktree=$1
+  local remote=$2
+  local expected_host expected_repo remote_urls remote_url count=0
+  expected_host=$(lowercase "$3")
+  expected_repo=$(lowercase "$4")
+  remote_urls=$(git -C "$git_worktree" remote get-url --push --all "$remote" 2>/dev/null) || \
+    die remote_not_found "The recorded Git remote is unavailable." \
+      "Configure a remote for the PR head repository and retry."
+  [[ -n $remote_urls ]] || \
+    die remote_not_found "The recorded Git remote has no push URL." \
+      "Configure a push URL for the PR head repository and retry."
+  while IFS= read -r remote_url; do
+    [[ -n $remote_url ]] || continue
+    count=$((count + 1))
+    canonicalize_remote_url "$remote_url"
+    [[ $CANONICAL_REMOTE_HOST == "$expected_host" && $CANONICAL_REMOTE_REPO == "$expected_repo" ]] || \
+      die remote_binding_mismatch "The Git remote push URL does not match the PR head repository." \
+        "Use a remote whose push URL targets $expected_host/$expected_repo; no push was attempted."
+  done <<<"$remote_urls"
+  [[ $count -gt 0 ]] || \
+    die remote_not_found "The recorded Git remote has no usable push URL." \
+      "Configure a push URL for the PR head repository and retry."
+}
+
+validate_json_response() {
+  jq -e . >/dev/null 2>&1 <<<"$2" || \
+    die invalid_github_response "$1 returned malformed JSON." "Update gh, retry, and inspect the remote response if it persists."
+}
+
+state_paths() {
+  local common
+  common=$(git rev-parse --git-common-dir 2>/dev/null) || \
+    die git_inspection_failed "Unable to locate the Git common directory." "Check the repository and retry."
+  COMMON_DIR=$(cd -- "$common" 2>/dev/null && pwd -P) || \
+    die git_inspection_failed "Unable to resolve the Git common directory." "Check repository permissions and retry."
+  STATE_DIR=$COMMON_DIR/skill-set/shipping-pr
+  STATE_FILE=$STATE_DIR/$PR.json
+  LOCK_DIR=$STATE_FILE.lock
+}
+
+acquire_lock() {
+  mkdir -p -- "$STATE_DIR" 2>/dev/null || \
+    die state_write_failed "Unable to create the shipping state directory." "Check permissions for $STATE_DIR."
+  if ! mkdir -- "$LOCK_DIR" 2>/dev/null; then
+    die lock_busy "Another shipping operation holds the PR state lock." \
+      "Wait for it to finish; remove $LOCK_DIR only after confirming no operation is active."
+  fi
+  LOCK_HELD=true
+}
+
+read_state() {
+  [[ -f $STATE_FILE ]] || \
+    die state_missing "No shipping state exists for PR $PR." "Run $PROGRAM init --pr $PR first."
+  STATE=$(<"$STATE_FILE")
+  jq -e --argjson expected_schema "$SCHEMA_VERSION" --argjson expected_pr "$PR" '
+    (.schema_version == $expected_schema) and
+    (.run_id | type == "string" and length > 0) and
+    (.repo | type == "string" and length > 0) and
+    (.github_host | type == "string" and test("^[A-Za-z0-9.-]+$")) and
+    (.head_repo | type == "string" and test("^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9_.-]+$")) and
+    (.head_branch | type == "string" and test("^[^\\n]+$")) and
+    (.pr == $expected_pr) and
+    (.head_sha | type == "string" and test("^[0-9a-fA-F]{40}$")) and
+    (.cycle | type == "number" and . >= 0) and
+    (.deadlines | type == "object") and
+    (.deadlines.checks_epoch | type == "number") and
+    (.deadlines.review_epoch | type == "number") and
+    (.deadlines.registration_epoch | type == "number") and
+    (.blocker_fingerprint | type == "string") and
+    (.checks_observed | type == "boolean") and
+    (.options | type == "object") and
+    (.options.ci_timeout_seconds | type == "number") and
+    (.options.review_timeout_seconds | type == "number") and
+    (.options.max_cycles | type == "number" and . > 0) and
+    (.options.required_only | type == "boolean") and
+    (.options.reviewer_detection == "auto") and
+    (.reviewers | type == "object") and
+    (.reviewers.active | type == "array") and
+    all(.reviewers.active[]; IN("claude","coderabbit","codex")) and
+    ((.resolver_attempt == null) or
+      ((.resolver_attempt | type == "object") and
+       (.resolver_attempt.head_sha | type == "string") and
+       (.resolver_attempt.blocker_fingerprint | type == "string") and
+       (.resolver_attempt.result | type == "string") and
+       (.resolver_attempt.observed_at | type == "number"))) and
+    ((.resolution == null) or
+      ((.resolution | type == "object") and
+       (.resolution.worktree | type == "string" and startswith("/")) and
+       ((.resolution.workspace_mode == null) or (.resolution.workspace_mode == "current")) and
+       (.resolution.branch | type == "string" and length > 0) and
+       (.resolution.remote | type == "string" and length > 0) and
+       (.resolution.remote_branch | type == "string" and length > 0) and
+       (.resolution.github_host | type == "string" and test("^[A-Za-z0-9.-]+$")) and
+       (.resolution.head_repo | type == "string" and test("^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9_.-]+$")) and
+       (.resolution.head_branch | type == "string" and test("^[^\\n]+$")) and
+       (.resolution.base_branch | type == "string" and length > 0) and
+       (.resolution.expected_remote_sha | type == "string" and test("^[0-9a-fA-F]{40}$")) and
+       (.resolution.base_sha | type == "string" and test("^[0-9a-fA-F]{40}$")) and
+       (.resolution.expected_head_sha | type == "string" and test("^[0-9a-fA-F]{40}$")) and
+       (.resolution.blocker_fingerprint | type == "string") and
+       (.resolution.expected_agents | type == "array" and length > 0) and
+       all(.resolution.expected_agents[];
+         IN("merge-conflict-resolver","ci-failure-resolver","pr-review-feedback")) and
+       (.resolution.started_at | type == "number") and
+       ((.resolution.result == null) or (.resolution.result | type == "string")) and
+       (.resolution.publication | type == "object") and
+       (.resolution.publication.phase | IN("pending","prepared","gate_passed","commenting","complete")) and
+       (.resolution.publication.pushed | type == "boolean") and
+       (.resolution.publication.comments_published | type == "number" and . >= 0) and
+       (.resolution.publication.comment_hashes | type == "array") and
+       (.resolution.publication.results_hash | type == "string") and
+       (.resolution.publication.intent_hash | type == "string") and
+       (.resolution.publication.summary_file | type == "string") and
+       (.resolution.publication.thread_feedback_file | type == "string") and
+       (.resolution.publication.thread_feedback_hash | type == "string") and
+       (.resolution.publication.thread_feedback_published | type == "number" and . >= 0) and
+       (.resolution.publication.marker | type == "string") and
+       (.resolution.publication.coderabbit_resolve | type == "boolean") and
+       (.resolution.publication.final_remote_sha | type == "string"))) and
+    (.status | IN("polling","blocked","awaiting_user","resolving","clean","stalled","timed_out","closed","failed"))
+  ' >/dev/null 2>&1 <<<"$STATE" || \
+    die invalid_state "The shipping state file is malformed or unsupported." \
+      "Inspect or move $STATE_FILE, then initialize a new run."
+
+  if jq -e '.resolution != null and .resolution.workspace_mode == null' \
+    >/dev/null 2>&1 <<<"$STATE"; then
+    local recorded_worktree actual_worktree recorded_branch actual_branch
+    recorded_worktree=$(jq -r .resolution.worktree <<<"$STATE")
+    actual_worktree=$(git rev-parse --show-toplevel 2>/dev/null) || \
+      die resolver_worktree_missing "Unable to verify the current worktree for legacy resolver recovery." \
+        "Return to the recorded resolver worktree and retry."
+    recorded_worktree=$(cd -- "$recorded_worktree" 2>/dev/null && pwd -P) || \
+      die resolver_worktree_missing "The recorded resolver worktree is unavailable." \
+        "Restore or inspect the recorded current worktree before recovery."
+    actual_worktree=$(cd -- "$actual_worktree" 2>/dev/null && pwd -P) || \
+      die resolver_worktree_missing "Unable to resolve the current worktree." \
+        "Return to the recorded resolver worktree and retry."
+    recorded_branch=$(jq -r .resolution.branch <<<"$STATE")
+    actual_branch=$(git symbolic-ref --quiet --short HEAD 2>/dev/null) || \
+      die invalid_resolver_worktree "The current checkout is detached during legacy resolver recovery." \
+        "Restore the recorded resolver branch and retry."
+    [[ $actual_worktree == "$recorded_worktree" && $actual_branch == "$recorded_branch" ]] || \
+      die workspace_mode_missing "Legacy resolver state lacks workspace_mode and is not in its recorded checkout." \
+        "Return to $recorded_worktree on $recorded_branch; the runner will migrate it to workspace_mode=current."
+    STATE=$(jq -c '.resolution.workspace_mode = "current"' <<<"$STATE")
+  fi
+}
+
+write_state() {
+  local contents=$1
+  TEMP_STATE=$STATE_FILE.tmp.$$
+  umask 077
+  printf '%s\n' "$contents" >"$TEMP_STATE" || \
+    die state_write_failed "Unable to write a temporary state file." "Check permissions for $STATE_DIR."
+  mv -f -- "$TEMP_STATE" "$STATE_FILE" || \
+    die state_write_failed "Unable to atomically replace the state file." "Check permissions for $STATE_DIR."
+  TEMP_STATE=
+}
+
+is_active_status() {
+  case "$1" in
+    polling|blocked|awaiting_user|resolving) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+emit_state() {
+  local command=$1
+  local state=$2
+  local resumed=${3:-false}
+  local dry_run=${4:-false}
+  jq -cn --arg command "$command" --argjson state "$state" \
+    --argjson resumed "$resumed" --argjson dry_run "$dry_run" \
+    '$state + {ok:true,command:$command,resumed:$resumed,dry_run:$dry_run}'
+}
+
+gh_json() {
+  local output error_file error_output
+  error_file=$(mktemp "${TMPDIR:-/tmp}/skill-set-pr-gh.XXXXXX" 2>/dev/null) || \
+    die temporary_file_failed "Unable to create a temporary gh error file." "Check temporary-directory permissions and retry."
+  if ! output=$(gh "$@" 2>"$error_file"); then
+    error_output=$(<"$error_file")
+    rm -f -- "$error_file"
+    die github_query_failed "GitHub query failed: ${error_output:-no diagnostic output}" \
+      "Verify gh authentication, repository access, and the PR number."
+  fi
+  rm -f -- "$error_file"
+  printf '%s\n' "$output"
+}
+
+gh_checks_json() {
+  local output error_file error_output exit_code argument required=false
+  for argument in "$@"; do
+    [[ $argument == --required ]] && required=true
+  done
+  error_file=$(mktemp "${TMPDIR:-/tmp}/skill-set-pr-checks.XXXXXX" 2>/dev/null) || \
+    die temporary_file_failed "Unable to create a temporary gh checks error file." "Check temporary-directory permissions and retry."
+  set +e
+  output=$(gh "$@" 2>"$error_file")
+  exit_code=$?
+  set -e
+  error_output=$(<"$error_file")
+  rm -f -- "$error_file"
+  if [[ $exit_code -eq 1 && $required == true && -z $output && \
+    $error_output == no\ required\ checks\ reported\ on\ the\ \'*\'\ branch ]]; then
+    output='[]'
+  fi
+  case "$exit_code" in
+    0|1|8) ;;
+    *) die github_query_failed "GitHub checks query failed: ${error_output:-exit $exit_code}" \
+      "Verify gh authentication, repository access, and the PR number." ;;
+  esac
+  if ! jq -e 'type == "array"' >/dev/null 2>&1 <<<"$output"; then
+    die github_query_failed "GitHub checks query did not return JSON: ${error_output:-exit $exit_code}" \
+      "Verify gh authentication and update gh before retrying."
+  fi
+  printf '%s\n' "$output"
+}
+
+read_remote_head() {
+  local repo=$1
+  local pr=$2
+  local response
+  response=$(gh_json pr view "$pr" --repo "$repo" \
+    --json headRefOid,headRefName,headRepository,state,url)
+  validate_json_response "gh pr view" "$response"
+  jq -e '
+    type == "object" and
+    (.headRefOid | type == "string") and
+    (.headRefName | type == "string" and length > 0) and
+    (.headRepository | type == "object") and
+    (.headRepository.nameWithOwner | type == "string" and length > 0) and
+    (.url | type == "string" and length > 0) and
+    (.state | type == "string")
+  ' >/dev/null 2>&1 <<<"$response" || \
+    die invalid_github_response "gh pr view returned an invalid publication HEAD repository/ref shape." \
+      "Confirm that the PR still exists and retry."
+  REMOTE_HEAD=$(jq -r .headRefOid <<<"$response")
+  REMOTE_HEAD_BRANCH=$(jq -r .headRefName <<<"$response")
+  REMOTE_HEAD_REPO=$(jq -r .headRepository.nameWithOwner <<<"$response")
+  REMOTE_PR_STATE=$(jq -r .state <<<"$response")
+  validate_sha headRefOid "$REMOTE_HEAD"
+  validate_branch headRefName "$REMOTE_HEAD_BRANCH"
+  validate_repo "$REMOTE_HEAD_REPO"
+  parse_pr_host "$(jq -r .url <<<"$response")"
+  REMOTE_GITHUB_HOST=$PR_HOST
+}
+
+validate_pr_head_binding() {
+  local expected_host expected_repo expected_branch
+  expected_host=$(lowercase "$1")
+  expected_repo=$(lowercase "$2")
+  expected_branch=$3
+  if [[ $REMOTE_GITHUB_HOST != "$expected_host" || \
+    $(lowercase "$REMOTE_HEAD_REPO") != "$expected_repo" || \
+    $REMOTE_HEAD_BRANCH != "$expected_branch" ]]; then
+    die pr_head_binding_changed "The live PR head repository or branch changed from the recorded snapshot." \
+      "Discard this resolver attempt, take a fresh snapshot, and bind a remote to the new PR head repository/ref."
+  fi
+}
+
+validate_worktree_file() {
+  local label=$1
+  local path=$2
+  local worktree=$3
+  validate_absolute_path "$label" "$path"
+  [[ -f $path && ! -L $path ]] || \
+    die invalid_publication_input "$label must be a readable regular, non-symlink file." \
+      "Create the publication input inside the preserved resolver worktree."
+  [[ -r $path ]] || \
+    die invalid_publication_input "$label is not readable." "Fix its permissions and retry."
+  local physical_dir physical_path physical_worktree
+  physical_dir=$(cd -- "$(dirname -- "$path")" 2>/dev/null && pwd -P) || \
+    die invalid_publication_input "Unable to resolve $label." "Check the input path and retry."
+  physical_path=$physical_dir/$(basename -- "$path")
+  physical_worktree=$(cd -- "$worktree" 2>/dev/null && pwd -P) || \
+    die resolver_worktree_missing "The recorded resolver worktree is unavailable." \
+      "Restore or inspect $worktree; do not dispatch a duplicate resolver."
+  case "$physical_path" in
+    "$physical_worktree"/*)
+      VALIDATED_FILE_RELATIVE=${physical_path#"$physical_worktree"/}
+      ;;
+    *) die unmanaged_publication_input "$label must be inside the recorded resolver worktree." \
+      "Move the input into $physical_worktree and retry." ;;
+  esac
+}
+
+run_expected_sha_push() {
+  local worktree=$1
+  local remote=$2
+  local remote_branch=$3
+  local expected_remote_sha=$4
+  local stdout_file stderr_file exit_code output error_output
+  [[ -x $GIT_RUNNER ]] || \
+    die dependency_missing "The skill-set-git runner is not executable." "Restore $GIT_RUNNER and retry."
+  stdout_file=$(mktemp "${TMPDIR:-/tmp}/skill-set-pr-push-out.XXXXXX" 2>/dev/null) || \
+    die temporary_file_failed "Unable to allocate push output." "Check temporary-directory permissions."
+  stderr_file=$(mktemp "${TMPDIR:-/tmp}/skill-set-pr-push-err.XXXXXX" 2>/dev/null) || {
+    rm -f -- "$stdout_file"
+    die temporary_file_failed "Unable to allocate push diagnostics." "Check temporary-directory permissions."
+  }
+  set +e
+  (cd -- "$worktree" && "$GIT_RUNNER" push --remote "$remote" \
+    --remote-branch "$remote_branch" --expected-remote-sha "$expected_remote_sha") \
+    >"$stdout_file" 2>"$stderr_file"
+  exit_code=$?
+  set -e
+  output=$(<"$stdout_file")
+  error_output=$(<"$stderr_file")
+  rm -f -- "$stdout_file" "$stderr_file"
+  if [[ $exit_code -ne 0 ]]; then
+    die publication_push_failed "Expected-SHA push failed: ${error_output:-no diagnostic output}" \
+      "Inspect the preserved resolver worktree and remote HEAD before any retry."
+  fi
+  validate_json_response "skill-set-git push" "$output"
+  jq -e '.ok == true and .pushed == true' >/dev/null 2>&1 <<<"$output" || \
+    die invalid_git_runner_response "skill-set-git did not confirm one successful push." \
+      "Inspect the preserved resolver worktree and remote HEAD before any retry."
+}
+
+comment_marker_exists() {
+  local repo=$1
+  local pr=$2
+  local marker=$3
+  local page=1 response count
+  COMMENT_MARKER_FOUND=false
+  while [[ $page -le 1000 ]]; do
+    response=$(gh_json api "repos/$repo/issues/$pr/comments?per_page=100&page=$page")
+    validate_json_response "issue comments API" "$response"
+    jq -e 'type == "array" and all(.[]; type == "object" and ((.body // "") | type == "string"))' \
+      >/dev/null 2>&1 <<<"$response" || \
+      die invalid_github_response "Issue comments API returned an invalid nested shape." \
+        "Verify GitHub API access before retrying publication."
+    if jq -e --arg marker "$marker" 'any(.[]; (.body // "") | contains($marker))' \
+      >/dev/null 2>&1 <<<"$response"; then
+      COMMENT_MARKER_FOUND=true
+      return 0
+    fi
+    count=$(jq 'length' <<<"$response")
+    [[ $count -eq 100 ]] || return 0
+    page=$((page + 1))
+  done
+  die pagination_limit "Issue comment pagination exceeded 1000 pages." \
+    "Inspect the PR comments before retrying publication."
+}
+
+now_epoch() {
+  if [[ -n ${NOW_OVERRIDE:-} ]]; then
+    printf '%s\n' "$NOW_OVERRIDE"
+  else
+    date +%s
+  fi
+}
+
+command_init() {
+  PR=
+  local repo=
+  local head_sha=
+  local resume=false
+  local dry_run=false
+  local ci_timeout=1800
+  local review_timeout=600
+  local max_cycles=5
+  local required_only=true
+  NOW_OVERRIDE=
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --pr) [[ $# -ge 2 ]] || die invalid_argument "--pr requires a value." "Pass --pr <number>."; PR=$2; shift 2 ;;
+      --repo) [[ $# -ge 2 ]] || die invalid_argument "--repo requires a value." "Pass --repo owner/name."; repo=$2; shift 2 ;;
+      --head-sha) [[ $# -ge 2 ]] || die invalid_argument "--head-sha requires a value." "Pass --head-sha <sha>."; head_sha=$2; shift 2 ;;
+      --ci-timeout-seconds) [[ $# -ge 2 ]] || die invalid_argument "--ci-timeout-seconds requires a value." "Pass a duration in seconds."; ci_timeout=$2; shift 2 ;;
+      --review-timeout-seconds) [[ $# -ge 2 ]] || die invalid_argument "--review-timeout-seconds requires a value." "Pass a duration in seconds."; review_timeout=$2; shift 2 ;;
+      --max-cycles) [[ $# -ge 2 ]] || die invalid_argument "--max-cycles requires a value." "Pass a positive cycle count."; max_cycles=$2; shift 2 ;;
+      --required-only) [[ $# -ge 2 ]] || die invalid_argument "--required-only requires a value." "Pass true or false."; required_only=$2; shift 2 ;;
+      --now) [[ $# -ge 2 ]] || die invalid_argument "--now requires a value." "Pass an epoch second."; NOW_OVERRIDE=$2; shift 2 ;;
+      --resume) resume=true; shift ;;
+      --dry-run) dry_run=true; shift ;;
+      *) die invalid_argument "Unknown init argument: $1" "Run $PROGRAM init with documented arguments." ;;
+    esac
+  done
+
+  [[ -n $PR ]] || die invalid_argument "init requires --pr." "Pass --pr <number>."
+  validate_pr "$PR"
+  validate_nonnegative_integer --ci-timeout-seconds "$ci_timeout"
+  validate_nonnegative_integer --review-timeout-seconds "$review_timeout"
+  validate_nonnegative_integer --max-cycles "$max_cycles"
+  validate_boolean --required-only "$required_only"
+  [[ -z $NOW_OVERRIDE ]] || validate_nonnegative_integer --now "$NOW_OVERRIDE"
+  [[ $max_cycles -gt 0 ]] || die invalid_argument "--max-cycles must be greater than zero." "Pass --max-cycles 1 or greater."
+  [[ -z $repo ]] || validate_repo "$repo"
+  [[ -z $head_sha ]] || validate_sha --head-sha "$head_sha"
+  state_paths
+
+  [[ $dry_run == true ]] || acquire_lock
+  if [[ -f $STATE_FILE ]]; then
+    read_state
+    local existing_status
+    existing_status=$(jq -r .status <<<"$STATE")
+    if is_active_status "$existing_status"; then
+      if [[ $resume == true ]]; then
+        emit_state init "$STATE" true "$dry_run"
+        return
+      fi
+      die active_run "An active shipping run already exists for PR $PR." \
+        "Use $PROGRAM init --pr $PR --resume to continue run $(jq -r .run_id <<<"$STATE")."
+    elif [[ $resume == true ]]; then
+      die inactive_run "The existing shipping run is terminal ($existing_status)." \
+        "Start a new run without --resume."
+    fi
+  elif [[ $resume == true ]]; then
+    die state_missing "No shipping state exists for PR $PR." "Initialize without --resume."
+  fi
+
+  if [[ -z $repo ]]; then
+    local repo_json
+    repo_json=$(gh_json repo view --json nameWithOwner)
+    validate_json_response "gh repo view" "$repo_json"
+    jq -e 'type == "object" and (.nameWithOwner | type == "string" and length > 0)' \
+      >/dev/null 2>&1 <<<"$repo_json" || \
+      die invalid_github_response "gh repo view did not return a string nameWithOwner." "Update gh and retry."
+    repo=$(jq -er .nameWithOwner <<<"$repo_json" 2>/dev/null) || \
+      die invalid_github_response "gh repo view did not return nameWithOwner." "Update gh and retry."
+  fi
+  validate_repo "$repo"
+
+  local recent_prs reviewers_active
+  recent_prs=$(gh_json pr list --repo "$repo" --state merged --limit 10 --json reviews,comments)
+  validate_json_response "gh pr list" "$recent_prs"
+  jq -e '
+    type == "array" and all(.[];
+      type == "object" and
+      ((.reviews // []) | type == "array") and
+      ((.comments // []) | type == "array") and
+      all(((.reviews // []) + (.comments // []))[];
+        type == "object" and
+        ((.author?.login? // .user?.login? // "") | type == "string")))
+  ' >/dev/null 2>&1 <<<"$recent_prs" || \
+    die invalid_github_response "gh pr list returned an invalid reviews/comments shape." "Update gh and retry."
+  reviewers_active=$(jq -c '
+    def reviewer_provider:
+      ascii_downcase
+      | if contains("coderabbit") then "coderabbit"
+        elif contains("chatgpt-codex-connector") or contains("codex-connector") then "codex"
+        elif contains("claude") then "claude"
+        else empty end;
+    [ .[]? | ((.reviews // []) + (.comments // []))[]?
+      | (.author.login // .user.login // "") | reviewer_provider ]
+    | unique
+  ' <<<"$recent_prs" 2>/dev/null) || \
+    die invalid_github_response "Unable to classify automated reviewer activity from gh pr list." "Update gh and retry."
+
+  local pr_json pr_state remote_head head_repo head_branch github_host pr_url
+  pr_json=$(gh_json pr view "$PR" --repo "$repo" \
+    --json headRefOid,headRefName,headRepository,state,url)
+  validate_json_response "gh pr view" "$pr_json"
+  jq -e '
+    type == "object" and
+    (.headRefOid | type == "string") and
+    (.headRefName | type == "string" and length > 0) and
+    (.headRepository | type == "object") and
+    (.headRepository.nameWithOwner | type == "string" and length > 0) and
+    (.url | type == "string" and length > 0) and
+    ((.state // "OPEN") | type == "string")
+  ' >/dev/null 2>&1 <<<"$pr_json" || \
+    die invalid_github_response "gh pr view returned an invalid head repository/ref shape." "Confirm that PR $PR exists."
+  remote_head=$(jq -er .headRefOid <<<"$pr_json" 2>/dev/null) || \
+    die invalid_github_response "PR data did not include headRefOid." "Confirm that PR $PR exists."
+  validate_sha headRefOid "$remote_head"
+  if [[ -n $head_sha && $head_sha != "$remote_head" ]]; then
+    die head_changed "PR HEAD changed before initialization." "Reload the PR and initialize with $remote_head."
+  fi
+  head_sha=$remote_head
+  validate_sha headRefOid "$head_sha"
+  head_repo=$(jq -r .headRepository.nameWithOwner <<<"$pr_json")
+  head_branch=$(jq -r .headRefName <<<"$pr_json")
+  pr_url=$(jq -r .url <<<"$pr_json")
+  validate_repo "$head_repo"
+  validate_branch headRefName "$head_branch"
+  parse_pr_host "$pr_url"
+  github_host=$PR_HOST
+  pr_state=$(jq -r '.state // "OPEN"' <<<"$pr_json")
+  local initial_status=polling
+  [[ $pr_state == CLOSED || $pr_state == MERGED ]] && initial_status=closed
+
+  local now checks_deadline review_deadline registration_deadline run_id new_state
+  now=$(now_epoch)
+  checks_deadline=$((now + ci_timeout))
+  review_deadline=$((now + review_timeout))
+  registration_deadline=$((now + REGISTRATION_GRACE_SECONDS))
+  run_id=ship-$(date +%s)-$$-$RANDOM
+  new_state=$(jq -cn \
+    --argjson schema "$SCHEMA_VERSION" --arg run_id "$run_id" --arg repo "$repo" \
+    --arg github_host "$github_host" --arg head_repo "$head_repo" --arg head_branch "$head_branch" \
+    --argjson pr "$PR" --arg head "$head_sha" --arg status "$initial_status" \
+    --argjson checks "$checks_deadline" --argjson review "$review_deadline" \
+    --argjson registration "$registration_deadline" \
+    --argjson ci_timeout "$ci_timeout" --argjson review_timeout "$review_timeout" \
+    --argjson max_cycles "$max_cycles" --argjson required_only "$required_only" \
+    --argjson reviewers "$reviewers_active" \
+    '{schema_version:$schema,run_id:$run_id,repo:$repo,github_host:$github_host,
+      head_repo:$head_repo,head_branch:$head_branch,pr:$pr,head_sha:$head,cycle:0,
+      deadlines:{checks_epoch:$checks,review_epoch:$review,registration_epoch:$registration},
+      blocker_fingerprint:"",checks_observed:false,resolver_attempt:null,resolution:null,status:$status,
+      options:{ci_timeout_seconds:$ci_timeout,review_timeout_seconds:$review_timeout,
+        max_cycles:$max_cycles,required_only:$required_only,reviewer_detection:"auto"},
+      reviewers:{active:$reviewers}}')
+  [[ $dry_run == true ]] || write_state "$new_state"
+  emit_state init "$new_state" false "$dry_run"
+}
+
+collect_threads() {
+  local repo=$1
+  local pr=$2
+  local owner=${repo%%/*}
+  local name=${repo#*/}
+  local cursor=
+  local pages=0
+  local response
+  # GraphQL variables must remain literal for gh to bind them.
+  # shellcheck disable=SC2016
+  local query='query($owner:String!,$repo:String!,$number:Int!,$cursor:String){repository(owner:$owner,name:$repo){pullRequest(number:$number){reviewThreads(first:100,after:$cursor){nodes{id isResolved isOutdated comments(last:1){nodes{id author{login} body path line}}}pageInfo{hasNextPage endCursor}}}}}'
+  THREAD_DETAILS='[]'
+
+  while :; do
+    pages=$((pages + 1))
+    [[ $pages -le 1000 ]] || \
+      die pagination_limit "Review thread pagination exceeded 1000 pages." "Retry or inspect the GitHub API response."
+    if [[ -n $cursor ]]; then
+      response=$(gh_json api graphql -f query="$query" -F owner="$owner" -F repo="$name" \
+        -F number="$pr" -f cursor="$cursor")
+    else
+      response=$(gh_json api graphql -f query="$query" -F owner="$owner" -F repo="$name" \
+        -F number="$pr")
+    fi
+    validate_json_response "reviewThreads GraphQL" "$response"
+    jq -e '
+      (.data.repository.pullRequest.reviewThreads | type == "object") and
+      (.data.repository.pullRequest.reviewThreads.nodes | type == "array") and
+      all(.data.repository.pullRequest.reviewThreads.nodes[];
+        type == "object" and
+        (.id | type == "string" and length > 0) and
+        (.isResolved | type == "boolean") and
+        (.isOutdated | type == "boolean") and
+        (.comments | type == "object") and
+        (.comments.nodes | type == "array") and
+        all(.comments.nodes[];
+          type == "object" and
+          ((.id // "") | type == "string") and
+          ((.author?.login? // "") | type == "string") and
+          ((.body // "") | type == "string") and
+          ((.path // "") | type == "string") and
+          ((.line // 0) | type == "number"))) and
+      (.data.repository.pullRequest.reviewThreads.pageInfo | type == "object") and
+      (.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage | type == "boolean") and
+      ((.data.repository.pullRequest.reviewThreads.pageInfo.endCursor == null) or
+       (.data.repository.pullRequest.reviewThreads.pageInfo.endCursor | type == "string"))
+    ' >/dev/null 2>&1 <<<"$response" || \
+      die invalid_github_response "GraphQL reviewThreads returned an invalid nested shape." \
+        "Verify GitHub permissions, update gh, and retry."
+    THREAD_DETAILS=$(jq -c --argjson existing "$THREAD_DETAILS" '
+      def non_actionable_body:
+        . as $raw
+        | ($raw | ascii_downcase | gsub("[[:punct:]]"; " ")
+          | gsub("[[:space:]]+"; " ")
+          | gsub("^[[:space:]]+|[[:space:]]+$"; "")) as $normalized
+        | ($raw | gsub("^[[:space:]]+|[[:space:]]+$"; "")) as $trimmed
+        | ((["lgtm","looks good","looks good to me","great work","great job",
+              "nice work","well done","thanks","thank you","approved","all good",
+              "ship it","summary","review summary","code review summary","walkthrough"]
+            | index($normalized)) != null)
+          or ((["👍","✅","🎉"] | index($trimmed)) != null);
+      $existing + [.data.repository.pullRequest.reviewThreads.nodes[]?
+        | select(.isResolved != true and .isOutdated != true)
+        | select(((.comments.nodes // []) | length) > 0)
+        | (.comments.nodes[-1].body // "") as $latest_body
+        | select((($latest_body | gsub("^[[:space:]]+|[[:space:]]+$"; "")) | length) > 0)
+        | select(($latest_body | non_actionable_body) | not)
+        | {id:.id,latest_comment:{id:(.comments.nodes[-1].id // ""),
+            author:(.comments.nodes[-1].author.login // ""),
+            body:(.comments.nodes[-1].body // ""),path:(.comments.nodes[-1].path // ""),
+            line:(.comments.nodes[-1].line // 0)}}]
+      | sort_by(.id)
+    ' <<<"$response" 2>/dev/null) || \
+      die invalid_github_response "Unable to normalize GraphQL review threads." \
+        "Inspect the GraphQL response shape and retry."
+    local has_next
+    has_next=$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage' \
+      <<<"$response" 2>/dev/null) || \
+      die invalid_github_response "Unable to read reviewThreads pagination metadata." "Retry the snapshot."
+    [[ $has_next == true ]] || break
+    cursor=$(jq -er '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor' <<<"$response") || \
+      die invalid_github_response "reviewThreads indicated another page without an end cursor." \
+        "Retry after GitHub finishes computing review data."
+  done
+  THREAD_PAGES=$pages
+}
+
+collect_pr_reactions() {
+  local repo=$1
+  local pr=$2
+  local page=1 response count
+  REVIEW_REACTIONS='[]'
+  while [[ $page -le 1000 ]]; do
+    response=$(gh_json api "repos/$repo/issues/$pr/reactions?per_page=100&page=$page")
+    validate_json_response "issue reactions API" "$response"
+    jq -e '
+      type == "array" and all(.[];
+        type == "object" and ((.content // "") | type == "string") and
+        ((.user?.login? // "") | type == "string"))
+    ' >/dev/null 2>&1 <<<"$response" || \
+      die invalid_github_response "Issue reactions API returned an invalid nested shape." \
+        "Verify GitHub API access before retrying the review snapshot."
+    REVIEW_REACTIONS=$(jq -cn --argjson existing "$REVIEW_REACTIONS" --argjson page "$response" \
+      '$existing + $page')
+    count=$(jq 'length' <<<"$response")
+    [[ $count -eq 100 ]] || return 0
+    page=$((page + 1))
+  done
+  die pagination_limit "Issue reaction pagination exceeded 1000 pages." \
+    "Inspect the PR reactions before retrying the review snapshot."
+}
+
+collect_reviewer_states() {
+  local repo=$1
+  local pr=$2
+  local head_sha=$3
+  local active_reviewers=$4
+  local cycle=$5
+  local status_json check_runs_json activity_json summary
+  status_json=$(gh_json api "repos/$repo/commits/$head_sha/status")
+  validate_json_response "commit status API" "$status_json"
+  jq -e '
+    (.statuses | type == "array") and
+    all(.statuses[];
+      type == "object" and
+      ((.context // "") | type == "string") and
+      ((.state // "pending") | type == "string"))
+  ' >/dev/null 2>&1 <<<"$status_json" || \
+    die invalid_github_response "Commit status response returned an invalid statuses shape." "Verify GitHub API access and retry."
+
+  check_runs_json=$(gh_json api "repos/$repo/commits/$head_sha/check-runs?per_page=100")
+  validate_json_response "check-runs API" "$check_runs_json"
+  jq -e '
+    (.check_runs | type == "array") and
+    all(.check_runs[];
+      type == "object" and
+      ((.name // "") | type == "string") and
+      ((.status // "") | type == "string") and
+      ((.conclusion // "") | type == "string") and
+      ((.app // {}) | type == "object") and
+      ((.app.slug // "") | type == "string") and
+      ((.app.name // "") | type == "string"))
+  ' >/dev/null 2>&1 <<<"$check_runs_json" || \
+    die invalid_github_response "Check-runs response returned an invalid nested shape." "Verify GitHub API access and retry."
+
+  activity_json=$(gh_json pr view "$pr" --repo "$repo" --json reviews,comments)
+  validate_json_response "gh pr view reviews/comments" "$activity_json"
+  jq -e '
+    type == "object" and
+    ((.reviews // []) | type == "array") and
+    ((.comments // []) | type == "array") and
+    all(((.reviews // []) + (.comments // []))[];
+      type == "object" and ((.author?.login? // .user?.login? // "") | type == "string")) and
+    all((.reviews // [])[];
+      ((.commit? // {}) | type == "object") and ((.commit?.oid? // "") | type == "string"))
+  ' >/dev/null 2>&1 <<<"$activity_json" || \
+    die invalid_github_response "PR review activity returned an invalid nested shape." "Update gh and retry."
+  collect_pr_reactions "$repo" "$pr"
+
+  summary=$(jq -cn --argjson statuses "$status_json" --argjson runs "$check_runs_json" \
+    --argjson activity "$activity_json" --argjson reactions "$REVIEW_REACTIONS" \
+    --argjson configured "$active_reviewers" --argjson cycle "$cycle" --arg head "$head_sha" '
+    def reviewer_provider:
+      ascii_downcase
+      | if contains("coderabbit") then "coderabbit"
+        elif contains("chatgpt-codex-connector") or contains("codex-connector") then "codex"
+        elif contains("claude code review") or contains("anthropic") or contains("claude") then "claude"
+        else "" end;
+    def run_provider:
+      [(.name // ""),(.app.slug // ""),(.app.name // "")]
+      | map(reviewer_provider) | map(select(length > 0)) | .[0] // "";
+    def provider_state($provider):
+      [$statuses.statuses[]?
+        | select(((.context // "") | reviewer_provider) == $provider)
+        | (.state // "pending" | ascii_downcase)] as $status_states
+      | [$runs.check_runs[]? | select((run_provider) == $provider)] as $provider_runs
+      | ([$status_states[] | select(. == "failure" or . == "error")]
+          + [$provider_runs[] | select((.status // "") == "completed")
+            | (.conclusion // "failure" | ascii_downcase)
+            | select(. == "failure" or . == "cancelled" or . == "timed_out"
+              or . == "action_required" or . == "startup_failure" or . == "stale")]
+          | length) as $failed
+      | ([$status_states[] | select(. == "pending")]
+          + [$provider_runs[] | select((.status // "") != "completed")] | length) as $pending
+      | ([$status_states[] | select(. == "success")]
+          + [$provider_runs[] | select((.status // "") == "completed")
+            | (.conclusion // "" | ascii_downcase)
+            | select(. == "success" or . == "neutral" or . == "skipped")]
+          | length) as $successful
+      | if $failed > 0 then "failed"
+        elif $pending > 0 then "pending"
+        elif $successful > 0 then "success"
+        else "absent" end;
+    [($statuses.statuses[]? | (.context // "") | reviewer_provider),
+      ($runs.check_runs[]? | run_provider),
+      ((($activity.reviews // []) + ($activity.comments // []))[]?
+        | (.author.login // .user.login // "") | reviewer_provider)]
+      | map(select(length > 0)) as $observed
+    | ($configured + $observed | unique) as $active
+    | (provider_state("claude")) as $claude_signal
+    | ([($activity.reviews // [])[]?
+        | select(((.author.login // "") | reviewer_provider) == "claude")
+        | select((.commit.oid // "") == $head)] | length) as $claude_reviews
+    | (provider_state("codex")) as $codex_signal
+    | ([($activity.reviews // [])[]?
+        | select(((.author.login // "") | reviewer_provider) == "codex")
+        | select((.commit.oid // "") == $head)] | length) as $codex_reviews
+    | ([if $cycle == 0 then $reactions[]? else empty end
+        | select(((.user.login // "") | reviewer_provider) == "codex")
+        | select((.content // "") == "+1")] | length) as $codex_reactions
+    | {
+        active:$active,
+        states:{
+          claude:(if $claude_signal == "failed" or $claude_signal == "pending"
+            then $claude_signal
+            elif $claude_reviews > 0 then "success"
+            else $claude_signal end),
+          coderabbit:provider_state("coderabbit"),
+          codex:(if $codex_signal == "failed" or $codex_signal == "pending"
+            then $codex_signal
+            elif ($codex_reviews + $codex_reactions) > 0 then "success"
+            else $codex_signal end)
+        }
+      }
+  ' 2>/dev/null) || \
+    die invalid_github_response "Unable to normalize automated reviewer state." "Inspect the GitHub API responses and retry."
+  REVIEWERS_ACTIVE=$(jq -c .active <<<"$summary")
+  REVIEWER_STATES=$(jq -c .states <<<"$summary")
+}
+
+collect_optional_reviewer_telemetry() {
+  local repo=$1
+  local pr=$2
+  local head_sha=$3
+  local active_reviewers=$4
+  local cycle=$5
+  local telemetry
+
+  REVIEWER_TELEMETRY_AVAILABLE=false
+  REVIEWERS_ACTIVE=$active_reviewers
+  REVIEWER_STATES='{"claude":"unavailable","coderabbit":"unavailable","codex":"unavailable"}'
+
+  if telemetry=$(
+    trap - EXIT HUP INT TERM
+    collect_reviewer_states "$repo" "$pr" "$head_sha" "$active_reviewers" "$cycle" 2>/dev/null
+    jq -cn --argjson active "$REVIEWERS_ACTIVE" --argjson states "$REVIEWER_STATES" \
+      '{active:$active,states:$states}'
+  ) && jq -e '
+    (.active | type == "array") and
+    (.states | type == "object") and
+    all([.states.claude,.states.coderabbit,.states.codex][]; type == "string")
+  ' >/dev/null 2>&1 <<<"$telemetry"; then
+    REVIEWERS_ACTIVE=$(jq -c .active <<<"$telemetry")
+    REVIEWER_STATES=$(jq -c .states <<<"$telemetry")
+    REVIEWER_TELEMETRY_AVAILABLE=true
+  fi
+}
+
+command_snapshot() {
+  PR=
+  local expected_run_id=''
+  local dry_run=false
+  NOW_OVERRIDE=
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --pr) [[ $# -ge 2 ]] || die invalid_argument "--pr requires a value." "Pass --pr <number>."; PR=$2; shift 2 ;;
+      --expected-run-id) [[ $# -ge 2 ]] || die invalid_argument "--expected-run-id requires a value." "Pass the run_id returned by init."; expected_run_id=$2; shift 2 ;;
+      --now) [[ $# -ge 2 ]] || die invalid_argument "--now requires a value." "Pass an epoch second."; NOW_OVERRIDE=$2; shift 2 ;;
+      --dry-run) dry_run=true; shift ;;
+      *) die invalid_argument "Unknown snapshot argument: $1" "Run $PROGRAM snapshot with documented arguments." ;;
+    esac
+  done
+  [[ -n $PR && -n $expected_run_id ]] || \
+    die invalid_argument "snapshot requires --pr and --expected-run-id." "Pass the PR number and current run_id."
+  validate_pr "$PR"
+  [[ -z $NOW_OVERRIDE ]] || validate_nonnegative_integer --now "$NOW_OVERRIDE"
+  state_paths
+  [[ $dry_run == true ]] || acquire_lock
+  read_state
+
+  local current_run current_status
+  current_run=$(jq -r .run_id <<<"$STATE")
+  current_status=$(jq -r .status <<<"$STATE")
+  [[ $current_run == "$expected_run_id" ]] || \
+    die stale_run "run_id changed before the snapshot." "Reload state and resume the active run."
+  [[ $current_status == polling ]] || \
+    die invalid_snapshot_state "Snapshots are allowed only from polling, not $current_status." \
+      "Handle $current_status with the state transition workflow before polling again."
+
+  local repo prior_head prior_head_repo prior_head_branch prior_host required_only reviewers_active cycle
+  repo=$(jq -r .repo <<<"$STATE")
+  prior_head=$(jq -r .head_sha <<<"$STATE")
+  prior_head_repo=$(jq -r .head_repo <<<"$STATE")
+  prior_head_branch=$(jq -r .head_branch <<<"$STATE")
+  prior_host=$(jq -r .github_host <<<"$STATE")
+  validate_repo "$repo"
+  validate_repo "$prior_head_repo"
+  validate_branch state.head_branch "$prior_head_branch"
+  validate_sha state.head_sha "$prior_head"
+  required_only=$(jq -r '
+    if .options.required_only == null then true else .options.required_only end
+  ' <<<"$STATE")
+  reviewers_active=$(jq -c '.reviewers.active // []' <<<"$STATE")
+  cycle=$(jq -r '.cycle // 0' <<<"$STATE")
+
+  local before_json start_head start_head_repo start_head_branch start_host pr_state mergeable merge_state
+  before_json=$(gh_json pr view "$PR" --repo "$repo" \
+    --json headRefOid,headRefName,headRepository,mergeable,mergeStateStatus,state,url)
+  validate_json_response "gh pr view" "$before_json"
+  jq -e '
+    type == "object" and
+    (.headRefOid | type == "string") and
+    (.headRefName | type == "string" and length > 0) and
+    (.headRepository | type == "object") and
+    (.headRepository.nameWithOwner | type == "string" and length > 0) and
+    (.url | type == "string" and length > 0) and
+    ((.mergeable // "UNKNOWN") | type == "string") and
+    ((.mergeStateStatus // "UNKNOWN") | type == "string") and
+    ((.state // "OPEN") | type == "string")
+  ' >/dev/null 2>&1 <<<"$before_json" || \
+    die invalid_github_response "gh pr view returned an invalid snapshot shape." "Confirm that PR $PR exists."
+  start_head=$(jq -er .headRefOid <<<"$before_json" 2>/dev/null) || \
+    die invalid_github_response "PR data did not include headRefOid." "Confirm the PR still exists."
+  validate_sha headRefOid "$start_head"
+  start_head_repo=$(jq -r .headRepository.nameWithOwner <<<"$before_json")
+  start_head_branch=$(jq -r .headRefName <<<"$before_json")
+  validate_repo "$start_head_repo"
+  validate_branch headRefName "$start_head_branch"
+  parse_pr_host "$(jq -r .url <<<"$before_json")"
+  start_host=$PR_HOST
+  pr_state=$(jq -r '.state // "OPEN"' <<<"$before_json")
+  mergeable=$(jq -r '.mergeable // "UNKNOWN"' <<<"$before_json")
+  merge_state=$(jq -r '.mergeStateStatus // "UNKNOWN"' <<<"$before_json")
+
+  local checks_json
+  if [[ $required_only == true ]]; then
+    checks_json=$(gh_checks_json pr checks "$PR" --repo "$repo" --required \
+      --json bucket,name,state,link,workflow)
+  else
+    checks_json=$(gh_checks_json pr checks "$PR" --repo "$repo" \
+      --json bucket,name,state,link,workflow)
+  fi
+  jq -e '
+    type == "array" and all(.[];
+      type == "object" and
+      ((.bucket // "pending") | type == "string") and
+      ((.name // "") | type == "string") and
+      ((.workflow // "") | type == "string") and
+      ((.link // "") | type == "string") and
+      ((.state // "") | type == "string"))
+  ' >/dev/null 2>&1 <<<"$checks_json" || \
+    die invalid_github_response "gh pr checks returned an invalid nested shape." "Update gh and retry."
+  local check_details check_counts check_total
+  check_details=$(jq -c '
+    [ .[]? as $check
+      | (($check.bucket // "pending") | ascii_downcase) as $bucket
+      | {name:($check.name // ""),workflow:($check.workflow // ""),link:($check.link // ""),
+          state:($check.state // ""),
+          bucket:(if $bucket == "pass" then "pass"
+            elif ($bucket == "skip" or $bucket == "skipping") then "skipping"
+            elif $bucket == "fail" then "fail"
+            elif ($bucket == "cancel" or $bucket == "cancelled") then "cancel"
+            else "pending" end)} ]
+    | sort_by(.workflow,.name,.link,.bucket,.state)
+  ' <<<"$checks_json" 2>/dev/null) || \
+    die invalid_github_response "Unable to normalize gh pr checks data." "Inspect the check response and retry."
+  check_counts=$(jq -c '
+    reduce .[]? as $check ({pass:0,skipping:0,fail:0,cancel:0,pending:0};
+      .[$check.bucket] += 1)
+  ' <<<"$check_details" 2>/dev/null) || \
+    die invalid_github_response "Unable to count normalized check buckets." "Retry the snapshot."
+  check_total=$(jq 'length' <<<"$check_details")
+
+  collect_threads "$repo" "$PR"
+  local unresolved_count
+  unresolved_count=$(jq 'length' <<<"$THREAD_DETAILS")
+
+  collect_optional_reviewer_telemetry "$repo" "$PR" "$start_head" "$reviewers_active" "$cycle"
+  reviewers_active=$REVIEWERS_ACTIVE
+  local reviewer_required reviewer_states reviewer_telemetry_available coderabbit_state
+  reviewer_telemetry_available=$REVIEWER_TELEMETRY_AVAILABLE
+  reviewer_required='{"claude":false,"coderabbit":false,"codex":false}'
+  reviewer_states=$(jq -cn --argjson active "$reviewers_active" --argjson required "$reviewer_required" \
+    --argjson states "$REVIEWER_STATES" '
+    def normalized($provider):
+      if ($active | index($provider)) == null then "inactive"
+      elif $required[$provider] then $states[$provider]
+      elif $states[$provider] == "absent" then "not_expected"
+      else $states[$provider] end;
+    {claude:normalized("claude"),coderabbit:normalized("coderabbit"),codex:normalized("codex")}
+  ')
+  coderabbit_state=$(jq -r .coderabbit <<<"$reviewer_states")
+
+  local after_json end_head end_head_repo end_head_branch end_host after_pr_state
+  after_json=$(gh_json pr view "$PR" --repo "$repo" \
+    --json headRefOid,headRefName,headRepository,state,url)
+  validate_json_response "gh pr view" "$after_json"
+  jq -e '
+    type == "object" and
+    (.headRefOid | type == "string") and
+    (.headRefName | type == "string" and length > 0) and
+    (.headRepository | type == "object") and
+    (.headRepository.nameWithOwner | type == "string" and length > 0) and
+    (.url | type == "string" and length > 0) and
+    ((.state // "OPEN") | type == "string")
+  ' >/dev/null 2>&1 <<<"$after_json" || \
+    die invalid_github_response "Final gh pr view returned an invalid HEAD/state shape." "Confirm that PR $PR exists."
+  end_head=$(jq -er .headRefOid <<<"$after_json" 2>/dev/null) || \
+    die invalid_github_response "Final PR data did not include headRefOid." "Retry the snapshot."
+  validate_sha headRefOid "$end_head"
+  end_head_repo=$(jq -r .headRepository.nameWithOwner <<<"$after_json")
+  end_head_branch=$(jq -r .headRefName <<<"$after_json")
+  validate_repo "$end_head_repo"
+  validate_branch headRefName "$end_head_branch"
+  parse_pr_host "$(jq -r .url <<<"$after_json")"
+  end_host=$PR_HOST
+  after_pr_state=$(jq -r '.state // "OPEN"' <<<"$after_json")
+
+  local now head_changed=false discarded=false deadlines checks_observed resolver_attempt
+  now=$(now_epoch)
+  deadlines=$(jq -c .deadlines <<<"$STATE")
+  checks_observed=$(jq -r .checks_observed <<<"$STATE")
+  resolver_attempt=$(jq -c '.resolver_attempt // null' <<<"$STATE")
+  if [[ $prior_head != "$start_head" || $start_head != "$end_head" || \
+    $(lowercase "$prior_head_repo") != "$(lowercase "$start_head_repo")" || \
+    $prior_head_branch != "$start_head_branch" || $prior_host != "$start_host" || \
+    $(lowercase "$start_head_repo") != "$(lowercase "$end_head_repo")" || \
+    $start_head_branch != "$end_head_branch" || $start_host != "$end_host" ]]; then
+    head_changed=true
+    local ci_timeout review_timeout registration_deadline
+    ci_timeout=$(jq -r '.options.ci_timeout_seconds // 1800' <<<"$STATE")
+    review_timeout=$(jq -r '.options.review_timeout_seconds // 600' <<<"$STATE")
+    registration_deadline=$((now + REGISTRATION_GRACE_SECONDS))
+    deadlines=$(jq -cn --argjson checks "$((now + ci_timeout))" \
+      --argjson review "$((now + review_timeout))" --argjson registration "$registration_deadline" \
+      '{checks_epoch:$checks,review_epoch:$review,registration_epoch:$registration}')
+    checks_observed=false
+    resolver_attempt=null
+  fi
+
+  local status conflict=false merge_pending=false registration_pending=false checks_missing=false
+  if [[ $pr_state == CLOSED || $pr_state == MERGED || $after_pr_state == CLOSED || $after_pr_state == MERGED ]]; then
+    status=closed
+  elif [[ $start_head != "$end_head" || \
+    $(lowercase "$start_head_repo") != "$(lowercase "$end_head_repo")" || \
+    $start_head_branch != "$end_head_branch" || $start_host != "$end_host" ]]; then
+    status=polling
+    discarded=true
+    checks_observed=false
+  else
+    [[ $mergeable == CONFLICTING || $merge_state == DIRTY ]] && conflict=true
+    [[ $mergeable == UNKNOWN || $merge_state == UNKNOWN ]] && merge_pending=true
+    local fail_count cancel_count pending_count checks_deadline registration_epoch
+    fail_count=$(jq -r .fail <<<"$check_counts")
+    cancel_count=$(jq -r .cancel <<<"$check_counts")
+    pending_count=$(jq -r .pending <<<"$check_counts")
+    checks_deadline=$(jq -r .checks_epoch <<<"$deadlines")
+    registration_epoch=$(jq -r .registration_epoch <<<"$deadlines")
+    if [[ $check_total -gt 0 ]]; then
+      checks_observed=true
+    elif [[ $checks_observed == true ]]; then
+      checks_missing=true
+    elif [[ $now -lt $registration_epoch ]]; then
+      registration_pending=true
+    fi
+    if [[ $conflict == true || $fail_count -gt 0 || $cancel_count -gt 0 || \
+      $unresolved_count -gt 0 ]]; then
+      status=blocked
+    elif [[ $pending_count -gt 0 || $merge_pending == true || $registration_pending == true || $checks_missing == true ]]; then
+      if [[ $now -ge $checks_deadline ]]; then status=timed_out; else status=polling; fi
+    else
+      status=clean
+    fi
+  fi
+
+  local fingerprint_material fingerprint effective_head effective_head_repo effective_head_branch effective_host last_snapshot new_state
+  effective_head=$end_head
+  effective_head_repo=$end_head_repo
+  effective_head_branch=$end_head_branch
+  effective_host=$end_host
+  if [[ $discarded == true ]]; then
+    fingerprint_material=$(jq -cn --arg head "$effective_head" --arg head_repo "$effective_head_repo" \
+      --arg head_branch "$effective_head_branch" --arg host "$effective_host" \
+      '{head:$head,head_repo:$head_repo,head_branch:$head_branch,github_host:$host,discarded:true}')
+  else
+    fingerprint_material=$(jq -cn --arg head "$effective_head" --argjson checks "$check_details" \
+      --arg head_repo "$effective_head_repo" --arg head_branch "$effective_head_branch" \
+      --arg host "$effective_host" \
+      --argjson conflict "$conflict" --argjson merge_pending "$merge_pending" \
+      --argjson threads "$THREAD_DETAILS" --argjson reviewers "$reviewer_states" \
+      '{head:$head,head_repo:$head_repo,head_branch:$head_branch,github_host:$host,
+        checks:$checks,conflict:$conflict,merge_pending:$merge_pending,
+        threads:$threads,reviewers:$reviewers}')
+  fi
+  fingerprint=$(printf '%s' "$fingerprint_material" | git hash-object --stdin)
+  if [[ $status == blocked && $resolver_attempt != null && \
+    $(jq -r .head_sha <<<"$resolver_attempt") == "$effective_head" && \
+    $(jq -r .blocker_fingerprint <<<"$resolver_attempt") == "$fingerprint" ]]; then
+    status=stalled
+  fi
+  last_snapshot=$(jq -cn --argjson checks "$check_counts" --argjson check_details "$check_details" \
+    --argjson conflict "$conflict" --argjson threads "$THREAD_DETAILS" \
+    --argjson unresolved "$unresolved_count" --argjson pages "$THREAD_PAGES" \
+    --arg coderabbit "$coderabbit_state" --argjson reviewers "$reviewer_states" \
+    --argjson reviewer_required "$reviewer_required" --argjson observed_at "$now" \
+    --argjson reviewer_telemetry_available "$reviewer_telemetry_available" \
+    --argjson registration_pending "$registration_pending" --argjson checks_missing "$checks_missing" \
+    '{checks:$checks,check_details:$check_details,conflict:$conflict,review_threads:$threads,
+      unresolved_actionable_threads:$unresolved,review_thread_pages:$pages,coderabbit:$coderabbit,
+      reviewers:{states:$reviewers,required:$reviewer_required,
+        telemetry_available:$reviewer_telemetry_available},
+      registration_pending:$registration_pending,checks_missing:$checks_missing,observed_at:$observed_at}')
+  if [[ $discarded == true ]]; then
+    last_snapshot=$(jq -cn --argjson observed_at "$now" \
+      '{discarded:true,reason:"head_changed_during_snapshot",observed_at:$observed_at}')
+  fi
+  new_state=$(jq -c --arg head "$effective_head" --arg head_repo "$effective_head_repo" \
+    --arg head_branch "$effective_head_branch" --arg github_host "$effective_host" --arg status "$status" \
+    --argjson deadlines "$deadlines" --arg fingerprint "$fingerprint" \
+    --argjson snapshot "$last_snapshot" --argjson checks_observed "$checks_observed" \
+    --argjson reviewers_active "$reviewers_active" \
+    '. + {head_sha:$head,head_repo:$head_repo,head_branch:$head_branch,github_host:$github_host,
+      status:$status,deadlines:$deadlines,
+      blocker_fingerprint:$fingerprint,checks_observed:$checks_observed,
+      reviewers:{active:$reviewers_active},
+      resolver_attempt:null,last_snapshot:$snapshot}' <<<"$STATE")
+  [[ $dry_run == true ]] || write_state "$new_state"
+
+  jq -cn --argjson state "$new_state" --argjson checks "$check_counts" \
+    --argjson check_details "$check_details" --argjson threads "$THREAD_DETAILS" \
+    --argjson head_changed "$head_changed" --argjson discarded "$discarded" \
+    --argjson unresolved "$unresolved_count" --argjson pages "$THREAD_PAGES" \
+    --arg coderabbit "$coderabbit_state" --argjson reviewers_active "$reviewers_active" \
+    --argjson reviewer_states "$reviewer_states" --argjson reviewer_required "$reviewer_required" \
+    --argjson reviewer_telemetry_available "$reviewer_telemetry_available" \
+    --argjson dry_run "$dry_run" \
+    '$state + {ok:true,command:"snapshot",checks:$checks,check_details:$check_details,
+      review_threads:$threads,head_changed:$head_changed,
+      discarded:$discarded,unresolved_actionable_threads:$unresolved,
+      review_thread_pages:$pages,coderabbit:$coderabbit,
+      reviewers:{active:$reviewers_active,states:$reviewer_states,required:$reviewer_required,
+        telemetry_available:$reviewer_telemetry_available},dry_run:$dry_run}'
+}
+
+legal_transition() {
+  case "$1:$2" in
+    polling:blocked|polling:clean|polling:timed_out|polling:closed|polling:failed|\
+    blocked:resolving|blocked:awaiting_user|blocked:polling|blocked:closed|blocked:failed|\
+    awaiting_user:resolving|awaiting_user:closed|awaiting_user:failed|\
+    resolving:polling|resolving:awaiting_user|resolving:closed|resolving:failed)
+      return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+command_transition() {
+  PR=
+  local from='' to='' expected_run_id=''
+  local resolver_attempt=false increment_cycle=false dry_run=false
+  local resolver_result=
+  local worktree='' resolver_branch='' remote='' remote_branch=''
+  local expected_remote_sha='' base_sha='' base_branch='' workspace_mode=''
+  local resolver_agents=()
+  local decision_requests=()
+  local resolver_decisions=()
+  local decision_request_count=0 resolver_decision_count=0
+  NOW_OVERRIDE=
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --pr) [[ $# -ge 2 ]] || die invalid_argument "--pr requires a value." "Pass --pr <number>."; PR=$2; shift 2 ;;
+      --from) [[ $# -ge 2 ]] || die invalid_argument "--from requires a value." "Pass the expected current state."; from=$2; shift 2 ;;
+      --to) [[ $# -ge 2 ]] || die invalid_argument "--to requires a value." "Pass the destination state."; to=$2; shift 2 ;;
+      --expected-run-id) [[ $# -ge 2 ]] || die invalid_argument "--expected-run-id requires a value." "Pass the run_id returned by init."; expected_run_id=$2; shift 2 ;;
+      --resolver-result) [[ $# -ge 2 ]] || die invalid_argument "--resolver-result requires a value." "Pass success, no-op, stale, partial-failure, ambiguous, or failed."; resolver_result=$2; shift 2 ;;
+      --resolver-agent) [[ $# -ge 2 ]] || die invalid_argument "--resolver-agent requires a value." "Pass a resolver agent name."; resolver_agents+=("$2"); shift 2 ;;
+      --decision-request) [[ $# -ge 2 ]] || die invalid_argument "--decision-request requires a value." "Pass a stable unresolved decision ID."; decision_requests[decision_request_count]=$2; decision_request_count=$((decision_request_count + 1)); shift 2 ;;
+      --resolver-decision) [[ $# -ge 2 ]] || die invalid_argument "--resolver-decision requires a value." "Pass ID=selected-resolution for every unresolved decision."; resolver_decisions[resolver_decision_count]=$2; resolver_decision_count=$((resolver_decision_count + 1)); shift 2 ;;
+      --worktree) [[ $# -ge 2 ]] || die invalid_argument "--worktree requires a value." "Pass the planned absolute resolver worktree path."; worktree=$2; shift 2 ;;
+      --resolver-branch) [[ $# -ge 2 ]] || die invalid_argument "--resolver-branch requires a value." "Pass the recorded current local branch."; resolver_branch=$2; shift 2 ;;
+      --remote) [[ $# -ge 2 ]] || die invalid_argument "--remote requires a value." "Pass the Git remote name."; remote=$2; shift 2 ;;
+      --remote-branch) [[ $# -ge 2 ]] || die invalid_argument "--remote-branch requires a value." "Pass the PR head branch."; remote_branch=$2; shift 2 ;;
+      --expected-remote-sha) [[ $# -ge 2 ]] || die invalid_argument "--expected-remote-sha requires a value." "Pass the observed PR HEAD SHA."; expected_remote_sha=$2; shift 2 ;;
+      --base-sha) [[ $# -ge 2 ]] || die invalid_argument "--base-sha requires a value." "Pass the pinned PR base SHA."; base_sha=$2; shift 2 ;;
+      --base-branch) [[ $# -ge 2 ]] || die invalid_argument "--base-branch requires a value." "Pass the PR base branch."; base_branch=$2; shift 2 ;;
+      --workspace-mode) [[ $# -ge 2 ]] || die invalid_argument "--workspace-mode requires a value." "Pass --workspace-mode current."; workspace_mode=$2; shift 2 ;;
+      --resolver-attempt) resolver_attempt=true; shift ;;
+      --increment-cycle) increment_cycle=true; shift ;;
+      --now) [[ $# -ge 2 ]] || die invalid_argument "--now requires a value." "Pass an epoch second."; NOW_OVERRIDE=$2; shift 2 ;;
+      --dry-run) dry_run=true; shift ;;
+      *) die invalid_argument "Unknown transition argument: $1" "Run $PROGRAM transition with documented arguments." ;;
+    esac
+  done
+  [[ -n $PR && -n $from && -n $to && -n $expected_run_id ]] || \
+    die invalid_argument "transition requires --pr, --from, --to, and --expected-run-id." \
+      "Pass all compare-and-swap fields."
+  validate_pr "$PR"
+  state_paths
+  [[ $dry_run == true ]] || acquire_lock
+  read_state
+  local current_status current_run
+  current_status=$(jq -r .status <<<"$STATE")
+  current_run=$(jq -r .run_id <<<"$STATE")
+  [[ $current_run == "$expected_run_id" ]] || \
+    die stale_run "run_id changed before the transition." "Reload state and resume the active run."
+  [[ $current_status == "$from" ]] || \
+    die stale_state "Expected $from but state is $current_status." "Take a new snapshot and retry from the current state."
+  legal_transition "$from" "$to" || \
+    die illegal_transition "Transition $from -> $to is not allowed." "Use an allowed adjacent state transition."
+
+  local decision_requests_json='[]' decision_records_json='[]' decision_value decision_id selection index
+  for ((index = 0; index < decision_request_count; index++)); do
+    decision_value=${decision_requests[index]}
+    decision_id=$decision_value
+    [[ $decision_id =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || \
+      die invalid_decision_id "Decision request IDs must use letters, digits, dots, underscores, or hyphens." \
+        "Pass a stable identifier such as REVIEW-001."
+    [[ $(jq -r --arg id "$decision_id" 'index($id) != null' <<<"$decision_requests_json") == false ]] || \
+      die duplicate_decision "Decision request $decision_id was provided more than once." \
+        "Pass each unresolved decision ID once."
+    decision_requests_json=$(jq -cn --argjson requests "$decision_requests_json" --arg id "$decision_id" \
+      '$requests + [$id]')
+  done
+  for ((index = 0; index < resolver_decision_count; index++)); do
+    decision_value=${resolver_decisions[index]}
+    [[ $decision_value == *=* ]] || \
+      die invalid_resolver_decision "Resolver decisions must use ID=selected-resolution." \
+        "Pass the exact selected resolution for each unresolved decision."
+    decision_id=${decision_value%%=*}
+    selection=${decision_value#*=}
+    [[ $decision_id =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ && -n $selection && $selection != *$'\n'* ]] || \
+      die invalid_resolver_decision "Resolver decisions require a valid ID and a non-empty single-line selection." \
+        "Pass ID=selected-resolution without embedded newlines."
+    [[ $(jq -r --arg id "$decision_id" 'any(.[]; .id == $id)' <<<"$decision_records_json") == false ]] || \
+      die duplicate_decision "Resolver decision $decision_id was provided more than once." \
+        "Pass one selected resolution for each decision ID."
+    decision_records_json=$(jq -cn --argjson decisions "$decision_records_json" \
+      --arg id "$decision_id" --arg selection "$selection" \
+      '$decisions + [{id:$id,selection:$selection}]')
+  done
+
+  local has_resolution_flags=false
+  if [[ -n $worktree || -n $resolver_branch || -n $remote || -n $remote_branch || \
+    -n $expected_remote_sha || -n $base_sha || -n $base_branch || -n $workspace_mode || \
+    ${#resolver_agents[@]} -gt 0 ]]; then
+    has_resolution_flags=true
+  fi
+
+  local resolution_json=null
+  if [[ $from == blocked && $to == resolving ]]; then
+    [[ -n $worktree && -n $resolver_branch && -n $remote && -n $remote_branch && \
+      -n $expected_remote_sha && -n $base_sha && -n $base_branch && -n $workspace_mode && \
+      ${#resolver_agents[@]} -gt 0 ]] || \
+      die resolution_metadata_required "Starting a resolver requires complete recovery and publication metadata." \
+        "Pass --worktree, --resolver-branch, --remote, --remote-branch, --expected-remote-sha, --base-sha, --base-branch, --workspace-mode current, and --resolver-agent."
+    validate_workspace_mode --workspace-mode "$workspace_mode"
+    validate_absolute_path --worktree "$worktree"
+    validate_branch --resolver-branch "$resolver_branch"
+    validate_branch --remote-branch "$remote_branch"
+    validate_branch --base-branch "$base_branch"
+    [[ $remote =~ ^[A-Za-z0-9._-]+$ ]] || \
+      die invalid_remote "--remote is not a valid Git remote name." "Pass a configured remote such as origin."
+    validate_sha --expected-remote-sha "$expected_remote_sha"
+    validate_sha --base-sha "$base_sha"
+    [[ $expected_remote_sha == "$(jq -r .head_sha <<<"$STATE")" ]] || \
+      die head_changed "Resolver metadata does not match the blocked snapshot HEAD." \
+        "Reload the snapshot and prepare the resolver from its current HEAD."
+
+    local repo github_host head_repo head_branch
+    repo=$(jq -r .repo <<<"$STATE")
+    github_host=$(jq -r .github_host <<<"$STATE")
+    head_repo=$(jq -r .head_repo <<<"$STATE")
+    head_branch=$(jq -r .head_branch <<<"$STATE")
+    validate_repo "$repo"
+    validate_repo "$head_repo"
+    validate_branch state.head_branch "$head_branch"
+    [[ $remote_branch == "$head_branch" ]] || \
+      die head_branch_mismatch "--remote-branch does not match the recorded PR head branch." \
+        "Use --remote-branch $head_branch; no push or comment was attempted."
+    validate_remote_binding "$worktree" "$remote" "$github_host" "$head_repo"
+    read_remote_head "$repo" "$PR"
+    validate_pr_head_binding "$github_host" "$head_repo" "$head_branch"
+    [[ $REMOTE_PR_STATE == OPEN ]] || \
+      die closed "The PR is no longer open." "Finish the shipping run as closed."
+    [[ $REMOTE_HEAD == "$expected_remote_sha" ]] || \
+      die head_changed "The live PR HEAD changed before resolver dispatch." \
+        "Take a fresh snapshot and prepare the resolver from $REMOTE_HEAD."
+
+    local resolver_agents_json='[]' agent seen_merge=false seen_ci=false seen_review=false
+    for agent in "${resolver_agents[@]}"; do
+      case "$agent" in
+        merge-conflict-resolver)
+          [[ $seen_merge == false ]] || die duplicate_resolver "Resolver plan contains $agent twice." "List each resolver once."
+          seen_merge=true ;;
+        ci-failure-resolver)
+          [[ $seen_ci == false && $seen_review == false ]] || \
+            die invalid_resolver_order "CI resolution must appear once and before review resolution." \
+              "Order --resolver-agent ci-failure-resolver before pr-review-feedback."
+          seen_ci=true ;;
+        pr-review-feedback)
+          [[ $seen_review == false ]] || die duplicate_resolver "Resolver plan contains $agent twice." "List each resolver once."
+          seen_review=true ;;
+        *) die invalid_resolver_agent "Unknown resolver agent: $agent" \
+          "Use merge-conflict-resolver, ci-failure-resolver, or pr-review-feedback." ;;
+      esac
+      resolver_agents_json=$(jq -cn --argjson agents "$resolver_agents_json" --arg agent "$agent" \
+        '$agents + [$agent]')
+    done
+    local snapshot_conflict snapshot_failures snapshot_threads
+    snapshot_conflict=$(jq -r '.last_snapshot.conflict // false' <<<"$STATE")
+    snapshot_failures=$(jq -r '(.last_snapshot.checks.fail // 0) + (.last_snapshot.checks.cancel // 0)' <<<"$STATE")
+    snapshot_threads=$(jq -r '.last_snapshot.unresolved_actionable_threads // 0' <<<"$STATE")
+    if [[ $snapshot_conflict == true ]]; then
+      [[ $(jq -r 'length == 1 and .[0] == "merge-conflict-resolver"' <<<"$resolver_agents_json") == true ]] || \
+        die invalid_resolver_plan "A merge conflict must use the merge resolver as the sole cycle." \
+          "Plan only --resolver-agent merge-conflict-resolver."
+    else
+      [[ $seen_merge == false ]] || \
+        die invalid_resolver_plan "The merge resolver is valid only for a conflicting snapshot." \
+          "Remove merge-conflict-resolver from this cycle."
+      [[ $snapshot_failures -eq 0 || $seen_ci == true ]] || \
+        die incomplete_resolver_plan "Failed or cancelled checks require ci-failure-resolver." \
+          "Add --resolver-agent ci-failure-resolver."
+      [[ $snapshot_threads -eq 0 || $seen_review == true ]] || \
+        die incomplete_resolver_plan "Actionable review threads require pr-review-feedback." \
+          "Add --resolver-agent pr-review-feedback after CI resolution."
+    fi
+    local resolution_now
+    resolution_now=$(now_epoch)
+    resolution_json=$(jq -cn --arg worktree "$worktree" --arg workspace_mode "$workspace_mode" \
+      --arg branch "$resolver_branch" \
+      --arg remote "$remote" --arg remote_branch "$remote_branch" --arg base_branch "$base_branch" \
+      --arg github_host "$github_host" --arg head_repo "$head_repo" --arg head_branch "$head_branch" \
+      --arg expected "$expected_remote_sha" --arg base "$base_sha" \
+      --arg fingerprint "$(jq -r .blocker_fingerprint <<<"$STATE")" \
+      --argjson agents "$resolver_agents_json" --argjson started_at "$resolution_now" \
+      '{worktree:$worktree,workspace_mode:$workspace_mode,branch:$branch,
+        remote:$remote,remote_branch:$remote_branch,
+        github_host:$github_host,head_repo:$head_repo,head_branch:$head_branch,
+        base_branch:$base_branch,expected_remote_sha:$expected,base_sha:$base,
+        expected_head_sha:$expected,blocker_fingerprint:$fingerprint,expected_agents:$agents,
+        started_at:$started_at,result:null,decision_requirements:[],decisions:[],
+        publication:{phase:"pending",pushed:false,
+          comments_published:0,comment_hashes:[],results_hash:"",intent_hash:"",
+          summary_file:"",thread_feedback_file:"",thread_feedback_hash:"",
+          thread_feedback_published:0,marker:"",coderabbit_resolve:false,final_remote_sha:""}}')
+  elif [[ $has_resolution_flags == true ]]; then
+    die invalid_resolution_metadata "Resolver metadata is valid only for blocked -> resolving." \
+      "Remove resolver metadata or start a new resolver cycle from blocked."
+  elif [[ $from == awaiting_user && $to == resolving ]]; then
+    resolution_json=$(jq -c '
+      .resolution
+      | if . == null then null else
+          . + {result:null,publication:{phase:"pending",pushed:false,comments_published:0,
+            comment_hashes:[],results_hash:"",intent_hash:"",summary_file:"",marker:"",
+            thread_feedback_file:"",thread_feedback_hash:"",thread_feedback_published:0,
+            coderabbit_resolve:false,final_remote_sha:""}}
+        end
+    ' <<<"$STATE")
+    [[ $resolution_json != null ]] || \
+      die recovery_metadata_missing "The awaiting_user state has no resolver recovery metadata." \
+        "Finish as failed and inspect preserved worktrees manually."
+    local resumed_repo resumed_worktree resumed_remote resumed_host resumed_head_repo resumed_head_branch resumed_head
+    resumed_repo=$(jq -r .repo <<<"$STATE")
+    resumed_worktree=$(jq -r .worktree <<<"$resolution_json")
+    resumed_remote=$(jq -r .remote <<<"$resolution_json")
+    resumed_host=$(jq -r .github_host <<<"$resolution_json")
+    resumed_head_repo=$(jq -r .head_repo <<<"$resolution_json")
+    resumed_head_branch=$(jq -r .head_branch <<<"$resolution_json")
+    resumed_head=$(jq -r .expected_remote_sha <<<"$resolution_json")
+    validate_remote_binding "$resumed_worktree" "$resumed_remote" "$resumed_host" "$resumed_head_repo"
+    read_remote_head "$resumed_repo" "$PR"
+    validate_pr_head_binding "$resumed_host" "$resumed_head_repo" "$resumed_head_branch"
+    [[ $REMOTE_PR_STATE == OPEN && $REMOTE_HEAD == "$resumed_head" ]] || \
+      die head_changed "The live PR HEAD changed while resolver recovery was awaiting user input." \
+        "Preserve the worktree, take a fresh snapshot, and do not resume publication."
+
+    local decision_requirements provided_decision_ids ordered_decisions
+    decision_requirements=$(jq -c '.decision_requirements // []' <<<"$resolution_json")
+    if [[ $(jq -r 'length' <<<"$decision_requirements") -gt 0 ]]; then
+      [[ $(jq -r 'length' <<<"$decision_records_json") -gt 0 ]] || \
+        die resolver_decision_required "Resuming an ambiguous resolver requires every selected resolution." \
+          "Pass one --resolver-decision ID=selected-resolution for each recorded decision request."
+      provided_decision_ids=$(jq -c '[.[].id]' <<<"$decision_records_json")
+      jq -e --argjson required "$decision_requirements" --argjson provided "$provided_decision_ids" \
+        '($required | sort) == ($provided | sort)' >/dev/null 2>&1 <<<null || \
+        die incomplete_resolver_decisions "The selected resolutions do not exactly match the recorded decision requests." \
+          "Pass one --resolver-decision for every recorded ID and no others."
+      ordered_decisions=$(jq -cn --argjson required "$decision_requirements" \
+        --argjson decisions "$decision_records_json" \
+        '[$required[] as $id | $decisions[] | select(.id == $id)]')
+      resolution_json=$(jq -cn --argjson resolution "$resolution_json" \
+        --argjson decisions "$ordered_decisions" '$resolution + {decisions:$decisions}')
+    elif [[ $(jq -r 'length' <<<"$decision_records_json") -gt 0 ]]; then
+      die unexpected_resolver_decision "This awaiting-user recovery has no recorded ambiguous decisions." \
+        "Resume without --resolver-decision or finish the failed recovery."
+    fi
+  fi
+
+  if [[ $from == resolving && $resolver_result == ambiguous ]]; then
+    [[ $(jq -r 'length' <<<"$decision_requests_json") -gt 0 ]] || \
+      die decision_request_required "An ambiguous resolver result must record every unresolved decision ID." \
+        "Pass one --decision-request for each unresolved decision before awaiting user input."
+    [[ $(jq -r 'length' <<<"$decision_records_json") -eq 0 ]] || \
+      die unexpected_resolver_decision "Selected resolutions are valid only when resuming from awaiting_user." \
+        "Record unresolved IDs now and pass selections on awaiting_user -> resolving."
+  elif [[ $(jq -r 'length' <<<"$decision_requests_json") -gt 0 ]]; then
+    die unexpected_decision_request "Decision requests are valid only for an ambiguous resolver result." \
+      "Remove --decision-request or return ambiguous to awaiting_user."
+  elif [[ $from != awaiting_user && $(jq -r 'length' <<<"$decision_records_json") -gt 0 ]]; then
+    die unexpected_resolver_decision "Selected resolutions are valid only when resuming from awaiting_user." \
+      "Remove --resolver-decision or resume the recorded awaiting-user state."
+  fi
+
+  if [[ -n $resolver_result ]]; then
+    case "$resolver_result" in success|no-op|stale|partial-failure|ambiguous|failed) ;; *)
+      die invalid_argument "Unknown resolver result: $resolver_result" "Use success, no-op, stale, partial-failure, ambiguous, or failed." ;;
+    esac
+  fi
+  if [[ $from == resolving ]]; then
+    [[ $resolver_attempt == true ]] || \
+      die resolver_attempt_required "Leaving resolving requires a completed resolver attempt." \
+        "Pass --resolver-attempt with the structured resolver result."
+    [[ -n $resolver_result ]] || \
+      die resolver_result_required "Leaving resolving requires --resolver-result." \
+        "Pass success, no-op, stale, partial-failure, ambiguous, or failed."
+    case "$resolver_result:$to" in
+      success:polling|no-op:polling|stale:polling|ambiguous:awaiting_user|\
+      partial-failure:awaiting_user|partial-failure:failed|failed:failed|failed:awaiting_user) ;;
+      success:*|no-op:*)
+        die invalid_resolver_transition "$resolver_result must return to polling for a post-resolver snapshot." \
+          "Transition resolving to polling, then observe HEAD and blocker fingerprint." ;;
+      *)
+        die unsafe_publication "Resolver result $resolver_result cannot transition to $to." \
+          "Preserve partial work and transition to awaiting_user or failed without publication." ;;
+    esac
+    if [[ $resolver_result == success || $resolver_result == no-op ]]; then
+      [[ $(jq -r '.resolution.publication.phase // "missing"' <<<"$STATE") == complete ]] || \
+        die publication_required "A successful/no-op resolver must pass the executable publication gate first." \
+          "Run $PROGRAM publish with the complete resolver result chain before returning to polling."
+    fi
+  elif [[ $resolver_attempt == true || -n $resolver_result ]]; then
+    die invalid_resolver_transition "Resolver flags are valid only when leaving resolving." \
+      "Remove resolver flags or transition from resolving."
+  fi
+
+  local cycle new_state
+  cycle=$(jq -r .cycle <<<"$STATE")
+  if [[ $from == blocked && $to == resolving && $increment_cycle != true ]]; then
+    die cycle_increment_required "A new resolver attempt must increment the cycle." "Pass --increment-cycle."
+  fi
+  if [[ $increment_cycle == true && ! ($from == blocked && $to == resolving) ]]; then
+    die invalid_cycle_increment "Cycle increment is valid only for blocked -> resolving." \
+      "Remove --increment-cycle for this transition."
+  fi
+  if [[ $increment_cycle == true ]]; then
+    cycle=$((cycle + 1))
+    local max_cycles
+    max_cycles=$(jq -r '.options.max_cycles // 5' <<<"$STATE")
+    [[ $cycle -le $max_cycles ]] || \
+      die max_cycles "Resolver cycle $cycle exceeds max-cycles $max_cycles." "Finish the run as failed or start a new authorized run."
+  fi
+  local resolver_observation=null
+  if [[ $from == resolving && $to == polling ]]; then
+    local transition_now
+    transition_now=$(now_epoch)
+    resolver_observation=$(jq -cn --arg head "$(jq -r .head_sha <<<"$STATE")" \
+      --arg fingerprint "$(jq -r .blocker_fingerprint <<<"$STATE")" \
+      --arg result "$resolver_result" --argjson observed_at "$transition_now" \
+      '{head_sha:$head,blocker_fingerprint:$fingerprint,result:$result,observed_at:$observed_at}')
+  fi
+  local transition_now
+  transition_now=$(now_epoch)
+  if [[ $from == resolving ]]; then
+    if [[ $resolver_result == ambiguous ]]; then
+      resolution_json=$(jq -c --arg result "$resolver_result" --argjson finished_at "$transition_now" \
+        --argjson requests "$decision_requests_json" \
+        '.resolution + {result:$result,finished_at:$finished_at,
+          decision_requirements:$requests,decisions:[]}' <<<"$STATE")
+    else
+      resolution_json=$(jq -c --arg result "$resolver_result" --argjson finished_at "$transition_now" \
+        '.resolution + {result:$result,finished_at:$finished_at}' <<<"$STATE")
+    fi
+  elif [[ $resolution_json == null ]]; then
+    resolution_json=$(jq -c '.resolution // null' <<<"$STATE")
+  fi
+  new_state=$(jq -c --arg status "$to" --argjson cycle "$cycle" \
+    --argjson resolver "$resolver_observation" --argjson resolution "$resolution_json" \
+    '. + {status:$status,cycle:$cycle,resolver_attempt:$resolver,resolution:$resolution}' <<<"$STATE")
+  [[ $dry_run == true ]] || write_state "$new_state"
+  emit_state transition "$new_state" false "$dry_run"
+}
+
+read_review_thread_publication_state() {
+  local thread_id=$1
+  local marker=$2
+  local response
+  # shellcheck disable=SC2016
+  local query='query($id:ID!){node(id:$id){... on PullRequestReviewThread{id isResolved comments(last:100){nodes{body}}}}}'
+  response=$(gh_json api graphql -f query="$query" -f id="$thread_id")
+  validate_json_response "review thread publication query" "$response"
+  jq -e '
+    (.data.node | type == "object") and
+    (.data.node.id | type == "string") and
+    (.data.node.isResolved | type == "boolean") and
+    (.data.node.comments.nodes | type == "array") and
+    all(.data.node.comments.nodes[]; ((.body // "") | type == "string"))
+  ' >/dev/null 2>&1 <<<"$response" || \
+    die invalid_github_response "Review thread publication query returned an invalid nested shape." \
+      "Verify GitHub review-thread permissions and retry publication."
+  REVIEW_THREAD_RESOLVED=$(jq -r .data.node.isResolved <<<"$response")
+  REVIEW_THREAD_MARKER_FOUND=$(jq -r --arg marker "$marker" \
+    'any(.data.node.comments.nodes[]?; (.body // "") | contains($marker))' <<<"$response")
+}
+
+publish_thread_feedback() {
+  local feedback_json=$1
+  local expected_run_id=$2
+  local cycle=$3
+  local entry thread_id outcome body thread_hash marker reply_body response
+  while IFS= read -r entry; do
+    thread_id=$(jq -r .id <<<"$entry")
+    outcome=$(jq -r .outcome <<<"$entry")
+    body=$(jq -r .body <<<"$entry")
+    thread_hash=$(printf '%s' "$thread_id" | git hash-object --stdin)
+    marker="<!-- skill-set-pr-thread:$expected_run_id:$cycle:$thread_hash -->"
+    read_review_thread_publication_state "$thread_id" "$marker"
+    if [[ $REVIEW_THREAD_MARKER_FOUND == false ]]; then
+      reply_body=$(printf '%s\n\n%s' "$body" "$marker")
+      # shellcheck disable=SC2016
+      local reply_mutation='mutation($id:ID!,$body:String!){addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$id,body:$body}){comment{id}}}'
+      response=$(gh_json api graphql -f query="$reply_mutation" -f id="$thread_id" -f body="$reply_body")
+      validate_json_response "review thread reply mutation" "$response"
+      jq -e '(.data.addPullRequestReviewThreadReply.comment.id | type == "string" and length > 0)' \
+        >/dev/null 2>&1 <<<"$response" || \
+        die invalid_github_response "Review thread reply mutation returned an invalid nested shape." \
+          "Inspect the preserved publication and retry."
+    fi
+    if [[ $outcome != unresolved && $REVIEW_THREAD_RESOLVED == false ]]; then
+      # shellcheck disable=SC2016
+      local resolve_mutation='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{id isResolved}}}'
+      response=$(gh_json api graphql -f query="$resolve_mutation" -f id="$thread_id")
+      validate_json_response "resolve review thread mutation" "$response"
+      jq -e '.data.resolveReviewThread.thread.isResolved == true' >/dev/null 2>&1 <<<"$response" || \
+        die invalid_github_response "Resolve review thread mutation did not confirm resolution." \
+          "Inspect the preserved publication and retry."
+    fi
+  done < <(jq -c '.threads[]' <<<"$feedback_json")
+}
+
+command_publish() {
+  PR=
+  local expected_run_id='' expected_head_sha='' expected_local_head_sha=''
+  local results_file='' summary_file='' thread_feedback_file='' coderabbit_resolve=false dry_run=false
+  NOW_OVERRIDE=
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --pr) [[ $# -ge 2 ]] || die invalid_argument "--pr requires a value." "Pass --pr <number>."; PR=$2; shift 2 ;;
+      --expected-run-id) [[ $# -ge 2 ]] || die invalid_argument "--expected-run-id requires a value." "Pass the active run_id."; expected_run_id=$2; shift 2 ;;
+      --expected-head-sha) [[ $# -ge 2 ]] || die invalid_argument "--expected-head-sha requires a value." "Pass the blocked snapshot HEAD."; expected_head_sha=$2; shift 2 ;;
+      --expected-local-head-sha) [[ $# -ge 2 ]] || die invalid_argument "--expected-local-head-sha requires a value." "Pass the validated resolver worktree HEAD."; expected_local_head_sha=$2; shift 2 ;;
+      --results-file) [[ $# -ge 2 ]] || die invalid_argument "--results-file requires a value." "Pass the absolute structured resolver results file."; results_file=$2; shift 2 ;;
+      --summary-file) [[ $# -ge 2 ]] || die invalid_argument "--summary-file requires a value." "Pass the absolute queued summary file."; summary_file=$2; shift 2 ;;
+      --thread-feedback-file) [[ $# -ge 2 ]] || die invalid_argument "--thread-feedback-file requires a value." "Pass the absolute queued thread feedback file."; thread_feedback_file=$2; shift 2 ;;
+      --now) [[ $# -ge 2 ]] || die invalid_argument "--now requires a value." "Pass an epoch second."; NOW_OVERRIDE=$2; shift 2 ;;
+      --dry-run) dry_run=true; shift ;;
+      *) die invalid_argument "Unknown publish argument: $1" "Run $PROGRAM publish with documented arguments." ;;
+    esac
+  done
+  [[ -n $PR && -n $expected_run_id && -n $expected_head_sha && \
+    -n $expected_local_head_sha && -n $results_file ]] || \
+    die invalid_argument "publish requires --pr, --expected-run-id, --expected-head-sha, --expected-local-head-sha, and --results-file." \
+      "Pass every publication compare-and-swap input."
+  validate_pr "$PR"
+  validate_sha --expected-head-sha "$expected_head_sha"
+  validate_sha --expected-local-head-sha "$expected_local_head_sha"
+  [[ -z $NOW_OVERRIDE ]] || validate_nonnegative_integer --now "$NOW_OVERRIDE"
+
+  state_paths
+  [[ $dry_run == true ]] || acquire_lock
+  read_state
+  [[ $(jq -r .run_id <<<"$STATE") == "$expected_run_id" ]] || \
+    die stale_run "run_id changed before publication." "Reload state and resume the active run."
+  [[ $(jq -r .status <<<"$STATE") == resolving ]] || \
+    die invalid_publication_state "Publication is allowed only while resolving." \
+      "Resume the active state instead of bypassing the resolver workflow."
+  [[ $(jq -r '.resolution.expected_head_sha // ""' <<<"$STATE") == "$expected_head_sha" && \
+    $(jq -r .head_sha <<<"$STATE") == "$expected_head_sha" ]] || \
+    die head_changed "Publication HEAD does not match the blocked snapshot." \
+      "Discard the stale publication attempt and reload the PR."
+
+  local repo worktree resolver_branch remote remote_branch base_sha expected_agents
+  local github_host head_repo head_branch resolution_host resolution_repo resolution_branch
+  local results_relative summary_relative='' thread_feedback_relative=''
+  repo=$(jq -r .repo <<<"$STATE")
+  github_host=$(jq -r .github_host <<<"$STATE")
+  head_repo=$(jq -r .head_repo <<<"$STATE")
+  head_branch=$(jq -r .head_branch <<<"$STATE")
+  worktree=$(jq -r '.resolution.worktree // ""' <<<"$STATE")
+  resolver_branch=$(jq -r '.resolution.branch // ""' <<<"$STATE")
+  remote=$(jq -r '.resolution.remote // ""' <<<"$STATE")
+  remote_branch=$(jq -r '.resolution.remote_branch // ""' <<<"$STATE")
+  resolution_host=$(jq -r '.resolution.github_host // ""' <<<"$STATE")
+  resolution_repo=$(jq -r '.resolution.head_repo // ""' <<<"$STATE")
+  resolution_branch=$(jq -r '.resolution.head_branch // ""' <<<"$STATE")
+  base_sha=$(jq -r '.resolution.base_sha // ""' <<<"$STATE")
+  expected_agents=$(jq -c '.resolution.expected_agents // []' <<<"$STATE")
+  validate_repo "$repo"
+  validate_repo "$head_repo"
+  validate_branch state.head_branch "$head_branch"
+  [[ $(lowercase "$resolution_host") == "$(lowercase "$github_host")" && \
+    $(lowercase "$resolution_repo") == "$(lowercase "$head_repo")" && \
+    $resolution_branch == "$head_branch" && $remote_branch == "$head_branch" ]] || \
+    die invalid_resolution_binding "Resolver publication metadata no longer matches the recorded PR head repository/ref." \
+      "Discard the stale resolver attempt and take a fresh snapshot; no push or comment was attempted."
+  validate_absolute_path resolution.worktree "$worktree"
+  [[ -d $worktree ]] || \
+    die resolver_worktree_missing "The recorded resolver worktree does not exist." \
+      "Restore or inspect $worktree; do not dispatch a duplicate resolver."
+  validate_worktree_file --results-file "$results_file" "$worktree"
+  results_relative=$VALIDATED_FILE_RELATIVE
+  if [[ -n $summary_file ]]; then
+    validate_worktree_file --summary-file "$summary_file" "$worktree"
+    summary_relative=$VALIDATED_FILE_RELATIVE
+    [[ -s $summary_file ]] || \
+      die invalid_publication_input "--summary-file must not be empty." "Write the queued summary before publication."
+  fi
+  local thread_feedback_json=''
+  if [[ -n $thread_feedback_file ]]; then
+    validate_worktree_file --thread-feedback-file "$thread_feedback_file" "$worktree"
+    thread_feedback_relative=$VALIDATED_FILE_RELATIVE
+    thread_feedback_json=$(<"$thread_feedback_file")
+    validate_json_response "thread feedback file" "$thread_feedback_json"
+    jq -e '
+      type == "object" and (.threads | type == "array" and length > 0) and
+      ([.threads[].id] | length == (unique | length)) and
+      all(.threads[];
+        ((keys | sort) == ["body","id","outcome"]) and
+        (.id | type == "string" and length > 0) and
+        (.outcome | IN("fixed","accepted_as_is","unresolved")) and
+        (.body | type == "string" and length > 0) and
+        ((.body | test("@(codex|claude|coderabbitai)\\b"; "i")) | not))
+    ' >/dev/null 2>&1 <<<"$thread_feedback_json" || \
+      die invalid_publication_input "--thread-feedback-file has an invalid or unsafe resolution-feedback shape." \
+        "Provide only unique thread IDs, supported outcomes, and bodies without bot mentions; reviewer adapters are derived automatically."
+  fi
+  local expected_thread_ids='[]'
+  if jq -e 'index("pr-review-feedback") != null' >/dev/null 2>&1 <<<"$expected_agents"; then
+    expected_thread_ids=$(jq -c '[.last_snapshot.review_threads[]?.id] | sort' <<<"$STATE")
+    [[ -n $thread_feedback_file ]] || \
+      die review_feedback_required "A planned review resolver must queue per-thread resolution feedback." \
+        "Pass --thread-feedback-file with one outcome for every actionable thread."
+    jq -e --argjson expected "$expected_thread_ids" \
+      '([.threads[].id] | sort) == $expected' >/dev/null 2>&1 <<<"$thread_feedback_json" || \
+      die incomplete_review_feedback "Thread feedback does not cover the blocked snapshot exactly." \
+        "Return one fixed, accepted_as_is, or unresolved outcome for every actionable thread."
+    thread_feedback_json=$(jq -c --argjson snapshot \
+      "$(jq -c '.last_snapshot.review_threads' <<<"$STATE")" '
+      def reviewer_provider:
+        ascii_downcase
+        | if contains("coderabbit") then "coderabbit"
+          elif contains("chatgpt-codex-connector") or contains("codex-connector") then "codex"
+          elif contains("claude") or contains("anthropic") then "claude"
+          else "other" end;
+      .threads |= map(. as $feedback
+        | ($snapshot[] | select(.id == $feedback.id)) as $thread
+        | $feedback + {provider:(($thread.latest_comment.author // "") | reviewer_provider)})
+    ' <<<"$thread_feedback_json" 2>/dev/null) || \
+      die invalid_publication_input "Unable to derive reviewer providers from the blocked snapshot." \
+        "Take a fresh snapshot and retry without reviewer adapter fields."
+    coderabbit_resolve=$(jq -r '
+      [.threads[] | select(.provider == "coderabbit")] as $items
+      | (($items | length) > 0 and all($items[]; .outcome != "unresolved"))
+    ' <<<"$thread_feedback_json")
+    [[ $coderabbit_resolve == false || -n $summary_file ]] || \
+      die invalid_publication_input "Resolved CodeRabbit feedback requires --summary-file." \
+        "Queue the summary and CodeRabbit resolve signal as one post-gate comment."
+  elif [[ -n $thread_feedback_file ]]; then
+    die unexpected_review_feedback "Thread feedback is valid only when pr-review-feedback was planned." \
+      "Remove --thread-feedback-file from CI-only or merge-only publication."
+  fi
+  if [[ -n $summary_file ]] && jq -e -Rs 'test("@(codex|claude|coderabbitai)\\b|review once|address that feedback"; "i")' \
+    <"$summary_file" >/dev/null 2>&1; then
+    die invalid_publication_input "--summary-file contains an automated-review trigger or edit delegation." \
+      "Use plain reviewer names in resolution summaries; never mention automated reviewer accounts."
+  fi
+
+  local physical_worktree actual_toplevel
+  physical_worktree=$(cd -- "$worktree" 2>/dev/null && pwd -P) || \
+    die invalid_resolver_worktree "Unable to resolve the recorded resolver worktree." \
+      "Inspect the preserved worktree and retry."
+  actual_toplevel=$(git -C "$worktree" rev-parse --show-toplevel 2>/dev/null) || \
+    die invalid_resolver_worktree "The recorded resolver path is not a Git worktree." \
+      "Inspect the preserved recovery path and retry."
+  actual_toplevel=$(cd -- "$actual_toplevel" 2>/dev/null && pwd -P) || \
+    die invalid_resolver_worktree "Unable to resolve the Git worktree root." \
+      "Inspect the preserved recovery path and retry."
+  [[ $actual_toplevel == "$physical_worktree" ]] || \
+    die invalid_resolver_worktree "The recorded resolver path is not the worktree root." \
+      "Use the exact recorded worktree root; a subdirectory cannot define the publication boundary."
+  if git -C "$worktree" ls-files --error-unmatch -- \
+    ":(top,literal)$results_relative" >/dev/null 2>&1; then
+    die managed_publication_input "--results-file must be an untracked publication artifact, not a tracked project file." \
+      "Write resolver results to a dedicated untracked file inside the worktree."
+  fi
+  if [[ -n $summary_relative ]] && \
+    git -C "$worktree" ls-files --error-unmatch -- \
+      ":(top,literal)$summary_relative" >/dev/null 2>&1; then
+    die managed_publication_input "--summary-file must be an untracked publication artifact, not a tracked project file." \
+      "Write the queued summary to a dedicated untracked file inside the worktree."
+  fi
+  if [[ -n $thread_feedback_relative ]] && \
+    git -C "$worktree" ls-files --error-unmatch -- \
+      ":(top,literal)$thread_feedback_relative" >/dev/null 2>&1; then
+    die managed_publication_input "--thread-feedback-file must be an untracked publication artifact, not a tracked project file." \
+      "Write queued thread feedback to a dedicated untracked file inside the worktree."
+  fi
+
+  local actual_branch actual_local_head
+  actual_branch=$(git -C "$worktree" symbolic-ref --quiet --short HEAD 2>/dev/null) || \
+    die invalid_resolver_worktree "The resolver worktree is detached." "Restore its recorded branch before publication."
+  [[ $actual_branch == "$resolver_branch" ]] || \
+    die invalid_resolver_worktree "Resolver branch changed from $resolver_branch to $actual_branch." \
+      "Inspect the preserved worktree and retry with the recorded branch."
+  actual_local_head=$(git -C "$worktree" rev-parse HEAD 2>/dev/null) || \
+    die invalid_resolver_worktree "Unable to read the resolver worktree HEAD." "Inspect $worktree and retry."
+  validate_sha resolver.worktree.head "$actual_local_head"
+  [[ $actual_local_head == "$expected_local_head_sha" ]] || \
+    die local_head_changed "Resolver worktree HEAD changed before publication." \
+      "Revalidate the resolver result chain for $actual_local_head."
+  git -C "$worktree" cat-file -e "$expected_head_sha^{commit}" 2>/dev/null || \
+    die resolver_head_missing "The pinned PR HEAD is missing from the resolver worktree." \
+      "Fetch the exact PR HEAD without rebasing and retry."
+  git -C "$worktree" cat-file -e "$base_sha^{commit}" 2>/dev/null || \
+    die resolver_base_missing "The pinned base SHA is missing from the resolver worktree." \
+      "Fetch the exact base SHA without moving the resolver branch and retry."
+  git -C "$worktree" merge-base --is-ancestor "$expected_head_sha" "$actual_local_head" 2>/dev/null || \
+    die invalid_resolver_history "Resolver HEAD is not descended from the pinned PR HEAD." \
+      "Preserve the worktree and inspect its commit history."
+
+  local results_json
+  results_json=$(<"$results_file")
+  validate_json_response "resolver results file" "$results_json"
+  jq -e '
+    type == "object" and (.results | type == "array" and length > 0) and
+    all(.results[];
+      type == "object" and
+      (.agent | IN("merge-conflict-resolver","ci-failure-resolver","pr-review-feedback")) and
+      (.result | IN("success","no-op","partial-failure","ambiguous","AMBIGUOUS","failed")) and
+      (.input_head | type == "string" and test("^[0-9a-fA-F]{40}$")) and
+      (.output_head | type == "string" and test("^[0-9a-fA-F]{40}$")))
+  ' >/dev/null 2>&1 <<<"$results_json" || \
+    die invalid_resolver_results "Resolver results have an invalid nested schema." \
+      "Write the complete ordered result chain and retry."
+  jq -e --argjson expected_agents "$expected_agents" --arg first "$expected_head_sha" \
+    --arg last "$expected_local_head_sha" '
+      .results as $results
+      | ([$results[].agent] == $expected_agents) and
+        ($results[0].input_head == $first) and
+        ($results[-1].output_head == $last) and
+        (reduce range(1; ($results | length)) as $i
+          (true; . and ($results[$i].input_head == $results[$i - 1].output_head)))
+    ' >/dev/null 2>&1 <<<"$results_json" || \
+    die invalid_resolver_results "Resolver results do not match the planned agents or HEAD chain." \
+      "Return one ordered result for every planned resolver and revalidate the local HEAD."
+  jq -e 'all(.results[]; .result == "success" or .result == "no-op")' \
+    >/dev/null 2>&1 <<<"$results_json" || \
+    die unsafe_publication "At least one resolver did not succeed or no-op." \
+      "Do not push or comment; preserve the worktree and transition to awaiting_user or failed."
+
+  local worktree_status
+  if [[ -n $summary_relative && -n $thread_feedback_relative ]]; then
+    worktree_status=$(git -C "$worktree" status --porcelain=v1 --untracked-files=all -- . \
+      ":(top,literal,exclude)$results_relative" ":(top,literal,exclude)$summary_relative" \
+      ":(top,literal,exclude)$thread_feedback_relative" 2>/dev/null) || \
+      die git_inspection_failed "Unable to verify the resolver worktree publication boundary." \
+        "Inspect the preserved worktree and retry."
+  elif [[ -n $summary_relative ]]; then
+    worktree_status=$(git -C "$worktree" status --porcelain=v1 --untracked-files=all -- . \
+      ":(top,literal,exclude)$results_relative" ":(top,literal,exclude)$summary_relative" 2>/dev/null) || \
+      die git_inspection_failed "Unable to verify the resolver worktree publication boundary." \
+        "Inspect the preserved worktree and retry."
+  elif [[ -n $thread_feedback_relative ]]; then
+    worktree_status=$(git -C "$worktree" status --porcelain=v1 --untracked-files=all -- . \
+      ":(top,literal,exclude)$results_relative" ":(top,literal,exclude)$thread_feedback_relative" 2>/dev/null) || \
+      die git_inspection_failed "Unable to verify the resolver worktree publication boundary." \
+        "Inspect the preserved worktree and retry."
+  else
+    worktree_status=$(git -C "$worktree" status --porcelain=v1 --untracked-files=all -- . \
+      ":(top,literal,exclude)$results_relative" 2>/dev/null) || \
+      die git_inspection_failed "Unable to verify the resolver worktree publication boundary." \
+        "Inspect the preserved worktree and retry."
+  fi
+  [[ -z $worktree_status ]] || \
+    die incomplete_resolver_worktree "The resolver worktree still has unpublished staged, unstaged, or untracked changes." \
+      "Commit every authorized fix or preserve the worktree and return partial-failure; do not publish a committed subset."
+
+  local marker results_hash comment_hashes='[]' intent_material intent_hash summary_path_for_state=''
+  local thread_feedback_hash='' thread_feedback_path_for_state=''
+  local cycle
+  cycle=$(jq -r .cycle <<<"$STATE")
+  marker="<!-- skill-set-pr:$expected_run_id:$cycle -->"
+  results_hash=$(jq -cS . <<<"$results_json" | git hash-object --stdin)
+  TEMP_BODY=
+  if [[ -n $summary_file ]]; then
+    TEMP_BODY=$(mktemp "${TMPDIR:-/tmp}/skill-set-pr-comment.XXXXXX" 2>/dev/null) || \
+      die temporary_file_failed "Unable to allocate the publication body." "Check temporary-directory permissions."
+    if [[ $coderabbit_resolve == true ]]; then
+      printf '@coderabbitai resolve\n\n%s\n' "$marker" >"$TEMP_BODY"
+    else
+      printf '%s\n' "$marker" >"$TEMP_BODY"
+    fi
+    command cat -- "$summary_file" >>"$TEMP_BODY"
+    comment_hashes=$(jq -cn --arg hash "$(git hash-object "$TEMP_BODY")" '[$hash]')
+    summary_path_for_state=$summary_file
+  fi
+  if [[ -n $thread_feedback_file ]]; then
+    thread_feedback_hash=$(jq -cS . <<<"$thread_feedback_json" | git hash-object --stdin)
+    thread_feedback_path_for_state=$thread_feedback_file
+  fi
+  intent_material=$(jq -cn --arg results "$results_hash" --arg local_head "$actual_local_head" \
+    --argjson comments "$comment_hashes" --argjson coderabbit "$coderabbit_resolve" \
+    --arg thread_feedback_hash "$thread_feedback_hash" \
+    '{results_hash:$results,local_head:$local_head,comment_hashes:$comments,
+      thread_feedback_hash:$thread_feedback_hash,coderabbit_resolve:$coderabbit}')
+  intent_hash=$(printf '%s' "$intent_material" | git hash-object --stdin)
+
+  local phase saved_intent new_state publication_now
+  phase=$(jq -r '.resolution.publication.phase' <<<"$STATE")
+  saved_intent=$(jq -r '.resolution.publication.intent_hash' <<<"$STATE")
+  if [[ $phase != pending && $saved_intent != "$intent_hash" ]]; then
+    die publication_intent_changed "Publication inputs changed after the gate was prepared." \
+      "Use the recorded worktree inputs; never replace queued publication during recovery."
+  fi
+  if [[ $phase == complete ]]; then
+    emit_state publish "$STATE" true "$dry_run"
+    return
+  fi
+
+  validate_remote_binding "$worktree" "$remote" "$github_host" "$head_repo"
+  read_remote_head "$repo" "$PR"
+  validate_pr_head_binding "$github_host" "$head_repo" "$head_branch"
+  [[ $REMOTE_PR_STATE == OPEN ]] || \
+    die closed "The PR is no longer open." "Finish the shipping run as closed."
+  if [[ $phase == pending ]]; then
+    [[ $REMOTE_HEAD == "$expected_head_sha" || $REMOTE_HEAD == "$actual_local_head" ]] || \
+      die head_changed "Remote PR HEAD changed before publication." "Discard this resolver attempt and snapshot the new HEAD."
+    publication_now=$(now_epoch)
+    new_state=$(jq -c --arg intent "$intent_hash" --arg results_hash "$results_hash" \
+      --arg results_file "$results_file" --arg summary_file "$summary_path_for_state" \
+      --arg thread_feedback_file "$thread_feedback_path_for_state" \
+      --arg thread_feedback_hash "$thread_feedback_hash" \
+      --arg marker "$marker" --argjson comments "$comment_hashes" \
+      --argjson coderabbit "$coderabbit_resolve" --argjson prepared_at "$publication_now" \
+      --argjson results "$(jq -c .results <<<"$results_json")" '
+      .resolution.publication += {phase:"prepared",intent_hash:$intent,results_hash:$results_hash,
+        results_file:$results_file,results:$results,summary_file:$summary_file,marker:$marker,
+        thread_feedback_file:$thread_feedback_file,thread_feedback_hash:$thread_feedback_hash,
+        comment_hashes:$comments,coderabbit_resolve:$coderabbit,prepared_at:$prepared_at}
+    ' <<<"$STATE")
+    if [[ $dry_run == true ]]; then
+      jq -cn --argjson state "$new_state" --argjson would_push "$([[ $actual_local_head != "$expected_head_sha" ]] && printf true || printf false)" \
+        --argjson comment_requested "$([[ -n $summary_file || -n $thread_feedback_file ]] && printf true || printf false)" \
+        '$state + {ok:true,command:"publish",dry_run:true,would_push:$would_push,comment_requested:$comment_requested}'
+      return
+    fi
+    write_state "$new_state"
+    STATE=$new_state
+    phase=prepared
+  elif [[ $dry_run == true ]]; then
+    emit_state publish "$STATE" true true
+    return
+  fi
+
+  local pushed=false
+  if [[ $phase == prepared ]]; then
+    validate_remote_binding "$worktree" "$remote" "$github_host" "$head_repo"
+    read_remote_head "$repo" "$PR"
+    validate_pr_head_binding "$github_host" "$head_repo" "$head_branch"
+    [[ $REMOTE_PR_STATE == OPEN ]] || die closed "The PR closed during publication." "Finish the run as closed."
+    if [[ $actual_local_head != "$expected_head_sha" ]]; then
+      if [[ $REMOTE_HEAD == "$expected_head_sha" ]]; then
+        validate_remote_binding "$worktree" "$remote" "$github_host" "$head_repo"
+        run_expected_sha_push "$worktree" "$remote" "$remote_branch" "$expected_head_sha"
+      elif [[ $REMOTE_HEAD != "$actual_local_head" ]]; then
+        die head_changed "Remote PR HEAD is neither the expected nor already-published resolver HEAD." \
+          "Inspect the remote and preserved worktree; do not push."
+      fi
+      pushed=true
+    elif [[ $REMOTE_HEAD != "$expected_head_sha" ]]; then
+      die head_changed "Remote PR HEAD changed before no-code publication." \
+        "Discard the queued comment and snapshot the new HEAD."
+    fi
+    read_remote_head "$repo" "$PR"
+    validate_pr_head_binding "$github_host" "$head_repo" "$head_branch"
+    [[ $REMOTE_PR_STATE == OPEN && $REMOTE_HEAD == "$actual_local_head" ]] || \
+      die publication_verification_failed "Remote HEAD did not match the resolver HEAD after the publication gate." \
+        "Inspect the preserved worktree and remote before any comment."
+    publication_now=$(now_epoch)
+    new_state=$(jq -c --arg final "$actual_local_head" --argjson pushed "$pushed" \
+      --argjson gate_at "$publication_now" '
+      .resolution.publication += {phase:"gate_passed",pushed:$pushed,
+        final_remote_sha:$final,gate_passed_at:$gate_at}
+    ' <<<"$STATE")
+    write_state "$new_state"
+    STATE=$new_state
+    phase=gate_passed
+  fi
+
+  if [[ -n $summary_file || -n $thread_feedback_file ]]; then
+    read_remote_head "$repo" "$PR"
+    validate_pr_head_binding "$github_host" "$head_repo" "$head_branch"
+    [[ $REMOTE_PR_STATE == OPEN && $REMOTE_HEAD == "$actual_local_head" ]] || \
+      die head_changed "Remote PR HEAD changed before queued comments were published." \
+        "Preserve the queued publication and inspect the new remote HEAD."
+    publication_now=$(now_epoch)
+    new_state=$(jq -c --argjson commenting_at "$publication_now" \
+      '.resolution.publication += {phase:"commenting",commenting_at:$commenting_at}' <<<"$STATE")
+    write_state "$new_state"
+    STATE=$new_state
+    if [[ -n $thread_feedback_file ]]; then
+      publish_thread_feedback "$thread_feedback_json" "$expected_run_id" "$cycle"
+    fi
+    if [[ -n $summary_file ]]; then
+      comment_marker_exists "$repo" "$PR" "$marker"
+      if [[ $COMMENT_MARKER_FOUND == false ]]; then
+        gh_json pr comment "$PR" --repo "$repo" --body-file "$TEMP_BODY" >/dev/null
+      fi
+    fi
+  fi
+
+  publication_now=$(now_epoch)
+  local comments_published=0 thread_feedback_published=0
+  [[ -z $summary_file ]] || comments_published=1
+  [[ -z $thread_feedback_file ]] || thread_feedback_published=$(jq '.threads | length' <<<"$thread_feedback_json")
+  new_state=$(jq -c --argjson completed_at "$publication_now" \
+    --argjson comments "$comments_published" --argjson thread_feedback "$thread_feedback_published" '
+    .resolution.publication += {phase:"complete",comments_published:$comments,
+      thread_feedback_published:$thread_feedback,completed_at:$completed_at}
+  ' <<<"$STATE")
+  write_state "$new_state"
+  STATE=$new_state
+  emit_state publish "$new_state" false false
+}
+
+command_finish() {
+  PR=
+  local from='' status='' expected_run_id='' dry_run=false
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --pr) [[ $# -ge 2 ]] || die invalid_argument "--pr requires a value." "Pass --pr <number>."; PR=$2; shift 2 ;;
+      --from) [[ $# -ge 2 ]] || die invalid_argument "--from requires a value." "Pass the expected current state."; from=$2; shift 2 ;;
+      --status) [[ $# -ge 2 ]] || die invalid_argument "--status requires a value." "Pass a terminal state."; status=$2; shift 2 ;;
+      --expected-run-id) [[ $# -ge 2 ]] || die invalid_argument "--expected-run-id requires a value." "Pass the run_id returned by init."; expected_run_id=$2; shift 2 ;;
+      --dry-run) dry_run=true; shift ;;
+      *) die invalid_argument "Unknown finish argument: $1" "Run $PROGRAM finish with documented arguments." ;;
+    esac
+  done
+  [[ -n $PR && -n $from && -n $status && -n $expected_run_id ]] || \
+    die invalid_argument "finish requires --pr, --from, --status, and --expected-run-id." "Pass all finish compare-and-swap fields."
+  case "$status" in clean|stalled|timed_out|closed|failed) ;; *)
+    die invalid_argument "finish accepts only terminal states." "Use clean, stalled, timed_out, closed, or failed." ;;
+  esac
+  validate_pr "$PR"
+  state_paths
+  [[ $dry_run == true ]] || acquire_lock
+  read_state
+  [[ $(jq -r .run_id <<<"$STATE") == "$expected_run_id" ]] || \
+    die stale_run "run_id changed before finish." "Reload state and finish the active run."
+  local current_status
+  current_status=$(jq -r .status <<<"$STATE")
+  [[ $current_status == "$from" ]] || \
+    die stale_state "Expected $from but state is $current_status." "Reload state before finishing the run."
+  case "$from:$status" in
+    polling:failed|blocked:failed|awaiting_user:failed|resolving:failed|\
+    clean:clean|stalled:stalled|timed_out:timed_out|closed:closed|failed:failed) ;;
+    *) die illegal_transition "Finish transition $from -> $status is not allowed." \
+      "Finish an observed terminal state unchanged, or finish an active state as failed." ;;
+  esac
+  local new_state
+  new_state=$(jq -c --arg status "$status" '. + {status:$status}' <<<"$STATE")
+  [[ $dry_run == true ]] || write_state "$new_state"
+  emit_state finish "$new_state" false "$dry_run"
+}
+
+main() {
+  [[ $# -gt 0 ]] || die usage "A subcommand is required." "Use init, snapshot, transition, publish, or finish."
+  local command=$1
+  shift
+  preflight
+  case "$command" in
+    init) command_init "$@" ;;
+    snapshot) command_snapshot "$@" ;;
+    transition) command_transition "$@" ;;
+    publish) command_publish "$@" ;;
+    finish) command_finish "$@" ;;
+    *) die usage "Unknown subcommand: $command" "Use init, snapshot, transition, publish, or finish." ;;
+  esac
+}
+
+main "$@"

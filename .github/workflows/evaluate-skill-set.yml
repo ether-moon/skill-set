@@ -1,26 +1,64 @@
 name: Evaluate skill-set models
 
 on:
-  schedule:
-    - cron: '23 3 * * 1'
   workflow_dispatch:
     inputs:
+      stage:
+        description: Explicit evaluation stage; stages never expand automatically
+        required: true
+        type: choice
+        default: development-smoke
+        options:
+          - development-smoke
+          - focused-comparison
+          - campaign
+      case:
+        description: Exact case name required for smoke or focused comparison
+        required: false
+        type: string
+      baseline:
+        description: Focused-comparison baseline
+        required: false
+        type: choice
+        default: none
+        options:
+          - none
+          - no-plugin
+          - deletion-baseline
+      reason:
+        description: Required purpose for focused comparison or campaign
+        required: false
+        type: string
       runs:
-        description: Runs per case (release review normally uses 3)
+        description: Campaign trials; omit for the one-trial smoke/focused stages
         required: false
-        default: '3'
+        type: string
+      max_calls:
+        description: Approved model-call budget; required for focused comparison or campaign
+        required: false
+        type: string
+      max_total_tokens:
+        description: Approved conservative token estimate, not a runtime hard cap
+        required: false
+        type: string
+      estimated_tokens_per_call:
+        description: Optional recent equivalent-trace p95; fallback is 25000
+        required: false
+        type: string
       max_cost_usd:
-        description: Total target split into two CLI ceilings; each may overrun one agent run
+        description: Optional secondary runtime ceiling for this evaluation adapter
         required: false
-        default: '40'
+        type: string
       model:
         description: Model identifier evaluated by the agent runs
         required: false
-        default: 'haiku'
+        default: haiku
+        type: string
       judge_model:
-        description: Independent model identifier used by LLM graders
+        description: Independent model identifier used only by qualitative graders
         required: false
-        default: 'sonnet'
+        default: sonnet
+        type: string
 
 permissions:
   contents: read
@@ -41,33 +79,59 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install tested Claude Code
+      - name: Install the current evaluation adapter
         run: npm install --global @anthropic-ai/claude-code@2.1.215
 
-      - name: Run candidate, no-plugin, and deletion-baseline arms
+      - name: Preflight and run the requested stage
         id: eval
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          REQUESTED_RUNS: ${{ github.event.inputs.runs || '3' }}
-          MAX_COST_USD: ${{ github.event.inputs.max_cost_usd || '40' }}
-          EVAL_MODEL: ${{ github.event.inputs.model || 'haiku' }}
-          JUDGE_MODEL: ${{ github.event.inputs.judge_model || 'sonnet' }}
+          EVAL_STAGE: ${{ inputs.stage }}
+          EVAL_CASE: ${{ inputs.case }}
+          EVAL_BASELINE: ${{ inputs.baseline }}
+          EVAL_REASON: ${{ inputs.reason }}
+          REQUESTED_RUNS: ${{ inputs.runs }}
+          MAX_CALLS: ${{ inputs.max_calls }}
+          MAX_TOTAL_TOKENS: ${{ inputs.max_total_tokens }}
+          ESTIMATED_TOKENS_PER_CALL: ${{ inputs.estimated_tokens_per_call }}
+          MAX_COST_USD: ${{ inputs.max_cost_usd }}
+          EVAL_MODEL: ${{ inputs.model }}
+          JUDGE_MODEL: ${{ inputs.judge_model }}
         run: |
           mkdir -p eval-results
+          args=(
+            --stage "$EVAL_STAGE"
+            --model "$EVAL_MODEL"
+            --judge-model "$JUDGE_MODEL"
+            --output-dir eval-results
+          )
+          [ -z "$EVAL_CASE" ] || args+=(--case "$EVAL_CASE")
+          [ "$EVAL_BASELINE" = none ] || args+=(--baseline "$EVAL_BASELINE")
+          [ -z "$EVAL_REASON" ] || args+=(--reason "$EVAL_REASON")
+          [ -z "$REQUESTED_RUNS" ] || args+=(--runs "$REQUESTED_RUNS")
+          [ -z "$MAX_CALLS" ] || args+=(--max-calls "$MAX_CALLS")
+          [ -z "$MAX_TOTAL_TOKENS" ] || args+=(--max-total-tokens "$MAX_TOTAL_TOKENS")
+          [ -z "$ESTIMATED_TOKENS_PER_CALL" ] || args+=(--estimated-tokens-per-call "$ESTIMATED_TOKENS_PER_CALL")
+          [ -z "$MAX_COST_USD" ] || args+=(--max-cost-usd "$MAX_COST_USD")
+
+          set +e
+          plugins/skill-set/scripts/run-evals "${args[@]}" --plan \
+            > eval-results/preflight-plan.json 2> eval-results/preflight.log
+          preflight_status=$?
+          set -e
+          if [ "$preflight_status" -ne 0 ]; then
+            printf 'status=blocked-preflight\n' >> "$GITHUB_OUTPUT"
+            cat eval-results/preflight.log
+            exit 1
+          fi
           if [ -z "$ANTHROPIC_API_KEY" ]; then
-            printf 'Model evaluation skipped: ANTHROPIC_API_KEY is not configured.\n' > eval-results/run.log
+            printf 'Model evaluation skipped after successful preflight: credentials are not configured.\n' > eval-results/run.log
             printf 'status=skipped-no-credentials\n' >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           set +e
-          plugins/skill-set/scripts/run-evals \
-            --output-dir eval-results \
-            --runs "$REQUESTED_RUNS" \
-            --max-cost-usd "$MAX_COST_USD" \
-            --model "$EVAL_MODEL" \
-            --judge-model "$JUDGE_MODEL" \
-            > eval-results/run.log 2>&1
+          plugins/skill-set/scripts/run-evals "${args[@]}" > eval-results/run.log 2>&1
           eval_status=$?
           set -e
           printf 'exit_code=%s\n' "$eval_status" >> "$GITHUB_OUTPUT"
@@ -79,16 +143,24 @@ jobs:
             printf 'status=failed\n' >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Explain feature-gated or failed runs
+      - name: Explain skipped or failed runs
         if: always()
         run: |
           status='${{ steps.eval.outputs.status }}'
           case "$status" in
             skipped-early-access-gate)
-              echo '::notice::Claude plugin eval is still feature-gated for this CLI/account. Artifacts contain the diagnostic.'
+              echo '::notice::The model evaluation feature is unavailable for this adapter/account. Artifacts contain the diagnostic.'
               ;;
             skipped-no-credentials)
-              echo '::notice::Configure ANTHROPIC_API_KEY to enable the weekly model evaluation.'
+              echo '::notice::Configure evaluation credentials to run the already-approved plan.'
+              ;;
+            blocked-preflight)
+              if jq -e . eval-results/preflight-plan.json >/dev/null 2>&1; then
+                jq . eval-results/preflight-plan.json
+              else
+                sed -n '1,240p' eval-results/preflight.log
+              fi
+              exit 1
               ;;
             failed)
               sed -n '1,240p' eval-results/run.log
@@ -96,12 +168,12 @@ jobs:
               ;;
           esac
 
-      - name: Surface acceptance metrics for human review
+      - name: Surface stage evidence for human review
         if: steps.eval.outputs.status == 'finished-needs-human-review'
         run: |
-          jq '{status, trigger, safety, baseline, resources, acceptance}' \
+          jq '{status, coverage_status, plan_match, reasons, acceptance}' \
             eval-results/acceptance-summary.json
-          echo '::notice::Model metrics are advisory and require human review before release.'
+          echo '::notice::Model evidence is advisory and requires human review before release.'
 
       - name: Upload evaluation artifacts
         if: always()

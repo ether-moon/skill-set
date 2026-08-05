@@ -1,32 +1,27 @@
-# Evaluation and Iteration
+# Evaluation Policy and Acceptance
 
 ## Table of Contents
 
-- [Core Loop](#core-loop)
-- [Official Eval Layout](#official-eval-layout)
-- [Trigger Cases](#trigger-cases)
-- [Functional Cases](#functional-cases)
-- [Baselines and Ablation](#baselines-and-ablation)
-- [Benchmark and Acceptance](#benchmark-and-acceptance)
-- [Failure Classification and Iteration](#failure-classification-and-iteration)
+- [Ownership Boundary](#ownership-boundary)
+- [Durable Evidence Layout](#durable-evidence-layout)
+- [Evaluation Dimensions](#evaluation-dimensions)
+- [Budgeted Evaluation Stages](#budgeted-evaluation-stages)
+- [Baselines and Provenance](#baselines-and-provenance)
+- [Isolation and Variance](#isolation-and-variance)
+- [Acceptance and Maintenance](#acceptance-and-maintenance)
+- [Failure Classification](#failure-classification)
 
-## Core Loop
+## Ownership Boundary
 
-Evaluate behavior before adding extensive instructions:
+When a compatible `skill-creator` is available, delegate prompt generation, budgeted candidate runs, grading, aggregation, review, description optimization, and packaging to it. Baseline runs and campaigns require the separate purpose and budget defined below.
 
-1. Define representative use cases and safety invariants.
-2. Run a no-skill baseline for a new skill or the current version for an existing skill.
-3. Create trigger and functional cases from observed gaps.
-4. Grade objective outcomes deterministically and qualitative outcomes with a concrete rubric.
-5. Compare quality, safety, triggering, tool use, duration, tokens, and cost.
-6. Make the smallest general correction and rerun the affected cases.
-7. Rerun the full suite before accepting the change.
+`creating-skills` defines the project contract around that loop: durable evidence format, safety invariants, comparison arms, required metrics, acceptance thresholds, and final lifecycle decision. Translate supported creator output into this contract. Do not discard valid evidence merely because its temporary workspace uses another schema.
 
-Do not build instructions around imagined failures. A baseline establishes whether the skill improves the task at all.
+When no creator can run an approved model stage, use an available evaluation adapter. Do not require provider-specific adapters or capability negotiation. Preserve unsupported metrics as unavailable instead of inventing values.
 
-## Official Eval Layout
+## Durable Evidence Layout
 
-For a Claude Code plugin, keep evaluations outside the skill directory:
+Packaged skill collections should retain behavioral cases outside the skill directory so different creators and host adapters can execute the same contract:
 
 ```text
 plugin/
@@ -35,160 +30,103 @@ plugin/
 │       └── SKILL.md
 └── evals/
     └── incident-triage/
-        ├── trigger-positive-01/
-        │   └── case.yaml
-        ├── trigger-negative-01/
-        │   └── case.yaml
-        └── mixed-findings/
+        └── active-alert/
             ├── case.yaml
             ├── prompt.md
             ├── graders/
-            │   ├── outcome.md
-            │   └── safety.md
+            │   └── qualitative.md
             └── fixtures/
                 └── scaffold.sh
 ```
 
-Use `case.yaml` for deterministic configuration and inline trigger prompts. Use `prompt.md` for longer functional prompts and `graders/*.md` for qualitative rubrics. Keep every fixture within its case directory.
+Use `case.yaml` for deterministic configuration, `prompt.md` for substantive tasks, `graders/` for qualitative contracts, and case-local fixtures. Adapter-specific workspaces are disposable execution detail; the repository layout is the regression source of truth.
 
-## Trigger Cases
+## Evaluation Dimensions
 
-Create 8–10 positive and 8–10 negative cases for every production skill. Positive prompts should vary phrasing, context, and uncommon but valid use. Negative prompts should be plausible near misses that share terms with the skill but need a different workflow.
+Define success before execution and keep four dimensions distinct:
 
-Positive example:
+| Dimension | Question | Preferred evidence |
+|---|---|---|
+| Outcome | Did the artifact or workflow actually work? | Executable checks, rendered output, state transition |
+| Conformance | Did it follow user and project requirements? | Schema checks, targeted assertions, human review |
+| Safety | Did it remain within authority and mutation boundaries? | Command logs, negative assertions, unchanged state |
+| Efficiency | Did it avoid material waste or regressions? | Turns, retries, tool calls, tokens, duration, cost |
 
-```yaml
-schema_version: "1.1"
-name: incident-triage-trigger-positive-01
-description: Selects incident triage for a production alert
-tags:
-  - incident-triage
-  - trigger-positive
-execution:
-  prompt: "Triage these production alerts and separate immediate mitigations from decisions."
-  max_turns: 4
-  timeout_seconds: 180
-  allowed_tools:
-    - Skill
-runs: 3
-graders:
-  - type: tool_used
-    name: selected-incident-triage
-    tool: Skill
-    input_match: incident-triage
-    min: 1
-  - type: llm
-    name: workflow-outcome
-    criteria: "Pass only if the response follows the incident-triage contract."
-    focus: last_message
+Grade outcomes, not paths. Assert a tool, order, or intermediate step only when that path is a safety invariant, protocol requirement, or user-visible contract. Otherwise allow the agent to reach the required result through a better route.
+
+Prefer deterministic checks for objective claims. Use a model grader only for qualities that cannot be reduced to an executable check, and batch all qualitative expectations for one output into one grader call. A qualitative rubric must state what passes, what fails, facts that must remain, and safety conditions that immediately fail.
+
+## Budgeted Evaluation Stages
+
+Use the cheapest authorized stage that can answer the current question:
+
+```text
+deterministic validation
+→ development smoke
+→ focused comparison
+→ campaign
 ```
 
-In a with/without ablation, keep the positive Skill-call grader display-only by omitting `arm`; the no-skill arm cannot call a skill that is absent.
+| Stage | Scope | Authorization |
+|---|---|---|
+| Deterministic validation | Structure, scripts, fixtures, schemas, and objective assertions | No model invocations |
+| Development smoke | Changed or highest-signal cases, candidate-only, one trial | Default ceiling: 4 calls and 100,000 projected tokens |
+| Focused comparison | Only cases where a pinned baseline is needed | Separate purpose and freshly approved budget |
+| Campaign | Full suite, repeated trials, cross-model evaluation, or broad optimization | Explicit request and separate budget |
 
-Negative example:
+Do not advance to another stage automatically, infer approval from a broad authoring request, or reuse an earlier stage's approval.
 
-```yaml
-schema_version: "1.1"
-name: incident-triage-trigger-negative-01
-description: Does not select incident triage for a status summary
-tags:
-  - incident-triage
-  - trigger-negative
-execution:
-  prompt: "Turn these resolved incident notes into a weekly status summary."
-  max_turns: 4
-  timeout_seconds: 180
-  allowed_tools:
-    - Skill
-runs: 3
-graders:
-  - type: tool_used
-    name: did-not-select-incident-triage
-    tool: Skill
-    input_match: incident-triage
-    min: 0
-    max: 0
-    arm: both
-  - type: llm
-    name: appropriate-scope
-    criteria: "Pass only if the response handles the request without forcing incident triage."
-    focus: last_message
+Before every model stage, run the stateless `scripts/plan_eval_budget.py` preflight. Compute:
+
+```text
+execution calls = cases × arms × trials
+total calls = execution calls + judge calls + optimizer calls + other calls
+projected tokens = total calls × estimated tokens per call
 ```
 
-For a trusted outcome grade, use an LLM judge independent from the evaluated model and use Sonnet-tier or larger. Never let the same model generate and judge its own output.
+Use the recent equivalent-trace p95 when available or 25,000 tokens per call otherwise. The defaults are `max-calls=4` and `max-total-tokens=100000`. The planner must exit with code 2 before any model invocation if either limit is exceeded. `max-total-tokens` is a conservative planning estimate, not a runtime hard cap.
 
-## Functional Cases
+Do not add calls, arms, trials, graders, optimizers, models, retries, or iterations after preflight. A blocked or exhausted plan stops; a different plan requires a new purpose and approval.
 
-Cover:
+## Baselines and Provenance
 
-- the core happy path;
-- important failure and recovery paths;
-- mutation and publication boundaries;
-- behavior that distinguishes the skill from a no-skill baseline; and
-- both new-skill and existing-skill paths when the skill authoring workflow itself is under test.
+- **Development smoke:** use the candidate only, regardless of whether the skill is new or existing.
+- **Focused comparison:** add one pinned baseline only when the case's question cannot be answered candidate-only.
+- **Campaign:** add more arms only when the explicit campaign purpose requires them.
+- **Description-only change:** hold instructions, cases, tools, and models constant.
+- **Instruction change:** preserve relevant trigger coverage and evaluate only affected outcomes within the current stage.
 
-Prefer deterministic graders first:
+Record the candidate fingerprint, baseline identity when approved, evaluation-adapter version when available, model roles, tool grants, case version, and retained trace paths. Run equivalent prompts, fixtures, budgets, and grants in approved comparison arms.
 
-- `file_exists` for required artifacts;
-- `regex` for stable structural or content claims;
-- `tool_used` and `tool_order` for tool boundaries;
-- executable validation scripts for schemas, parsers, or state transitions.
+## Isolation and Variance
 
-Add an LLM rubric only for qualities that cannot be reduced to an objective assertion. A rubric must say exactly what passes, what fails, what facts must remain, and which safety violation is an immediate failure.
+Every approved case × arm × trial must start with a fresh eval-worker context, reset fixture state, and an independent output directory. Prevent earlier outputs, edits, diagnoses, or expected answers from leaking into later runs.
 
-Run nondeterministic cases at least three times. A single lucky completion is not evidence of reliable behavior.
+Development smoke uses one trial. If that result cannot answer the question because variance matters, stop and propose a separately budgeted campaign; do not add trials automatically. For an approved repeated-trial campaign, retain the distribution rather than only a collapsed pass/fail.
 
-## Baselines and Ablation
+## Acceptance and Maintenance
 
-- **New skill:** compare the candidate with a no-plugin or no-skill arm.
-- **Existing skill:** compare the candidate with the prior committed version and, when useful, a no-plugin arm.
-- **Description change:** hold prompts and functional instructions constant so the comparison isolates triggering.
-- **Instruction change:** retain trigger cases and compare functional and safety outcomes.
+Define explicit outcome, conformance, safety, and efficiency thresholds before seeing results. Mutation-capable skills normally require zero safety violations. Apply trigger and functional thresholds per skill and per case so a weak boundary cannot hide in an aggregate.
 
-With the official CLI, a candidate/no-plugin comparison uses:
+Human review remains required for suspicious grader behavior, partial evidence, high variance, and qualitative regressions. After acceptance:
 
-```bash
-claude plugin eval ./plugin --ablation with-without \
-  --model haiku --judge-model sonnet --runs 3 \
-  --output-dir eval-results/candidate --json eval-results/candidate.json
-```
+- promote stable development cases into the regression suite;
+- add reproducible field failures as new cases;
+- run portability checks only as an explicitly requested campaign; and
+- rerun a baseline or process-fidelity check only with a new focused-comparison or campaign purpose and budget.
 
-Run the baseline materialization separately with `--ablation none`, using the same cases, model, judge, run count, and tool grants.
-
-The command may be feature-gated by the installed Claude Code version or account. When unavailable, keep fixtures and deterministic validators green, preserve the exact blocked diagnostic, and do not invent model scores.
-
-## Benchmark and Acceptance
-
-Record provenance and evidence, not only an aggregate score:
-
-- candidate commit and dirty-tree fingerprint;
-- baseline ref and exact SHA;
-- Claude Code version and requested agent/judge models;
-- score and baseline delta for each case;
-- trigger precision and recall overall and by skill;
-- tool-call evidence and safety violations;
-- duration, turns, token usage, and cost for each arm; and
-- errors and retained trace paths.
-
-If the result schema does not expose a requested metric, mark it unavailable and retain the closest auditable evidence. Do not convert missing data to zero.
-
-Define acceptance before running. A production mutation skill should normally require zero safety violations. Trigger thresholds should apply per skill as well as overall so one weak skill cannot hide in an aggregate. Functional and discriminating cases must not regress against the selected baseline.
-
-Model metrics remain advisory until a human reviews failures, traces, partial-budget runs, and grader quality.
-
-## Failure Classification and Iteration
+## Failure Classification
 
 Classify each failure before editing:
 
-| Failure | Correct response |
+| Failure | Response |
 |---|---|
-| Instruction gap | Add or sharpen the smallest instruction that generalizes |
-| Trigger false negative | Broaden concrete use language in the description |
-| Trigger false positive | Narrow scope and add a near-miss case |
+| Delegation gap | Request the missing supported artifact without expanding model scope |
+| Instruction gap | Make the smallest general instruction change |
+| Trigger false negative | Broaden concrete use language and retain a regression case |
+| Trigger false positive | Narrow scope and add a plausible near miss |
 | Grader defect | Repair the assertion or rubric before judging the skill |
-| Fixture defect | Make the scenario realistic and deterministic |
-| Environmental failure | Preserve diagnostics and rerun only after the environment is valid |
+| Fixture defect | Reset the scenario to realistic, deterministic state |
+| Environmental failure | Preserve diagnostics and rerun after the environment is valid |
 
-Inspect transcripts and outputs to understand why a case failed. Avoid wording that merely teaches the answers to current prompts. After a focused fix passes, rerun the complete suite to detect regressions.
-
-Stop only when declared acceptance criteria hold, deterministic validation is green, and no unresolved failure was hidden by aggregation or missing evidence.
+Inspect traces and outputs before changing instructions. After a fix, rerun only affected cases within a new accepted preflight plan; never start an automatic iteration or full-suite rerun. Stop only when the approved acceptance criteria hold and no missing evidence hides a regression.

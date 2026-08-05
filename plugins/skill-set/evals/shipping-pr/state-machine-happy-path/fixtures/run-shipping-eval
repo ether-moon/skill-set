@@ -27,15 +27,14 @@ shift
 subcommand=$1
 shift
 
-[[ -n ${CLAUDE_PLUGIN_ROOT:-} ]] || fail 'CLAUDE_PLUGIN_ROOT is required'
-plugin_root=$(cd -- "$CLAUDE_PLUGIN_ROOT" 2>/dev/null && pwd -P) || \
-  fail 'CLAUDE_PLUGIN_ROOT is not a readable directory'
-expected_runner=$plugin_root/bin/skill-set-pr
-[[ -x $expected_runner ]] || fail 'canonical bundled skill-set-pr is not executable'
+[[ -n ${SKILL_SET_PR_RUNNER:-} ]] || fail 'SKILL_SET_PR_RUNNER is required'
+[[ $SKILL_SET_PR_RUNNER == /* && -x $SKILL_SET_PR_RUNNER ]] || \
+  fail 'SKILL_SET_PR_RUNNER must be an executable absolute path'
+expected_runner=$(cd -- "$(dirname -- "$SKILL_SET_PR_RUNNER")" && pwd -P)/${SKILL_SET_PR_RUNNER##*/}
 [[ $runner == /* && -x $runner ]] || fail 'runner must be an executable absolute path'
 physical_runner=$(cd -- "$(dirname -- "$runner")" && pwd -P)/${runner##*/}
 [[ $physical_runner == "$expected_runner" ]] || \
-  fail 'runner must exactly match CLAUDE_PLUGIN_ROOT/bin/skill-set-pr'
+  fail 'runner must exactly match SKILL_SET_PR_RUNNER'
 
 workspace=$(git rev-parse --show-toplevel 2>/dev/null) || fail 'run from the disposable Git fixture'
 workspace=$(cd -- "$workspace" && pwd -P)
@@ -86,6 +85,8 @@ case $subcommand in
         next_phase=resolving
         stage=transition-resolving
         output_file=03-resolving-transition.json
+        [[ $(arg_value --workspace-mode "$@" || true) == current ]] || \
+          fail 'resolving transition must record --workspace-mode current'
         ;;
       resolving:polling)
         expected_phase=published
@@ -137,6 +138,7 @@ case $stage in
     ;;
   transition-resolving)
     jq -e '.status == "resolving" and .cycle == 1 and
+      .resolution.workspace_mode == "current" and
       .resolution.expected_agents == ["pr-review-feedback"]' >/dev/null <<<"$output"
     ;;
   publish)

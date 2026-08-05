@@ -1,112 +1,90 @@
-# Testing Skills
+# Testing and Isolation Policy
 
 ## Table of Contents
 
+- [Responsibility](#responsibility)
 - [Test in Layers](#test-in-layers)
-- [Structural Validation](#structural-validation)
-- [Trigger Testing](#trigger-testing)
-- [Functional and Safety Testing](#functional-and-safety-testing)
-- [Cross-Model Testing](#cross-model-testing)
-- [Observe Navigation](#observe-navigation)
-- [Acceptance Evidence](#acceptance-evidence)
+- [Structural Boundary](#structural-boundary)
+- [Behavioral Contracts](#behavioral-contracts)
+- [Efficient Case Design](#efficient-case-design)
+- [Isolated Execution](#isolated-execution)
+- [Campaign Execution](#campaign-execution)
+- [Trace Review](#trace-review)
+
+## Responsibility
+
+Delegate test generation, budgeted execution, grading, aggregation, and review to a compatible `skill-creator` when supported. The preflight envelope remains authoritative; a creator that cannot honor it may produce artifacts but must not launch model invocations. This reference defines the common evidence policy and local fallback.
 
 ## Test in Layers
 
-Use the cheapest layer that can disprove the claim, then expand:
+Use the cheapest layer that can disprove the claim:
 
-1. **Structure** — frontmatter, directory names, references, fixture paths, and scripts are valid.
-2. **Deterministic behavior** — bundled scripts parse, validate, dry-run, mutate, recover, and report errors correctly.
-3. **Triggering** — representative positive and near-miss negative prompts select the correct skill.
-4. **Functional behavior** — the complete workflow produces the required outcome and respects stop conditions.
-5. **Safety** — unauthorized mutation, publication, deletion, or scope expansion remains impossible.
-6. **Comparison** — candidate behavior improves or preserves the declared baseline.
+1. **Structure** — frontmatter, paths, references, fixtures, and scripts validate.
+2. **Deterministic behavior** — scripts parse, dry-run, mutate, recover, and report errors correctly.
+3. **Triggering** — realistic positive requests and plausible near misses select the right entry point.
+4. **Functional behavior** — the complete workflow produces the required outcome.
+5. **Safety** — absent or narrower authority cannot cause forbidden effects.
+6. **Comparison** — when separately approved, the candidate improves or preserves the declared baseline.
 
-Do not substitute a prose assertion about a script for executing it.
+Do not substitute prose claims for executing a script or inspecting an artifact.
 
-## Structural Validation
+## Structural Boundary
 
-At minimum verify:
+Run the repository-provided validator first and a host-provided validator when available. The repository validator owns portable and project invariants; host validators add surface-specific checks. A creator's validator may execute either, but it does not replace them.
 
-- the directory and frontmatter `name` match;
-- the description states what the skill does and when to use it;
-- `SKILL.md` stays focused and every linked path resolves;
-- references are one level deep and do not create chains;
-- scripts declare dependencies, validate input, and return actionable failures;
-- mutation scripts provide a safe dry run or preview where meaningful; and
-- examples use real supported tools and argument syntax.
+At minimum verify the directory and frontmatter name, description scope, linked paths, executable resources, dependency diagnostics, safe previews for mutations, and real supported tool syntax.
 
-Run the host plugin validator when available. Add repository-local checks for stronger project invariants such as exact inventory, forbidden dependencies, generated-file drift, or Bash compatibility.
+## Behavioral Contracts
 
-## Trigger Testing
-
-For a production skill, use 8–10 should-trigger and 8–10 should-not-trigger prompts.
-
-Positive coverage should include:
-
-- direct requests;
-- paraphrases and informal wording;
-- uncommon valid uses;
-- requests that compete with a neighboring skill; and
-- explicit use of a key input type or workflow phase.
-
-Negative coverage should prioritize near misses:
-
-- the same noun but a different desired action;
-- an adjacent workflow owned elsewhere;
-- a simpler request that should be handled directly;
-- a later or earlier lifecycle phase outside the skill; and
-- a request that names an excluded output.
-
-Avoid irrelevant negatives. They inflate precision without testing the boundary.
-
-Measure precision and recall overall and per skill. Review the actual Skill calls as well as the final message.
-
-## Functional and Safety Testing
-
-Translate the workflow into observable contracts:
+Express each case as observable state:
 
 ```text
-Given: fixture state and explicit authority
+Given: reset fixture state and explicit authority
 When: the skill follows its normal entry point
-Then: exact output, state transition, tool scope, and recovery behavior
+Then: required output, state transition, scope, and recovery behavior
 ```
 
-Include happy path, invalid input, dependency failure, partial completion, retry, and concurrency when relevant. For stateful or mutating skills, use disposable repositories, mock services, and command logs. Verify both what happened and what did not happen.
+The project authoring skill owns change detection, safety contracts, and representative-case selection. Keep each common case focused on one observable regression risk rather than repeating a generic command or failure matrix.
 
-Safety tests should exercise absent or narrower authority, stale compare-and-swap values, ambiguous findings, unrelated user changes, failed substeps, and publication gates. A model rubric saying “be safe” is weaker than a command log proving no push or comment occurred.
+Verify both what happened and what did not happen. Command logs and state inspection are stronger safety evidence than a rubric that merely says the run was safe.
 
-## Cross-Model Testing
+## Efficient Case Design
 
-Test every model tier the skill supports:
+- Give each case one regression risk that differs from every existing case.
+- Do not repeat the full policy or a long command matrix in every prompt; reference concise task-local fixtures and contracts.
+- Move checks for strings, file existence, tool calls, and state transitions into deterministic tests.
+- Merge expectations that measure the same meaning.
+- Leave only genuinely qualitative judgment to a model grader.
+- Use at most one batched model-grader call for one output; do not launch one grader per expectation.
+- Do not add a case that duplicates an existing deterministic test or cannot reproduce an actual or credible observed failure.
+- After a fix, rerun only affected cases. Do not automatically rerun the full suite.
 
-- **Haiku** exposes missing sequence details and weak guardrails.
-- **Sonnet** is a balanced functional target and the minimum trusted LLM judge tier.
-- **Opus** exposes unnecessary instruction volume and overconstraint.
+## Isolated Execution
 
-Use a different model for LLM grading than for the agent run. Hold cases, fixtures, tool grants, and run count constant when comparing models. Run nondeterministic cases at least three times.
+Start every approved case, comparison arm, and trial in a fresh eval-worker context with reset fixtures and a separate output directory. Pass raw task artifacts and the skill under test; do not leak the expected answer, suspected bug, intended fix, or earlier conclusions.
 
-## Observe Navigation
+Use disposable repositories, mock services, or scoped test accounts for stateful workflows. Preserve unrelated user changes and clean trial artifacts that a later run could discover.
 
-Read traces to see how the model consumes the skill:
+## Campaign Execution
 
-- Does it open the correct reference only when needed?
-- Does it miss a critical instruction buried in a reference?
-- Does it repeatedly recreate a script that should be bundled?
-- Does it explore unrelated files or invoke another workflow?
-- Does it stop at the intended boundary?
+Treat a full suite, repeated trials, cross-model evaluation, cross-environment portability check, or broad optimizer pass as a campaign. Run it only after an explicit request, a stated purpose, and a separate accepted preflight budget.
 
-Move critical workflow and safety rules into `SKILL.md`. Remove references that are never used or do not change outcomes.
+Do not infer a campaign from successful deterministic validation, development smoke, or focused comparison. Do not reuse approval from any earlier stage.
 
-## Acceptance Evidence
+When a campaign needs qualitative grading, batch the qualitative expectations for each output into one model-grader call. Hold cases, fixtures, grants, and approved run counts constant across comparison arms.
 
-Before declaring the skill ready, retain:
+## Trace Review
 
-- baseline and candidate provenance;
-- deterministic test commands and results;
-- per-case scores and deltas;
-- trigger precision/recall overall and by skill;
-- safety violations and relevant tool-call evidence;
-- duration, turns, token, and cost data when exposed; and
-- unresolved environmental or grader limitations.
+Inspect whether the run:
 
-The top-level lifecycle routes to the separate evaluation reference for official case layout, ablation commands, grader selection, and iteration.
+- selected `creating-skills` as the primary entry point for overlapping authoring requests;
+- delegated only supported work inside the accepted preflight plan;
+- loaded only relevant references and reused bundled scripts;
+- ran deterministic validation before any development smoke;
+- kept development smoke candidate-only and single-trial;
+- added a baseline only for an approved focused comparison;
+- started a campaign only after an explicit request and separate budget;
+- stopped at the intended authority boundary; and
+- returned enough evidence for the policy gate.
+
+Move only critical orchestration and safety rules into `SKILL.md`. Remove guidance that the creator already owns or that never changes outcomes.

@@ -38,7 +38,15 @@ fi
 if [[ ${1:-} == pr && ${2:-} == list ]]; then
   if [[ $MOCK_GH_SCENARIO == malformed-pr-list ]]; then
     printf '%s\n' '[{"reviews":42,"comments":[]}]'
-  elif [[ $MOCK_GH_SCENARIO == coderabbit-active ]]; then
+  elif [[ $MOCK_GH_SCENARIO == reviewers-active ]]; then
+    printf '%s\n' '[{"reviews":[{"author":{"login":"coderabbitai[bot]"}},{"author":{"login":"claude[bot]"}},{"author":{"login":"chatgpt-codex-connector[bot]"}}],"comments":[]}]'
+  elif [[ $MOCK_GH_SCENARIO == codex-reaction || $MOCK_GH_SCENARIO == codex-unresolved ]]; then
+    printf '%s\n' '[{"reviews":[{"author":{"login":"chatgpt-codex-connector[bot]"}}],"comments":[]}]'
+  elif [[ $MOCK_GH_SCENARIO == claude-review ]]; then
+    printf '%s\n' '[{"reviews":[{"author":{"login":"claude[bot]"}}],"comments":[]}]'
+  elif [[ $MOCK_GH_SCENARIO == signal-gated-* ]]; then
+    printf '%s\n' '[{"reviews":[{"author":{"login":"claude[bot]"}},{"author":{"login":"chatgpt-codex-connector[bot]"}}],"comments":[]}]'
+  elif [[ $MOCK_GH_SCENARIO == coderabbit-* || $MOCK_GH_SCENARIO == malformed-coderabbit ]]; then
     printf '%s\n' '[{"reviews":[{"author":{"login":"coderabbitai[bot]"}}],"comments":[]}]'
   else
     printf '%s\n' '[]'
@@ -68,6 +76,13 @@ if [[ ${1:-} == pr && ${2:-} == view ]]; then
   mergeable=MERGEABLE
   merge_state=CLEAN
   pr_state=OPEN
+  reviews='[]'
+  comments='[]'
+  if [[ $MOCK_GH_SCENARIO == reviewers-active ]]; then
+    reviews=$(jq -cn --arg sha "$sha" '[{author:{login:"chatgpt-codex-connector[bot]"},commit:{oid:$sha},state:"COMMENTED"}]')
+  elif [[ $MOCK_GH_SCENARIO == claude-review ]]; then
+    reviews=$(jq -cn --arg sha "$sha" '[{author:{login:"claude[bot]"},commit:{oid:$sha},state:"COMMENTED"}]')
+  fi
   if [[ $MOCK_GH_SCENARIO == conflict ]]; then
     mergeable=CONFLICTING
     merge_state=DIRTY
@@ -79,10 +94,11 @@ if [[ ${1:-} == pr && ${2:-} == view ]]; then
   jq -cn --arg sha "$sha" --arg base "$MOCK_GH_BASE_SHA" --arg mergeable "$mergeable" \
     --arg merge_state "$merge_state" --arg state "$pr_state" --arg head_repo "$head_repo" \
     --arg head_branch "$head_branch" --arg host "$github_host" \
+    --argjson reviews "$reviews" --argjson comments "$comments" \
     '{number:17,headRefOid:$sha,headRefName:$head_branch,
       headRepository:{nameWithOwner:$head_repo},baseRefOid:$base,baseRefName:"main",
       mergeable:$mergeable,mergeStateStatus:$merge_state,state:$state,
-      url:("https://" + $host + "/owner/repo/pull/17")}'
+      url:("https://" + $host + "/owner/repo/pull/17"),reviews:$reviews,comments:$comments}'
   exit 0
 fi
 
@@ -113,7 +129,16 @@ if [[ ${1:-} == pr && ${2:-} == checks ]]; then
   fi
   bucket=$MOCK_GH_SCENARIO
   check_name=verify
-  if [[ $MOCK_GH_SCENARIO == registration-delay ]]; then
+  workflow=CI
+  if [[ $MOCK_GH_SCENARIO == signal-gated-running ]]; then
+    bucket=pending
+    check_name=review
+    workflow='Signal-Gated PR Review'
+  elif [[ $MOCK_GH_SCENARIO == signal-gated-complete || $MOCK_GH_SCENARIO == signal-gated-thread ]]; then
+    bucket=pass
+    check_name=review
+    workflow='Signal-Gated PR Review'
+  elif [[ $MOCK_GH_SCENARIO == registration-delay ]]; then
     if [[ $count -eq 1 ]]; then
       printf "%s\n" "no required checks reported on the 'feature' branch" >&2
       exit 1
@@ -135,8 +160,8 @@ if [[ ${1:-} == pr && ${2:-} == checks ]]; then
     fail|cancel|pending|pass|skipping) ;;
     *) bucket=pass ;;
   esac
-  jq -cn --arg bucket "$bucket" --arg name "$check_name" \
-    '[{bucket:$bucket,name:$name,state:($bucket | ascii_upcase),link:("https://example.test/check/" + $name),workflow:"CI"}]'
+  jq -cn --arg bucket "$bucket" --arg name "$check_name" --arg workflow "$workflow" \
+    '[{bucket:$bucket,name:$name,state:($bucket | ascii_upcase),link:("https://example.test/check/" + $name),workflow:$workflow}]'
   case "$bucket" in
     pending) exit 8 ;;
     fail|cancel) exit 1 ;;
@@ -145,7 +170,31 @@ if [[ ${1:-} == pr && ${2:-} == checks ]]; then
 fi
 
 if [[ ${1:-} == api && ${2:-} == graphql ]]; then
-  if [[ $MOCK_GH_SCENARIO == malformed-threads ]]; then
+  graphql_id=
+  graphql_body=
+  for argument in "$@"; do
+    case "$argument" in
+      id=*) graphql_id=${argument#id=} ;;
+      body=*) graphql_body=${argument#body=} ;;
+    esac
+  done
+  # shellcheck disable=SC2016 # Match the literal GraphQL query fragment below.
+  if [[ "$*" == *addPullRequestReviewThreadReply* ]]; then
+    printf '%s\n' "$graphql_body" >"$MOCK_GH_DIR/$graphql_id.reply"
+    printf '%s\n' '{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"reply-1"}}}}'
+  elif [[ "$*" == *resolveReviewThread* ]]; then
+    : >"$MOCK_GH_DIR/$graphql_id.resolved"
+    jq -cn --arg id "$graphql_id" '{data:{resolveReviewThread:{thread:{id:$id,isResolved:true}}}}'
+  elif [[ "$*" == *'node(id:$id)'* ]]; then
+    resolved=false
+    [[ ! -f $MOCK_GH_DIR/$graphql_id.resolved ]] || resolved=true
+    reply_nodes='[]'
+    if [[ -f $MOCK_GH_DIR/$graphql_id.reply ]]; then
+      reply_nodes=$(jq -Rs '[{body:.}]' <"$MOCK_GH_DIR/$graphql_id.reply")
+    fi
+    jq -cn --arg id "$graphql_id" --argjson resolved "$resolved" --argjson replies "$reply_nodes" \
+      '{data:{node:{id:$id,isResolved:$resolved,comments:{nodes:$replies}}}}'
+  elif [[ $MOCK_GH_SCENARIO == malformed-threads ]]; then
     jq -cn '{data:{repository:{pullRequest:{reviewThreads:{nodes:[{id:"thread-1",isResolved:false,isOutdated:false,comments:{nodes:[{body:42}]}}],pageInfo:{hasNextPage:false,endCursor:null}}}}}}'
   elif [[ $MOCK_GH_SCENARIO == pagination ]]; then
     if [[ "$*" == *'cursor=page-2'* ]]; then
@@ -153,6 +202,12 @@ if [[ ${1:-} == api && ${2:-} == graphql ]]; then
     else
       jq -cn '{data:{repository:{pullRequest:{reviewThreads:{nodes:[range(0;100) | {id:("thread-" + tostring),isResolved:true,isOutdated:false,comments:{nodes:[]}}],pageInfo:{hasNextPage:true,endCursor:"page-2"}}}}}}'
     fi
+  elif [[ $MOCK_GH_SCENARIO == coderabbit-unresolved ]]; then
+    jq -cn '{data:{repository:{pullRequest:{reviewThreads:{nodes:[{id:"thread-coderabbit",isResolved:false,isOutdated:false,comments:{nodes:[{id:"comment-coderabbit",author:{login:"coderabbitai[bot]"},body:"Please fix this",path:"fixture.txt",line:1}]}}],pageInfo:{hasNextPage:false,endCursor:null}}}}}}'
+  elif [[ $MOCK_GH_SCENARIO == codex-unresolved ]]; then
+    jq -cn '{data:{repository:{pullRequest:{reviewThreads:{nodes:[{id:"thread-codex",isResolved:false,isOutdated:false,comments:{nodes:[{id:"comment-codex",author:{login:"chatgpt-codex-connector[bot]"},body:"Please fix this",path:"fixture.txt",line:1}]}}],pageInfo:{hasNextPage:false,endCursor:null}}}}}}'
+  elif [[ $MOCK_GH_SCENARIO == signal-gated-thread ]]; then
+    jq -cn '{data:{repository:{pullRequest:{reviewThreads:{nodes:[{id:"thread-signal-gated",isResolved:false,isOutdated:false,comments:{nodes:[{author:{login:"github-actions[bot]"},body:"Please address this review finding",path:"fixture.txt",line:1}]}}],pageInfo:{hasNextPage:false,endCursor:null}}}}}}'
   elif [[ $MOCK_GH_SCENARIO == unresolved ]]; then
     jq -cn '{data:{repository:{pullRequest:{reviewThreads:{nodes:[{id:"thread-1",isResolved:false,isOutdated:false,comments:{nodes:[{author:{login:"reviewer"},body:"Please fix this",path:"fixture.txt",line:1}]} }],pageInfo:{hasNextPage:false,endCursor:null}}}}}}'
   elif [[ $MOCK_GH_SCENARIO == praise-only ]]; then
@@ -179,8 +234,19 @@ if [[ ${1:-} == api && ${2:-} == repos/*/issues/*/comments* ]]; then
   exit 0
 fi
 
+if [[ ${1:-} == api && ${2:-} == repos/*/issues/*/reactions* ]]; then
+  if [[ $MOCK_GH_SCENARIO == codex-reaction ]]; then
+    printf '%s\n' '[{"content":"+1","user":{"login":"chatgpt-codex-connector[bot]"}}]'
+  else
+    printf '%s\n' '[]'
+  fi
+  exit 0
+fi
+
 if [[ ${1:-} == api && ${2:-} == repos/*/commits/*/check-runs* ]]; then
-  if [[ $MOCK_GH_SCENARIO == coderabbit-check-delay ]]; then
+  if [[ $MOCK_GH_SCENARIO == reviewers-active ]]; then
+    printf '%s\n' '{"check_runs":[{"name":"CodeRabbit","status":"completed","conclusion":"success","app":{"slug":"coderabbitai"}},{"name":"Claude Code Review","status":"completed","conclusion":"neutral","app":{"slug":"claude"}}]}'
+  elif [[ $MOCK_GH_SCENARIO == coderabbit-check-delay ]]; then
     count=$(next_count coderabbit-check)
     if [[ $count -eq 1 ]]; then
       printf '%s\n' '{"check_runs":[{"name":"CodeRabbit","status":"in_progress","conclusion":null,"app":{"slug":"coderabbitai"}}]}'
@@ -204,6 +270,8 @@ if [[ ${1:-} == api && ${2:-} == repos/*/commits/*/status ]]; then
     [[ $count -gt 1 ]] && state=success
   elif [[ $MOCK_GH_SCENARIO == coderabbit-failure ]]; then
     state=failure
+  elif [[ $MOCK_GH_SCENARIO == reviewers-active ]]; then
+    state=success
   fi
   if [[ $state == absent ]]; then
     printf '%s\n' '{"statuses":[]}'

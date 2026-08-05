@@ -1,6 +1,6 @@
 {
   "name": "skill-set",
-  "description": "A marketplace for the unified skill-set development workflow plugin.",
+  "description": "A marketplace for focused development workflow and release automation plugins.",
   "owner": {
     "name": "ether-moon"
   },
@@ -9,6 +9,14 @@
       "name": "skill-set",
       "source": "./plugins/skill-set",
       "description": "Development workflow toolkit for Claude Code with git and PR automation, test strategy, skill authoring, architecture review, and technical writing."
+    },
+    {
+      "name": "release-workflow",
+      "source": {
+        "source": "github",
+        "repo": "ether-moon/release-workflow"
+      },
+      "description": "Opt-in semantic-version release preparation with isolated commits, explicit publication approval, and direct-push safety checks."
     }
   ]
 }
