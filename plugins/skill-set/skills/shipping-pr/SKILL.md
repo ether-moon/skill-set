@@ -27,7 +27,7 @@ Do not use for:
 
 | Flag | Default | Meaning |
 |---|---:|---|
-| `--max-cycles` | 3 | Maximum resolver attempts |
+| `--max-cycles` | 5 | Maximum resolver attempts |
 | `--ci-timeout` | 30 minutes | Current-HEAD check deadline |
 | `--review-timeout` | 10 minutes | Current-HEAD CodeRabbit deadline; preserves the legacy command default |
 | `--no-coderabbit` | off | Disable CodeRabbit completion requirement |

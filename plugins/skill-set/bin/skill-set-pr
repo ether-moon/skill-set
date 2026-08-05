@@ -475,7 +475,7 @@ command_init() {
   local dry_run=false
   local ci_timeout=1800
   local review_timeout=600
-  local max_cycles=3
+  local max_cycles=5
   local required_only=true
   local coderabbit_mode=auto
   NOW_OVERRIDE=
@@ -1276,7 +1276,7 @@ command_transition() {
   if [[ $increment_cycle == true ]]; then
     cycle=$((cycle + 1))
     local max_cycles
-    max_cycles=$(jq -r '.options.max_cycles // 3' <<<"$STATE")
+    max_cycles=$(jq -r '.options.max_cycles // 5' <<<"$STATE")
     [[ $cycle -le $max_cycles ]] || \
       die max_cycles "Resolver cycle $cycle exceeds max-cycles $max_cycles." "Finish the run as failed or start a new authorized run."
   fi
