@@ -7,7 +7,7 @@ Invoke the `shipping-pr` skill with the user's arguments.
 
 Supported flags and defaults:
 
-- `--max-cycles N` — resolver attempts, default 3
+- `--max-cycles N` — resolver attempts, default 5
 - `--ci-timeout MIN` — current-HEAD CI deadline, default 30
 - `--review-timeout MIN` — current-HEAD automated-review deadline, default 10
 - `--no-create` — fail when the current branch has no PR

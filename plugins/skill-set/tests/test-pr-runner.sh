@@ -238,7 +238,7 @@ assert_equals closed "$(jq -r .status <<<"$closed")" "closed PR initialization"
 
 make_fixture default-timeouts
 defaults=$(run_ok init --pr 17 --repo owner/repo --now 100)
-jq -e '.options.review_timeout_seconds == 600 and .deadlines.review_epoch == 700' \
+jq -e '.options.max_cycles == 5 and .options.review_timeout_seconds == 600 and .deadlines.review_epoch == 700' \
   <<<"$defaults" >/dev/null
 
 make_fixture reviewer-override-rejected

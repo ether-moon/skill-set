@@ -27,7 +27,7 @@ Do not use for:
 
 | Flag | Default | Meaning |
 |---|---:|---|
-| `--max-cycles` | 3 | Maximum resolver attempts |
+| `--max-cycles` | 5 | Maximum resolver attempts |
 | `--ci-timeout` | 30 minutes | Current-HEAD check deadline |
 | `--review-timeout` | 10 minutes | Persisted compatibility deadline; reviewer telemetry never delays a settled PR |
 | `--no-create` | off | Refuse to create a missing PR |
