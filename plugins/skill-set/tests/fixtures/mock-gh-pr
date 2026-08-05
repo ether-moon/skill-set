@@ -86,6 +86,8 @@ if [[ ${1:-} == pr && ${2:-} == view ]]; then
   if [[ $MOCK_GH_SCENARIO == conflict ]]; then
     mergeable=CONFLICTING
     merge_state=DIRTY
+  elif [[ $MOCK_GH_SCENARIO == merge-state-blocked ]]; then
+    merge_state=BLOCKED
   elif [[ $MOCK_GH_SCENARIO == closed ]]; then
     pr_state=CLOSED
   elif [[ $MOCK_GH_SCENARIO == close-race && $count -gt 2 ]]; then
@@ -100,6 +102,40 @@ if [[ ${1:-} == pr && ${2:-} == view ]]; then
       mergeable:$mergeable,mergeStateStatus:$merge_state,state:$state,
       url:("https://" + $host + "/owner/repo/pull/17"),reviews:$reviews,comments:$comments}'
   exit 0
+fi
+
+if [[ ${1:-} == api && ${2:-} == repos/*/rules/branches/* ]]; then
+  if [[ $MOCK_GH_SCENARIO == malformed-rules ]]; then
+    printf '%s\n' '[{"type":"required_status_checks","parameters":{"required_status_checks":[{"context":42}]}}]'
+  elif [[ $MOCK_GH_SCENARIO == missing-required-review ]]; then
+    jq -cn '[{type:"required_status_checks",parameters:{required_status_checks:[
+      {context:"verify",integration_id:null},
+      {context:"signal-gated-review",integration_id:null}
+    ]}}]'
+  elif [[ $MOCK_GH_SCENARIO == no-required ]]; then
+    printf '%s\n' '[]'
+  elif [[ $MOCK_GH_SCENARIO == signal-gated-* ]]; then
+    jq -cn '[{type:"required_status_checks",parameters:{required_status_checks:[
+      {context:"review",integration_id:null}
+    ]}}]'
+  else
+    jq -cn '[{type:"required_status_checks",parameters:{required_status_checks:[
+      {context:"verify",integration_id:null}
+    ]}}]'
+  fi
+  exit 0
+fi
+
+if [[ ${1:-} == api && ${2:-} == repos/*/branches/*/protection/required_status_checks* ]]; then
+  if [[ $MOCK_GH_SCENARIO == legacy-missing-required ]]; then
+    printf '%s\n' '{"strict":false,"contexts":["legacy-review"],"checks":[]}'
+    exit 0
+  elif [[ $MOCK_GH_SCENARIO == malformed-protection ]]; then
+    printf '%s\n' '{"strict":false,"contexts":[42],"checks":[]}'
+    exit 0
+  fi
+  printf '%s\n' 'gh: Branch not protected (HTTP 404)' >&2
+  exit 1
 fi
 
 if [[ ${1:-} == pr && ${2:-} == comment ]]; then
@@ -127,6 +163,13 @@ if [[ ${1:-} == pr && ${2:-} == checks ]]; then
     printf "%s\n" "no required checks reported on the 'feature' branch" >&2
     exit 1
   fi
+  if [[ $MOCK_GH_SCENARIO == missing-required-review && $count -gt 1 ]]; then
+    jq -cn '[
+      {bucket:"pass",name:"verify",state:"PASS",link:"https://example.test/check/verify",workflow:"CI"},
+      {bucket:"pass",name:"signal-gated-review",state:"PASS",link:"https://example.test/check/signal-gated-review",workflow:"Signal-Gated PR Review"}
+    ]'
+    exit 0
+  fi
   bucket=$MOCK_GH_SCENARIO
   check_name=verify
   workflow=CI
@@ -138,6 +181,8 @@ if [[ ${1:-} == pr && ${2:-} == checks ]]; then
     bucket=pass
     check_name=review
     workflow='Signal-Gated PR Review'
+  elif [[ $MOCK_GH_SCENARIO == coderabbit-fingerprint ]]; then
+    bucket=pending
   elif [[ $MOCK_GH_SCENARIO == registration-delay ]]; then
     if [[ $count -eq 1 ]]; then
       printf "%s\n" "no required checks reported on the 'feature' branch" >&2
@@ -153,6 +198,10 @@ if [[ ${1:-} == pr && ${2:-} == checks ]]; then
   elif [[ $MOCK_GH_SCENARIO == fail-b ]]; then
     bucket=fail
     check_name='test'
+  elif [[ $MOCK_GH_SCENARIO == missing-required-review ]]; then
+    bucket=pass
+  elif [[ $MOCK_GH_SCENARIO == legacy-missing-required ]]; then
+    bucket=pass
   fi
   [[ $bucket == delayed && $count -eq 1 ]] && bucket=pending
   [[ $bucket == delayed && $count -gt 1 ]] && bucket=pass
@@ -265,6 +314,10 @@ if [[ ${1:-} == api && ${2:-} == repos/*/commits/*/status ]]; then
     printf '%s\n' '{"statuses":[{"context":42,"state":"success"}]}'
     exit 0
   elif [[ $MOCK_GH_SCENARIO == coderabbit-delay ]]; then
+    count=$(next_count coderabbit)
+    state=pending
+    [[ $count -gt 1 ]] && state=success
+  elif [[ $MOCK_GH_SCENARIO == coderabbit-fingerprint ]]; then
     count=$(next_count coderabbit)
     state=pending
     [[ $count -gt 1 ]] && state=success
