@@ -1,0 +1,23 @@
+## Decisions Made
+- main의 새 runner 구조를 유지했습니다: `plugins/skill-set/bin/skill-set-pr`는 compatibility shim으로 남기고 5회 기본값을 canonical skill script에 이식했습니다.
+- main의 reviewer override 제거를 유지했습니다: 기존 테스트 호출은 그대로 두고 `max_cycles == 5` 단언만 합쳤습니다.
+
+## Problems Encountered
+- PR이 최신 main과 merge conflict 상태였습니다: 비변경 3-tree 분석으로 두 충돌을 OBVIOUS로 분류한 뒤 정확한 base SHA를 병합했습니다.
+- managed inspect가 한 번 원격 조회에 실패했습니다: 승인된 네트워크 접근으로 재시도해 index CAS merge commit을 완료했습니다.
+
+## Constraints Identified
+- resolver cycle의 conflict 단계는 merge-conflict-resolver만 실행해야 합니다: CI와 리뷰 처리는 새 HEAD snapshot 이후로 미뤄집니다.
+- 병합은 이동하는 branch ref가 아닌 고정된 base SHA를 사용해야 합니다: rebase와 force-push는 금지됩니다.
+
+## Open Questions
+- None
+
+## Context
+PR #38을 main의 최신 구조와 병합하면서 shipping-pr resolver 기본값 5회 변경을 보존했습니다. 두 충돌은 모두 객관적인 구조 이동 및 테스트 계약 결합으로 해소되었고 PR runner 테스트와 셸 문법 검사가 통과했습니다. merge commit은 아직 publication gate를 거치기 전입니다.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
