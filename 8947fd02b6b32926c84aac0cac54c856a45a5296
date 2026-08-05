@@ -1,0 +1,24 @@
+## Decisions Made
+- origin/main의 최신 커밋 `6d968c5`를 immutable base로 사용해 patch 버전을 `1.14.5`에서 `1.14.6`으로 올린다: 사용자가 최신 main 기준 patch bump를 명시했다.
+- changelog에는 이전 release 이후 병합된 PR #38과 #39를 모두 `Fixed`에 포함한다: runner가 committed versioning policy와 commit 범위에서 계산한 결과를 승인했다.
+- release commit은 `CHANGELOG.md`와 `plugins/skill-set/.claude-plugin/plugin.json`만 변경한다: 프로젝트의 manifest 및 changelog 정책을 따른다.
+
+## Problems Encountered
+- None
+
+## Constraints Identified
+- release 준비는 승인된 `base_sha`와 `input_digest`가 모두 일치해야 한다: main 변경이나 입력 변경이 있으면 기존 preview를 재사용할 수 없다.
+- publication은 별도의 사용자 승인과 원격 main SHA 재검증 후 normal push로만 수행해야 한다: force-push나 PR fallback은 허용되지 않는다.
+- 이번 작업은 버전 commit과 changelog 갱신까지만 포함한다: package publish, tag 생성, deployment는 범위 밖이다.
+
+## Open Questions
+- None
+
+## Context
+PR #39 병합 후 origin/main 최신 상태를 기준으로 skill-set plugin의 patch release를 준비했다. release runner가 버전 1.14.6, 두 개의 변경 파일, 커밋 `8947fd0`을 격리된 worktree에서 생성하고 scope를 검증했다. 실제 origin/main push는 최종 사용자 승인을 기다리고 있다.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
