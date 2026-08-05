@@ -29,9 +29,9 @@ Do not use for:
 |---|---:|---|
 | `--max-cycles` | 3 | Maximum resolver attempts |
 | `--ci-timeout` | 30 minutes | Current-HEAD check deadline |
-| `--review-timeout` | 10 minutes | Persisted compatibility deadline; reviewer telemetry never delays a settled PR |
+| `--review-timeout` | 10 minutes | Deprecated compatibility input; it does not gate completion |
 | `--no-create` | off | Refuse to create a missing PR |
-| `--required-only` | true | Select required checks only |
+| `--required-only` | true | Enforce effective required checks only; `false` additionally selects observed optional checks |
 
 ## Common Scenarios
 
@@ -39,7 +39,7 @@ Do not use for:
 - “Ship this branch even though it is behind main” commits and publishes the current branch state, then lets the normal blocker cycle resolve any base conflict.
 - “Keep resolving without extra checkouts” reconciles and fixes the PR in the currently checked-out worktree and branch.
 - “Resume PR 42” loads the active run and branches on its persisted status/publication phase without starting a duplicate resolver.
-- “Is this PR truly clean?” snapshots the same HEAD across checks, paginated threads, mergeability, and auto-detected reviewer telemetry. Pending reviewer telemetry is reported without delaying a settled PR.
+- “Is this PR truly clean?” snapshots the same HEAD across effective required checks, paginated threads, and mergeability. Reviewer telemetry is reported without affecting the verdict.
 
 ## Workflow
 
@@ -74,11 +74,10 @@ Convert minute flags to seconds, then run:
   --pr "$PR" --repo "$REPO" \
   --max-cycles "$MAX_CYCLES" \
   --ci-timeout-seconds "$CI_TIMEOUT_SECONDS" \
-  --review-timeout-seconds "$REVIEW_TIMEOUT_SECONDS" \
   --required-only "$REQUIRED_ONLY"
 ```
 
-Reviewer discovery is always automatic. The runner detects CodeRabbit, Claude, and `chatgpt-codex-connector` from recent merged-PR activity, then incorporates current-PR evidence on every snapshot for reporting and blocker fingerprints. Do not ask the user to select an adapter or pass reviewer-specific flags. Reviewer telemetry is not a separate completion gate: once selected checks are settled and no actionable review thread remains, an absent, pending, or failed reviewer signal must not keep the run polling or make it time out. A reviewer check still participates through the normal selected-check gate, and reviewer feedback still participates through review threads.
+Reviewer discovery is always automatic and reporting-only. The runner detects CodeRabbit, Claude, and `chatgpt-codex-connector` from recent merged-PR activity, but their absent, pending, or failed telemetry never affects status, deadlines, or blocker fingerprints. Do not ask the user to select an adapter or pass reviewer-specific flags. A review-related status or check gates completion only when it is an effective required context; `--required-only false` intentionally broadens the selected set to every observed check. Existing actionable review threads still participate through the review-thread gate.
 
 Use `--resume` only when the runner reports an active run. State lives under the repository's Git common directory, so linked worktrees share one lock and one run. Branch on the returned status: snapshot only `polling`; handle `blocked`, `awaiting_user`, and `resolving` before polling again. A resumed `resolving` run must use its recorded `resolution` metadata, including `decision_requirements` and `decisions`, and must never dispatch a duplicate resolver. Resume a journaled `prepared`, `gate_passed`, or `commenting` publication by calling `publish` with the unchanged files; the runner reconciles the remote HEAD and hidden comment marker. If its phase is `pending`, report the recorded worktree/branch and treat the interrupted attempt as `partial-failure`. A resumed `awaiting_user` run remains paused with its saved result and recovery paths until the user explicitly decides every recorded ID.
 
@@ -150,13 +149,15 @@ Every transition supplies `--from`, `--to`, and `--expected-run-id`. Treat a com
 Declare clean only when one snapshot confirms all of the following for the same HEAD at query start and finish:
 
 - no merge conflict;
-- every selected check is `pass` or `skipping`;
+- every effective required check context is present and `pass` or `skipping`;
+- every additionally selected optional check is `pass` or `skipping`;
 - no fail, cancel, pending, or timeout result;
+- GitHub mergeability is known;
 - no unresolved actionable review thread;
 
-Auto-detected reviewer signals are telemetry only. Their absence, pending state, or standalone failure does not override this verdict; checks and actionable review threads remain authoritative.
+An effective required context that has not appeared on the current HEAD is `pending`, not absent from the verdict. Auto-detected reviewer signals are telemetry only and never override this rule; a reviewer affects the verdict only through a required check context or an existing actionable thread. `mergeStateStatus=BLOCKED` is reported but does not independently gate completion because it can include approval requirements outside the required check set.
 
-If HEAD changes, discard the old results. The runner resets the check deadline, review deadline, and check-registration grace before snapshotting the new HEAD.
+If HEAD changes, discard the old results. The runner resets the check deadline and check-registration grace before snapshotting the new HEAD.
 
 ## Output
 

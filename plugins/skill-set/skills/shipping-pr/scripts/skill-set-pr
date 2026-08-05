@@ -211,6 +211,7 @@ read_state() {
     (.github_host | type == "string" and test("^[A-Za-z0-9.-]+$")) and
     (.head_repo | type == "string" and test("^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9_.-]+$")) and
     (.head_branch | type == "string" and test("^[^\\n]+$")) and
+    ((.base_branch == null) or (.base_branch | type == "string" and test("^[^\\n]+$"))) and
     (.pr == $expected_pr) and
     (.head_sha | type == "string" and test("^[0-9a-fA-F]{40}$")) and
     (.cycle | type == "number" and . >= 0) and
@@ -338,6 +339,28 @@ gh_json() {
   fi
   rm -f -- "$error_file"
   printf '%s\n' "$output"
+}
+
+gh_optional_json_404() {
+  local output error_file error_output exit_code
+  error_file=$(mktemp "${TMPDIR:-/tmp}/skill-set-pr-gh.XXXXXX" 2>/dev/null) || \
+    die temporary_file_failed "Unable to create a temporary gh error file." "Check temporary-directory permissions and retry."
+  set +e
+  output=$(gh "$@" 2>"$error_file")
+  exit_code=$?
+  set -e
+  error_output=$(<"$error_file")
+  rm -f -- "$error_file"
+  if [[ $exit_code -eq 0 ]]; then
+    OPTIONAL_JSON_FOUND=true
+    OPTIONAL_JSON=$output
+  elif [[ $exit_code -eq 1 && $error_output == *"(HTTP 404)"* ]]; then
+    OPTIONAL_JSON_FOUND=false
+    OPTIONAL_JSON=null
+  else
+    die github_query_failed "GitHub query failed: ${error_output:-exit $exit_code}" \
+      "Verify gh authentication and repository access before retrying."
+  fi
 }
 
 gh_checks_json() {
@@ -602,9 +625,9 @@ command_init() {
   ' <<<"$recent_prs" 2>/dev/null) || \
     die invalid_github_response "Unable to classify automated reviewer activity from gh pr list." "Update gh and retry."
 
-  local pr_json pr_state remote_head head_repo head_branch github_host pr_url
+  local pr_json pr_state remote_head head_repo head_branch base_branch github_host pr_url
   pr_json=$(gh_json pr view "$PR" --repo "$repo" \
-    --json headRefOid,headRefName,headRepository,state,url)
+    --json headRefOid,headRefName,headRepository,baseRefName,state,url)
   validate_json_response "gh pr view" "$pr_json"
   jq -e '
     type == "object" and
@@ -612,6 +635,7 @@ command_init() {
     (.headRefName | type == "string" and length > 0) and
     (.headRepository | type == "object") and
     (.headRepository.nameWithOwner | type == "string" and length > 0) and
+    (.baseRefName | type == "string" and length > 0) and
     (.url | type == "string" and length > 0) and
     ((.state // "OPEN") | type == "string")
   ' >/dev/null 2>&1 <<<"$pr_json" || \
@@ -626,9 +650,11 @@ command_init() {
   validate_sha headRefOid "$head_sha"
   head_repo=$(jq -r .headRepository.nameWithOwner <<<"$pr_json")
   head_branch=$(jq -r .headRefName <<<"$pr_json")
+  base_branch=$(jq -r .baseRefName <<<"$pr_json")
   pr_url=$(jq -r .url <<<"$pr_json")
   validate_repo "$head_repo"
   validate_branch headRefName "$head_branch"
+  validate_branch baseRefName "$base_branch"
   parse_pr_host "$pr_url"
   github_host=$PR_HOST
   pr_state=$(jq -r '.state // "OPEN"' <<<"$pr_json")
@@ -644,6 +670,7 @@ command_init() {
   new_state=$(jq -cn \
     --argjson schema "$SCHEMA_VERSION" --arg run_id "$run_id" --arg repo "$repo" \
     --arg github_host "$github_host" --arg head_repo "$head_repo" --arg head_branch "$head_branch" \
+    --arg base_branch "$base_branch" \
     --argjson pr "$PR" --arg head "$head_sha" --arg status "$initial_status" \
     --argjson checks "$checks_deadline" --argjson review "$review_deadline" \
     --argjson registration "$registration_deadline" \
@@ -651,7 +678,8 @@ command_init() {
     --argjson max_cycles "$max_cycles" --argjson required_only "$required_only" \
     --argjson reviewers "$reviewers_active" \
     '{schema_version:$schema,run_id:$run_id,repo:$repo,github_host:$github_host,
-      head_repo:$head_repo,head_branch:$head_branch,pr:$pr,head_sha:$head,cycle:0,
+      head_repo:$head_repo,head_branch:$head_branch,base_branch:$base_branch,
+      pr:$pr,head_sha:$head,cycle:0,
       deadlines:{checks_epoch:$checks,review_epoch:$review,registration_epoch:$registration},
       blocker_fingerprint:"",checks_observed:false,resolver_attempt:null,resolution:null,status:$status,
       options:{ci_timeout_seconds:$ci_timeout,review_timeout_seconds:$review_timeout,
@@ -659,6 +687,71 @@ command_init() {
       reviewers:{active:$reviewers}}')
   [[ $dry_run == true ]] || write_state "$new_state"
   emit_state init "$new_state" false "$dry_run"
+}
+
+collect_required_contexts() {
+  local repo=$1
+  local base_branch=$2
+  local encoded_branch page=1 response count
+  encoded_branch=$(jq -rn --arg branch "$base_branch" '$branch | @uri')
+  REQUIRED_CONTEXTS='[]'
+
+  while [[ $page -le 1000 ]]; do
+    response=$(gh_json api "repos/$repo/rules/branches/$encoded_branch?per_page=100&page=$page")
+    validate_json_response "branch rules API" "$response"
+    jq -e '
+      type == "array" and all(.[];
+        type == "object" and
+        ((.type // "") | type == "string") and
+        ((.parameters // {}) | type == "object") and
+        (if .type == "required_status_checks" then
+          (.parameters.required_status_checks | type == "array") and
+          all(.parameters.required_status_checks[];
+            type == "object" and
+            (.context | type == "string" and length > 0) and
+            ((.integration_id == null) or (.integration_id | type == "number")))
+        else true end))
+    ' >/dev/null 2>&1 <<<"$response" || \
+      die invalid_github_response "Branch rules returned an invalid required-status-check shape." \
+        "Verify GitHub API access and retry."
+    REQUIRED_CONTEXTS=$(jq -cn --argjson existing "$REQUIRED_CONTEXTS" --argjson rules "$response" '
+      [$existing[],
+       $rules[]? | select(.type == "required_status_checks")
+         | .parameters.required_status_checks[]?.context]
+      | unique | sort
+    ')
+    count=$(jq 'length' <<<"$response")
+    [[ $count -eq 100 ]] || break
+    page=$((page + 1))
+  done
+  [[ $page -le 1000 ]] || \
+    die pagination_limit "Branch rule pagination exceeded 1000 pages." \
+      "Inspect the effective rules for $base_branch before retrying."
+
+  gh_optional_json_404 api \
+    "repos/$repo/branches/$encoded_branch/protection/required_status_checks"
+  if [[ $OPTIONAL_JSON_FOUND == true ]]; then
+    validate_json_response "status-check protection API" "$OPTIONAL_JSON"
+    jq -e '
+      type == "object" and
+      ((.contexts // []) | type == "array") and
+      all((.contexts // [])[]; type == "string" and length > 0) and
+      ((.checks // []) | type == "array") and
+      all((.checks // [])[];
+        type == "object" and
+        (.context | type == "string" and length > 0) and
+        ((.app_id == null) or (.app_id | type == "number")))
+    ' >/dev/null 2>&1 <<<"$OPTIONAL_JSON" || \
+      die invalid_github_response "Status-check protection returned an invalid context shape." \
+        "Verify GitHub API access and retry."
+    REQUIRED_CONTEXTS=$(jq -cn --argjson existing "$REQUIRED_CONTEXTS" \
+      --argjson protection "$OPTIONAL_JSON" '
+      [$existing[],
+       ($protection.contexts // [])[],
+       ($protection.checks // [])[]?.context]
+      | unique | sort
+    ')
+  fi
 }
 
 collect_threads() {
@@ -950,15 +1043,17 @@ command_snapshot() {
     die invalid_snapshot_state "Snapshots are allowed only from polling, not $current_status." \
       "Handle $current_status with the state transition workflow before polling again."
 
-  local repo prior_head prior_head_repo prior_head_branch prior_host required_only reviewers_active cycle
+  local repo prior_head prior_head_repo prior_head_branch prior_base_branch prior_host required_only reviewers_active cycle
   repo=$(jq -r .repo <<<"$STATE")
   prior_head=$(jq -r .head_sha <<<"$STATE")
   prior_head_repo=$(jq -r .head_repo <<<"$STATE")
   prior_head_branch=$(jq -r .head_branch <<<"$STATE")
+  prior_base_branch=$(jq -r '.base_branch // ""' <<<"$STATE")
   prior_host=$(jq -r .github_host <<<"$STATE")
   validate_repo "$repo"
   validate_repo "$prior_head_repo"
   validate_branch state.head_branch "$prior_head_branch"
+  [[ -z $prior_base_branch ]] || validate_branch state.base_branch "$prior_base_branch"
   validate_sha state.head_sha "$prior_head"
   required_only=$(jq -r '
     if .options.required_only == null then true else .options.required_only end
@@ -966,9 +1061,9 @@ command_snapshot() {
   reviewers_active=$(jq -c '.reviewers.active // []' <<<"$STATE")
   cycle=$(jq -r '.cycle // 0' <<<"$STATE")
 
-  local before_json start_head start_head_repo start_head_branch start_host pr_state mergeable merge_state
+  local before_json start_head start_head_repo start_head_branch start_base_branch start_host pr_state mergeable merge_state
   before_json=$(gh_json pr view "$PR" --repo "$repo" \
-    --json headRefOid,headRefName,headRepository,mergeable,mergeStateStatus,state,url)
+    --json headRefOid,headRefName,headRepository,baseRefName,mergeable,mergeStateStatus,state,url)
   validate_json_response "gh pr view" "$before_json"
   jq -e '
     type == "object" and
@@ -976,6 +1071,7 @@ command_snapshot() {
     (.headRefName | type == "string" and length > 0) and
     (.headRepository | type == "object") and
     (.headRepository.nameWithOwner | type == "string" and length > 0) and
+    (.baseRefName | type == "string" and length > 0) and
     (.url | type == "string" and length > 0) and
     ((.mergeable // "UNKNOWN") | type == "string") and
     ((.mergeStateStatus // "UNKNOWN") | type == "string") and
@@ -987,20 +1083,27 @@ command_snapshot() {
   validate_sha headRefOid "$start_head"
   start_head_repo=$(jq -r .headRepository.nameWithOwner <<<"$before_json")
   start_head_branch=$(jq -r .headRefName <<<"$before_json")
+  start_base_branch=$(jq -r .baseRefName <<<"$before_json")
   validate_repo "$start_head_repo"
   validate_branch headRefName "$start_head_branch"
+  validate_branch baseRefName "$start_base_branch"
   parse_pr_host "$(jq -r .url <<<"$before_json")"
   start_host=$PR_HOST
   pr_state=$(jq -r '.state // "OPEN"' <<<"$before_json")
   mergeable=$(jq -r '.mergeable // "UNKNOWN"' <<<"$before_json")
   merge_state=$(jq -r '.mergeStateStatus // "UNKNOWN"' <<<"$before_json")
 
-  local checks_json
+  local checks_json required_checks_json required_contexts missing_required required_summary
+  collect_required_contexts "$repo" "$start_base_branch"
+  required_contexts=$REQUIRED_CONTEXTS
   if [[ $required_only == true ]]; then
     checks_json=$(gh_checks_json pr checks "$PR" --repo "$repo" --required \
       --json bucket,name,state,link,workflow)
+    required_checks_json=$checks_json
   else
     checks_json=$(gh_checks_json pr checks "$PR" --repo "$repo" \
+      --json bucket,name,state,link,workflow)
+    required_checks_json=$(gh_checks_json pr checks "$PR" --repo "$repo" --required \
       --json bucket,name,state,link,workflow)
   fi
   jq -e '
@@ -1013,9 +1116,28 @@ command_snapshot() {
       ((.state // "") | type == "string"))
   ' >/dev/null 2>&1 <<<"$checks_json" || \
     die invalid_github_response "gh pr checks returned an invalid nested shape." "Update gh and retry."
+  jq -e 'type == "array" and all(.[]; type == "object" and ((.name // "") | type == "string"))' \
+    >/dev/null 2>&1 <<<"$required_checks_json" || \
+    die invalid_github_response "Required checks returned an invalid nested shape." "Update gh and retry."
+  missing_required=$(jq -cn --argjson required "$required_contexts" \
+    --argjson observed "$required_checks_json" '
+    ($observed | map(.name // "") | unique) as $observed_names
+    | [$required[] as $context
+       | select(($observed_names | index($context)) == null)
+       | $context]
+  ')
+  required_summary=$(jq -cn --argjson configured "$required_contexts" \
+    --argjson observed "$required_checks_json" --argjson missing "$missing_required" '
+    ($observed | map(.name // "") | unique) as $observed_names
+    | {configured:$configured,
+       observed:[$configured[] as $context
+         | select(($observed_names | index($context)) != null)
+         | $context],
+       missing:$missing}
+  ')
   local check_details check_counts check_total
-  check_details=$(jq -c '
-    [ .[]? as $check
+  check_details=$(jq -cn --argjson checks "$checks_json" --argjson missing "$missing_required" '
+    ([ $checks[]? as $check
       | (($check.bucket // "pending") | ascii_downcase) as $bucket
       | {name:($check.name // ""),workflow:($check.workflow // ""),link:($check.link // ""),
           state:($check.state // ""),
@@ -1024,8 +1146,9 @@ command_snapshot() {
             elif $bucket == "fail" then "fail"
             elif ($bucket == "cancel" or $bucket == "cancelled") then "cancel"
             else "pending" end)} ]
+      + [$missing[] | {name:.,workflow:"",link:"",state:"MISSING",bucket:"pending"}])
     | sort_by(.workflow,.name,.link,.bucket,.state)
-  ' <<<"$checks_json" 2>/dev/null) || \
+  ' 2>/dev/null) || \
     die invalid_github_response "Unable to normalize gh pr checks data." "Inspect the check response and retry."
   check_counts=$(jq -c '
     reduce .[]? as $check ({pass:0,skipping:0,fail:0,cancel:0,pending:0};
@@ -1054,9 +1177,10 @@ command_snapshot() {
   ')
   coderabbit_state=$(jq -r .coderabbit <<<"$reviewer_states")
 
-  local after_json end_head end_head_repo end_head_branch end_host after_pr_state
+  local after_json end_head end_head_repo end_head_branch end_base_branch end_host after_pr_state
+  local end_mergeable end_merge_state
   after_json=$(gh_json pr view "$PR" --repo "$repo" \
-    --json headRefOid,headRefName,headRepository,state,url)
+    --json headRefOid,headRefName,headRepository,baseRefName,mergeable,mergeStateStatus,state,url)
   validate_json_response "gh pr view" "$after_json"
   jq -e '
     type == "object" and
@@ -1064,7 +1188,10 @@ command_snapshot() {
     (.headRefName | type == "string" and length > 0) and
     (.headRepository | type == "object") and
     (.headRepository.nameWithOwner | type == "string" and length > 0) and
+    (.baseRefName | type == "string" and length > 0) and
     (.url | type == "string" and length > 0) and
+    ((.mergeable // "UNKNOWN") | type == "string") and
+    ((.mergeStateStatus // "UNKNOWN") | type == "string") and
     ((.state // "OPEN") | type == "string")
   ' >/dev/null 2>&1 <<<"$after_json" || \
     die invalid_github_response "Final gh pr view returned an invalid HEAD/state shape." "Confirm that PR $PR exists."
@@ -1073,11 +1200,15 @@ command_snapshot() {
   validate_sha headRefOid "$end_head"
   end_head_repo=$(jq -r .headRepository.nameWithOwner <<<"$after_json")
   end_head_branch=$(jq -r .headRefName <<<"$after_json")
+  end_base_branch=$(jq -r .baseRefName <<<"$after_json")
   validate_repo "$end_head_repo"
   validate_branch headRefName "$end_head_branch"
+  validate_branch baseRefName "$end_base_branch"
   parse_pr_host "$(jq -r .url <<<"$after_json")"
   end_host=$PR_HOST
   after_pr_state=$(jq -r '.state // "OPEN"' <<<"$after_json")
+  end_mergeable=$(jq -r '.mergeable // "UNKNOWN"' <<<"$after_json")
+  end_merge_state=$(jq -r '.mergeStateStatus // "UNKNOWN"' <<<"$after_json")
 
   local now head_changed=false discarded=false deadlines checks_observed resolver_attempt
   now=$(now_epoch)
@@ -1086,7 +1217,9 @@ command_snapshot() {
   resolver_attempt=$(jq -c '.resolver_attempt // null' <<<"$STATE")
   if [[ $prior_head != "$start_head" || $start_head != "$end_head" || \
     $(lowercase "$prior_head_repo") != "$(lowercase "$start_head_repo")" || \
-    $prior_head_branch != "$start_head_branch" || $prior_host != "$start_host" || \
+    $prior_head_branch != "$start_head_branch" || \
+    ( -n $prior_base_branch && $prior_base_branch != "$start_base_branch" ) || \
+    $prior_host != "$start_host" || \
     $(lowercase "$start_head_repo") != "$(lowercase "$end_head_repo")" || \
     $start_head_branch != "$end_head_branch" || $start_host != "$end_host" ]]; then
     head_changed=true
@@ -1101,12 +1234,14 @@ command_snapshot() {
     resolver_attempt=null
   fi
 
+  merge_state=$end_merge_state
   local status conflict=false merge_pending=false registration_pending=false checks_missing=false
   if [[ $pr_state == CLOSED || $pr_state == MERGED || $after_pr_state == CLOSED || $after_pr_state == MERGED ]]; then
     status=closed
   elif [[ $start_head != "$end_head" || \
     $(lowercase "$start_head_repo") != "$(lowercase "$end_head_repo")" || \
-    $start_head_branch != "$end_head_branch" || $start_host != "$end_host" ]]; then
+    $start_head_branch != "$end_head_branch" || $start_base_branch != "$end_base_branch" || \
+    $start_host != "$end_host" || $mergeable != "$end_mergeable" ]]; then
     status=polling
     discarded=true
     checks_observed=false
@@ -1129,31 +1264,36 @@ command_snapshot() {
     if [[ $conflict == true || $fail_count -gt 0 || $cancel_count -gt 0 || \
       $unresolved_count -gt 0 ]]; then
       status=blocked
-    elif [[ $pending_count -gt 0 || $merge_pending == true || $registration_pending == true || $checks_missing == true ]]; then
+    elif [[ $pending_count -gt 0 || $merge_pending == true || \
+      $registration_pending == true || $checks_missing == true ]]; then
       if [[ $now -ge $checks_deadline ]]; then status=timed_out; else status=polling; fi
     else
       status=clean
     fi
   fi
-
-  local fingerprint_material fingerprint effective_head effective_head_repo effective_head_branch effective_host last_snapshot new_state
+  local fingerprint_material fingerprint effective_head effective_head_repo effective_head_branch effective_base_branch effective_host last_snapshot new_state
   effective_head=$end_head
   effective_head_repo=$end_head_repo
   effective_head_branch=$end_head_branch
+  effective_base_branch=$end_base_branch
   effective_host=$end_host
   if [[ $discarded == true ]]; then
     fingerprint_material=$(jq -cn --arg head "$effective_head" --arg head_repo "$effective_head_repo" \
-      --arg head_branch "$effective_head_branch" --arg host "$effective_host" \
-      '{head:$head,head_repo:$head_repo,head_branch:$head_branch,github_host:$host,discarded:true}')
+      --arg head_branch "$effective_head_branch" --arg base_branch "$effective_base_branch" \
+      --arg host "$effective_host" \
+      '{head:$head,head_repo:$head_repo,head_branch:$head_branch,base_branch:$base_branch,
+        github_host:$host,discarded:true}')
   else
     fingerprint_material=$(jq -cn --arg head "$effective_head" --argjson checks "$check_details" \
       --arg head_repo "$effective_head_repo" --arg head_branch "$effective_head_branch" \
-      --arg host "$effective_host" \
+      --arg base_branch "$effective_base_branch" --arg host "$effective_host" \
+      --argjson required "$required_contexts" \
       --argjson conflict "$conflict" --argjson merge_pending "$merge_pending" \
-      --argjson threads "$THREAD_DETAILS" --argjson reviewers "$reviewer_states" \
-      '{head:$head,head_repo:$head_repo,head_branch:$head_branch,github_host:$host,
-        checks:$checks,conflict:$conflict,merge_pending:$merge_pending,
-        threads:$threads,reviewers:$reviewers}')
+      --argjson threads "$THREAD_DETAILS" \
+      '{head:$head,head_repo:$head_repo,head_branch:$head_branch,base_branch:$base_branch,
+        github_host:$host,required:$required,checks:$checks,conflict:$conflict,
+        merge_pending:$merge_pending,
+        threads:$threads}')
   fi
   fingerprint=$(printf '%s' "$fingerprint_material" | git hash-object --stdin)
   if [[ $status == blocked && $resolver_attempt != null && \
@@ -1162,27 +1302,33 @@ command_snapshot() {
     status=stalled
   fi
   last_snapshot=$(jq -cn --argjson checks "$check_counts" --argjson check_details "$check_details" \
-    --argjson conflict "$conflict" --argjson threads "$THREAD_DETAILS" \
+    --argjson required_checks "$required_summary" \
+    --arg merge_state "$merge_state" --argjson conflict "$conflict" \
+    --argjson threads "$THREAD_DETAILS" \
     --argjson unresolved "$unresolved_count" --argjson pages "$THREAD_PAGES" \
     --arg coderabbit "$coderabbit_state" --argjson reviewers "$reviewer_states" \
     --argjson reviewer_required "$reviewer_required" --argjson observed_at "$now" \
     --argjson reviewer_telemetry_available "$reviewer_telemetry_available" \
     --argjson registration_pending "$registration_pending" --argjson checks_missing "$checks_missing" \
-    '{checks:$checks,check_details:$check_details,conflict:$conflict,review_threads:$threads,
+    '{checks:$checks,check_details:$check_details,required_checks:$required_checks,
+      merge_state:$merge_state,
+      conflict:$conflict,review_threads:$threads,
       unresolved_actionable_threads:$unresolved,review_thread_pages:$pages,coderabbit:$coderabbit,
       reviewers:{states:$reviewers,required:$reviewer_required,
         telemetry_available:$reviewer_telemetry_available},
       registration_pending:$registration_pending,checks_missing:$checks_missing,observed_at:$observed_at}')
   if [[ $discarded == true ]]; then
     last_snapshot=$(jq -cn --argjson observed_at "$now" \
-      '{discarded:true,reason:"head_changed_during_snapshot",observed_at:$observed_at}')
+      '{discarded:true,reason:"snapshot_binding_changed",observed_at:$observed_at}')
   fi
   new_state=$(jq -c --arg head "$effective_head" --arg head_repo "$effective_head_repo" \
-    --arg head_branch "$effective_head_branch" --arg github_host "$effective_host" --arg status "$status" \
+    --arg head_branch "$effective_head_branch" --arg base_branch "$effective_base_branch" \
+    --arg github_host "$effective_host" --arg status "$status" \
     --argjson deadlines "$deadlines" --arg fingerprint "$fingerprint" \
     --argjson snapshot "$last_snapshot" --argjson checks_observed "$checks_observed" \
     --argjson reviewers_active "$reviewers_active" \
-    '. + {head_sha:$head,head_repo:$head_repo,head_branch:$head_branch,github_host:$github_host,
+    '. + {head_sha:$head,head_repo:$head_repo,head_branch:$head_branch,base_branch:$base_branch,
+      github_host:$github_host,
       status:$status,deadlines:$deadlines,
       blocker_fingerprint:$fingerprint,checks_observed:$checks_observed,
       reviewers:{active:$reviewers_active},
@@ -1191,6 +1337,7 @@ command_snapshot() {
 
   jq -cn --argjson state "$new_state" --argjson checks "$check_counts" \
     --argjson check_details "$check_details" --argjson threads "$THREAD_DETAILS" \
+    --argjson required_checks "$required_summary" --arg merge_state "$merge_state" \
     --argjson head_changed "$head_changed" --argjson discarded "$discarded" \
     --argjson unresolved "$unresolved_count" --argjson pages "$THREAD_PAGES" \
     --arg coderabbit "$coderabbit_state" --argjson reviewers_active "$reviewers_active" \
@@ -1198,6 +1345,7 @@ command_snapshot() {
     --argjson reviewer_telemetry_available "$reviewer_telemetry_available" \
     --argjson dry_run "$dry_run" \
     '$state + {ok:true,command:"snapshot",checks:$checks,check_details:$check_details,
+      required_checks:$required_checks,merge_state:$merge_state,
       review_threads:$threads,head_changed:$head_changed,
       discarded:$discarded,unresolved_actionable_threads:$unresolved,
       review_thread_pages:$pages,coderabbit:$coderabbit,

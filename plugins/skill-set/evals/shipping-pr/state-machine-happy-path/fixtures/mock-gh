@@ -31,6 +31,16 @@ if [[ ${1:-} == pr && ${2:-} == checks ]]; then
   exit 0
 fi
 
+if [[ ${1:-} == api && ${2:-} == repos/*/rules/branches/* ]]; then
+  printf '%s\n' '[{"type":"required_status_checks","parameters":{"required_status_checks":[{"context":"verify","integration_id":null}]}}]'
+  exit 0
+fi
+
+if [[ ${1:-} == api && ${2:-} == repos/*/branches/*/protection/required_status_checks* ]]; then
+  printf '%s\n' 'gh: Branch not protected (HTTP 404)' >&2
+  exit 1
+fi
+
 if [[ ${1:-} == api && ${2:-} == graphql ]]; then
   graphql_id=
   graphql_body=

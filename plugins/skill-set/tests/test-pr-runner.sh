@@ -159,9 +159,8 @@ export MOCK_GH_SCENARIO=fail
 init_case --required-only false >/dev/null
 all_checks=$(snapshot_case 101)
 assert_equals blocked "$(jq -r .status <<<"$all_checks")" "all-check failure state"
-if grep -Eq '^pr checks .* --required( |$)' "$MOCK_GH_LOG"; then
-  fail "--required-only false still passed --required to gh pr checks"
-fi
+assert_equals 2 "$(count_log '^pr checks ')" "all-check and required-inventory query count"
+assert_equals 1 "$(count_log '^pr checks .* --required( |$)')" "required-inventory query count"
 
 make_fixture skipping
 export MOCK_GH_SCENARIO=skipping
@@ -186,6 +185,50 @@ registered_pending=$(snapshot_case 110)
 assert_equals polling "$(jq -r .status <<<"$registered_pending")" "registered pending check"
 registered_pass=$(snapshot_case 120)
 assert_equals clean "$(jq -r .status <<<"$registered_pass")" "registered passing check"
+
+make_fixture missing-required-review
+export MOCK_GH_SCENARIO=missing-required-review
+init_case >/dev/null
+missing_required_review=$(snapshot_case 101)
+jq -e '
+  .status == "polling" and
+  .checks.pass == 1 and
+  .checks.pending == 1 and
+  .required_checks.configured == ["signal-gated-review","verify"] and
+  .required_checks.observed == ["verify"] and
+  .required_checks.missing == ["signal-gated-review"]
+' <<<"$missing_required_review" >/dev/null
+required_review_complete=$(snapshot_case 102)
+jq -e '
+  .status == "clean" and
+  .checks.pass == 2 and
+  .checks.pending == 0 and
+  .required_checks.observed == ["signal-gated-review","verify"] and
+  .required_checks.missing == []
+' <<<"$required_review_complete" >/dev/null
+
+make_fixture legacy-missing-required
+export MOCK_GH_SCENARIO=legacy-missing-required
+init_case >/dev/null
+legacy_missing_required=$(snapshot_case 101)
+jq -e '
+  .status == "polling" and
+  .checks.pass == 1 and
+  .checks.pending == 1 and
+  .required_checks.configured == ["legacy-review","verify"] and
+  .required_checks.missing == ["legacy-review"]
+' <<<"$legacy_missing_required" >/dev/null
+
+make_fixture merge-state-blocked
+export MOCK_GH_SCENARIO=merge-state-blocked
+init_case >/dev/null
+merge_state_blocked=$(snapshot_case 101)
+jq -e '
+  .status == "clean" and
+  .checks.pass == 1 and
+  .checks.pending == 0 and
+  .merge_state == "BLOCKED"
+' <<<"$merge_state_blocked" >/dev/null
 
 make_fixture signal-gated-running
 export MOCK_GH_SCENARIO=signal-gated-running
@@ -436,6 +479,19 @@ init_case --review-timeout-seconds 5 >/dev/null
 cr_timeout=$(snapshot_case 106)
 jq -e '.status == "clean" and .reviewers.states.coderabbit == "pending" and
   .reviewers.required.coderabbit == false' <<<"$cr_timeout" >/dev/null
+
+make_fixture coderabbit-fingerprint
+export MOCK_GH_SCENARIO=coderabbit-fingerprint
+init_case >/dev/null
+reviewer_pending=$(snapshot_case 101)
+reviewer_complete=$(snapshot_case 102)
+jq -e '.status == "polling" and .reviewers.states.coderabbit == "pending"' \
+  <<<"$reviewer_pending" >/dev/null
+jq -e '.status == "polling" and .reviewers.states.coderabbit == "success"' \
+  <<<"$reviewer_complete" >/dev/null
+assert_equals "$(jq -r .blocker_fingerprint <<<"$reviewer_pending")" \
+  "$(jq -r .blocker_fingerprint <<<"$reviewer_complete")" \
+  "optional reviewer telemetry does not affect blocker fingerprint"
 
 make_fixture coderabbit-auto
 export MOCK_GH_SCENARIO=coderabbit-active
@@ -1002,7 +1058,7 @@ export MOCK_GH_SCENARIO=malformed-pr-list
 malformed_list=$(run_fail init --pr 17 --repo owner/repo)
 assert_equals invalid_github_response "$(jq -r .error.code <<<"$malformed_list")" "nested PR list response"
 
-for scenario in malformed-checks malformed-threads; do
+for scenario in malformed-checks malformed-threads malformed-rules malformed-protection; do
   make_fixture "$scenario"
   export MOCK_GH_SCENARIO=$scenario
   initialized=$(init_case)
