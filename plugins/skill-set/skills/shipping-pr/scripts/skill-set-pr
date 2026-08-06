@@ -119,9 +119,24 @@ parse_pr_host() {
   PR_HOST=$(lowercase "$PR_HOST")
 }
 
+# Resolve an SSH host alias to the real hostname the ssh client would dial.
+# When work and personal GitHub accounts are separated by a host alias such as
+# github.com-emu, the push URL host differs textually from the canonical host,
+# so an otherwise valid remote is rejected as remote_binding_mismatch.
+# On any failure the original host is returned, so validation never loosens.
+resolve_ssh_host_alias() {
+  local host=$1 resolved=""
+  command -v ssh >/dev/null 2>&1 || { printf '%s\n' "$host"; return 0; }
+  # Swallow the status so an ssh failure cannot abort the script under set -e and pipefail.
+  resolved=$(ssh -G "$host" 2>/dev/null | awk '$1 == "hostname" { print $2; exit }') || resolved=""
+  [[ -n $resolved && $resolved =~ ^[A-Za-z0-9.-]+$ ]] || resolved=$host
+  printf '%s\n' "$resolved"
+}
+
 canonicalize_remote_url() {
   local url=$1
   local rest authority path host
+  local is_ssh=0
   case "$url" in
     *://*/*)
       rest=${url#*://}
@@ -129,11 +144,13 @@ canonicalize_remote_url() {
       path=${rest#*/}
       authority=${authority##*@}
       host=${authority%%:*}
+      case "$url" in ssh://*) is_ssh=1 ;; esac
       ;;
     *@*:*/*)
       rest=${url#*@}
       host=${rest%%:*}
       path=${rest#*:}
+      is_ssh=1
       ;;
     *) die invalid_remote_url "The Git remote push URL cannot be bound to a GitHub repository." \
       "Configure an HTTP(S), SSH, or git GitHub remote URL and retry." ;;
@@ -145,6 +162,9 @@ canonicalize_remote_url() {
   [[ $host =~ ^[A-Za-z0-9.-]+$ ]] || \
     die invalid_remote_url "The Git remote push URL has an invalid host." \
       "Configure the remote for the PR head repository and retry."
+  if [[ $is_ssh -eq 1 ]]; then
+    host=$(resolve_ssh_host_alias "$host")
+  fi
   CANONICAL_REMOTE_HOST=$(lowercase "$host")
   CANONICAL_REMOTE_REPO=$(lowercase "$path")
 }
