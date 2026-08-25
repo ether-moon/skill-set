@@ -1,0 +1,19 @@
+schema_version: "1.1"
+name: reviewing-with-peer-agents-trigger-positive-04
+description: Should select reviewing-with-peer-agents for a representative request
+tags:
+  - reviewing-with-peer-agents
+  - trigger-positive
+execution:
+  prompt: "What do the available peer LLMs think about the test coverage in this diff?"
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 1
+graders:
+  - type: tool_used
+    name: selected-reviewing-with-peer-agents
+    tool: Skill
+    input_match: "reviewing-with-peer-agents"
+    min: 1
