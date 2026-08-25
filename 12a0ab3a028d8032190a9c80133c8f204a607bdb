@@ -1,0 +1,24 @@
+## Decisions Made
+- Added the missing member-denied authorization fixture assertion.
+- Added a declared clean-worktree contract for no-mutation peer-review evals.
+- Enforced tracked, staged, and untracked sandbox cleanliness before trace retention.
+- Kept the default bounded autofix skill contract unchanged.
+
+## Problems Encountered
+- The Bash mutation denylist missed tee-based writes while the final file grader still passed.
+- The full suite exposed a flaky broken pipe in the run-evals help assertion; the test now captures output before matching.
+- ShellCheck was unavailable in the local mise environment.
+
+## Constraints Identified
+- Bash must remain available as a runtime-selected review mechanism.
+- Safety evidence cannot rely only on enumerating mutation commands.
+- Model-backed evals were unnecessary and were not run.
+- Publication remains owned by the shipping-pr runner.
+
+## Open Questions
+- None.
+
+## Context
+- Resolves CodeRabbit threads PRRT_kwDOQSH5Bc6b7DF6 and PRRT_kwDOQSH5Bc6b7DF8 on PR 41.
+- PRRT_kwDOQSH5Bc6b7DF9 is accepted as-is under the recorded review-only exception and default bounded autofix decision.
+- Full deterministic suite passed with mise x.
