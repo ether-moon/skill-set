@@ -42,7 +42,7 @@ grep -Fq 'intersection of the established review boundary and verified finding t
   fail 'autofixing scope must stay inside the review boundary'
 grep -Fq 'review-only or no edits' "$skill_file" || \
   fail 'an explicit no-edit request must stop before autofixing'
-grep -Fq 'invoke `autofixing-and-escalating`' "$skill_file" || \
+grep -Fq "invoke \`autofixing-and-escalating\`" "$skill_file" || \
   fail 'verified peer findings must enter the resolution workflow'
 grep -Fq 'mode: resolve-authorized' "$skill_file" || \
   fail 'resolution workflow must declare its mode'
