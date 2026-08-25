@@ -1,0 +1,19 @@
+schema_version: "1.1"
+name: reviewing-with-peer-agents-trigger-positive-07
+description: Should select reviewing-with-peer-agents for a representative request
+tags:
+  - reviewing-with-peer-agents
+  - trigger-positive
+execution:
+  prompt: "Use peer agents to review the current work in parallel, then reconcile disagreements."
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 1
+graders:
+  - type: tool_used
+    name: selected-reviewing-with-peer-agents
+    tool: Skill
+    input_match: "reviewing-with-peer-agents"
+    min: 1

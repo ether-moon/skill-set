@@ -21,6 +21,28 @@
       "Prepare a minor version bump and changelog entry."
     ]
   },
+  "reviewing-with-peer-agents": {
+    "positive": [
+      "Ask Codex and Gemini agents to review this branch and synthesize verified findings.",
+      "Have another LLM agent independently review my implementation for regressions.",
+      "Get Claude's second opinion on these changes; keep the review read-only.",
+      "What do the available peer LLMs think about the test coverage in this diff?",
+      "Delegate a security review of this patch to an independent model and report only verified issues.",
+      "Please ask Gemini to validate whether this code satisfies the acceptance criteria.",
+      "Use peer agents to review the current work in parallel, then reconcile disagreements.",
+      "I want an external LLM review of this technical design, not your opinion alone."
+    ],
+    "negative": [
+      "Give these latest code changes an ordinary correctness review yourself.",
+      "Fix the actionable findings from these CodeRabbit comments.",
+      "Grill this implementation plan one decision at a time.",
+      "Explain where this unfamiliar module fits in the system.",
+      "Find ranked refactor candidates in this package.",
+      "Ask a human teammate to review this pull request.",
+      "Summarize the existing review comments without requesting another review.",
+      "Run the tests and tell me whether they pass."
+    ]
+  },
   "creating-skills": {
     "positive": [
       "I have skill-creator installed. Create a new agent skill for incident triage, including trigger cases and functional evals, while preserving the project's policy and final acceptance gate.",

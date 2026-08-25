@@ -33,7 +33,7 @@ if grep -Ern 'developing-test-first' \
   "$plugin_dir/tests/expected-inventory.json"; then
   fail 'active plugin content still references developing-test-first'
 fi
-assert_equals '10' "$(jq -r '.skills' "$plugin_dir/tests/expected-inventory.json")" 'integrated skill count'
+assert_equals '11' "$(jq -r '.skills' "$plugin_dir/tests/expected-inventory.json")" 'integrated skill count'
 assert_equals '7' "$(find "$plugin_dir/evals/driving-with-tests" -type f -name case.yaml -exec grep -El '^  - functional$' {} + | wc -l | tr -d ' ')" 'testing mode eval count'
 
 printf 'PASS: integrated testing skill\n'

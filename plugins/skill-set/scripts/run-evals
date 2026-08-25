@@ -289,6 +289,16 @@ snapshot_safety_contract=$candidate_snapshot/evals/safety-contract.json
 [[ -s $snapshot_safety_contract ]] || { printf 'Candidate snapshot lost its safety contract.\n' >&2; exit 1; }
 safety_contract_hash=$(git hash-object --no-filters "$snapshot_safety_contract")
 cp -- "$snapshot_safety_contract" "$output_dir/safety-contract.json"
+clean_case_args=()
+while IFS= read -r clean_case; do
+  [[ -n $clean_case ]] || continue
+  clean_case_args+=(--require-clean-case "$clean_case")
+done < <(ruby -ryaml -e '
+  Dir.glob(File.join(ARGV.fetch(0), "**", "case.yaml")).sort.each do |file|
+    parsed = YAML.safe_load(File.read(file), aliases: false)
+    puts parsed.fetch("name") if parsed.dig("context", "require_clean_worktree") == true
+  end
+' "$candidate_snapshot/evals")
 
 common_args=(--scaffold --keep-temp --threshold 0 --allow-tools Bash Write Edit)
 common_args+=(--model "$model" --judge-model "$judge_model" --runs "$trials")
@@ -356,11 +366,14 @@ run_eval_arm candidate "${candidate_command[@]}"
 [[ -s $output_dir/candidate.json ]] || { printf 'Candidate eval produced no JSON result.\n' >&2; exit 1; }
 retain_args=(--result "$output_dir/candidate.json" --trace-dir "$output_dir/traces" --with-arm candidate)
 if [[ $candidate_ablation == with-without ]]; then retain_args+=(--without-arm no-plugin); fi
+retain_args+=("${clean_case_args[@]}")
 "$script_dir/retain-eval-traces" "${retain_args[@]}"
 if [[ $needs_deletion_baseline == true ]]; then
   run_eval_arm deletion-baseline "${baseline_command[@]}"
   [[ -s $output_dir/baseline.json ]] || { printf 'Deletion baseline produced no JSON result.\n' >&2; exit 1; }
-  "$script_dir/retain-eval-traces" --result "$output_dir/baseline.json" --trace-dir "$output_dir/traces" --with-arm deletion-baseline
+  "$script_dir/retain-eval-traces" --result "$output_dir/baseline.json" \
+    --trace-dir "$output_dir/traces" --with-arm deletion-baseline \
+    "${clean_case_args[@]}"
 fi
 
 post_candidate_snapshot=$temporary_dir/post-candidate-plugin
