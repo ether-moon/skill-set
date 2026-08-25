@@ -1,0 +1,18 @@
+## Decisions Made
+- Replaced the SC2016-triggering single-quoted grep pattern with a double-quoted pattern containing escaped literal backticks.
+- Preserved the exact grep target and test behavior.
+
+## Problems Encountered
+- The local mise environment does not provide a ShellCheck executable.
+
+## Constraints Identified
+- The fix must not execute the backtick-delimited skill name as command substitution.
+- The separately reported warning required a one-line test-only correction.
+- Model-backed evals were prohibited and unnecessary.
+
+## Open Questions
+- None.
+
+## Context
+- Resolves deterministic-validation run 32805931537 ShellCheck SC2016 at test-reviewing-with-peer-agents.sh line 45.
+- Focused tests, eval validation, Bash syntax validation, and the full deterministic suite passed before commit.
