@@ -1,0 +1,20 @@
+Decisions Made
+- Restored the peer-review workflow as reviewing-with-peer-agents.
+- Kept review delegation tool- and command-neutral at skill level.
+- Pass work intent and an observable decision record to reviewers.
+- Route verified findings through bounded autofixing, except explicit review-only requests.
+
+Problems Encountered
+- The system Ruby 2.6 lacked Array#filter_map; mise x selected Ruby 4.0.6 for the full deterministic suite.
+
+Constraints Identified
+- Reviewers remain read-only and may not mutate external state.
+- Autofixing stays inside the established review boundary and never grants commit, push, or comment capability.
+- Model-backed evals, when used, must be scoped and token-efficient.
+
+Open Questions
+- None.
+
+Context
+- Added three functional eval paths, generated trigger coverage, global mutation-safety checks, inventory updates, and dedicated regression tests.
+- Full deterministic suite and 211-case eval validation passed before shipping.
