@@ -5,6 +5,21 @@ All notable changes to plugins in the skill-set marketplace will be documented i
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.0] - 2026-08-25
+
+### Added
+
+- feat: restore peer-agent review skill
+
+### Improved
+
+- Merge pull request #41 from ether-moon/ether/restore-agent-review-skill
+
+### Fixed
+
+- fix: satisfy ShellCheck in peer review test
+- fix: harden peer review eval safety
+
 ## [1.14.7] - 2026-08-06
 
 ### Fixed
