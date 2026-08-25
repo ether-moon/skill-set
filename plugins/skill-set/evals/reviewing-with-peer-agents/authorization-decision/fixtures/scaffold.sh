@@ -23,6 +23,7 @@ cat >test/permissions.test.ts <<'EOF'
 import { canManageBilling } from "../src/permissions";
 
 if (!canManageBilling({ role: "admin" })) throw new Error("admin denied");
+if (canManageBilling({ role: "member" })) throw new Error("member allowed");
 if (canManageBilling({ role: "guest" })) throw new Error("guest allowed");
 EOF
 

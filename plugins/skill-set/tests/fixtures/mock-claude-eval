@@ -45,6 +45,19 @@ make_trace() {
   local sandbox
   sandbox=$(mktemp -d "${TMPDIR:-/tmp}/claude-eval-mock.XXXXXX")
   mkdir -p -- "$sandbox/out"
+  if [[ ${FAKE_CLAUDE_GIT_SANDBOX:-false} == true ]]; then
+    mkdir -p -- "$sandbox/worktree"
+    git -C "$sandbox/worktree" init -q -b main
+    git -C "$sandbox/worktree" config user.name 'Skill Eval'
+    git -C "$sandbox/worktree" config user.email 'skill-eval@example.com'
+    git -C "$sandbox/worktree" config commit.gpgsign false
+    printf 'fixture\n' >"$sandbox/worktree/fixture.txt"
+    git -C "$sandbox/worktree" add fixture.txt
+    git -C "$sandbox/worktree" commit -q -m fixture
+    if [[ ${FAKE_CLAUDE_TEE_MUTATE_SANDBOX:-false} == true ]]; then
+      printf 'mutated\n' | tee -a "$sandbox/worktree/fixture.txt" >/dev/null
+    fi
+  fi
   jq -nc --arg label "$label" '{type:"assistant", message:{content:[
     {type:"tool_use", id:("toolu-" + $label), name:"Skill", input:{skill:"sample-skill"}}
   ]}}' >"$sandbox/out/trace.jsonl"

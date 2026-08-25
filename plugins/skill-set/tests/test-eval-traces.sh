@@ -16,10 +16,12 @@ no_plugin_sandbox=$(mktemp -d "${TMPDIR:-/tmp}/claude-eval-no-plugin.XXXXXX")
 duplicate_source_sandbox=
 duplicate_identity_sandbox_a=
 duplicate_identity_sandbox_b=
+dirty_worktree_sandbox=
+clean_worktree_sandbox=
 test_root=$(cd -- "$test_root" && pwd -P)
 candidate_sandbox=$(cd -- "$candidate_sandbox" && pwd -P)
 no_plugin_sandbox=$(cd -- "$no_plugin_sandbox" && pwd -P)
-trap 'rm -rf -- "$test_root" "$candidate_sandbox" "$no_plugin_sandbox" "$duplicate_source_sandbox" "$duplicate_identity_sandbox_a" "$duplicate_identity_sandbox_b"' EXIT
+trap 'rm -rf -- "$test_root" "$candidate_sandbox" "$no_plugin_sandbox" "$duplicate_source_sandbox" "$duplicate_identity_sandbox_a" "$duplicate_identity_sandbox_b" "$dirty_worktree_sandbox" "$clean_worktree_sandbox"' EXIT
 mkdir -p -- "$candidate_sandbox/out" "$no_plugin_sandbox/out"
 
 jq -nc '{type:"result", usage:{input_tokens:11, output_tokens:3}}' \
@@ -60,6 +62,87 @@ jq -e '
 ' "$test_root/result.json" >/dev/null
 jq -e '.usage.input_tokens == 11 and .usage.output_tokens == 3' \
   "$candidate_copy" >/dev/null
+
+dirty_worktree_sandbox=$(mktemp -d "${TMPDIR:-/tmp}/claude-eval-dirty-worktree.XXXXXX")
+dirty_worktree_sandbox=$(cd -- "$dirty_worktree_sandbox" && pwd -P)
+mkdir -p -- "$dirty_worktree_sandbox/out" "$dirty_worktree_sandbox/worktree"
+jq -nc '{type:"result", usage:{input_tokens:1}}' \
+  >"$dirty_worktree_sandbox/out/trace.jsonl"
+git -C "$dirty_worktree_sandbox/worktree" init -q -b main
+git -C "$dirty_worktree_sandbox/worktree" config user.name 'Skill Eval'
+git -C "$dirty_worktree_sandbox/worktree" config user.email 'skill-eval@example.com'
+git -C "$dirty_worktree_sandbox/worktree" config commit.gpgsign false
+printf 'fixture\n' >"$dirty_worktree_sandbox/worktree/fixture.txt"
+git -C "$dirty_worktree_sandbox/worktree" add fixture.txt
+git -C "$dirty_worktree_sandbox/worktree" commit -q -m fixture
+printf 'mutated\n' | tee -a "$dirty_worktree_sandbox/worktree/fixture.txt" >/dev/null
+jq -n --arg trace "$dirty_worktree_sandbox/out/trace.jsonl" '{
+  schemaVersion:1,
+  cases:[{name:"reviewing-with-peer-agents-review-only", arms:{with:[{tracePath:$trace}]}}]
+}' >"$test_root/dirty-worktree-result.json"
+if "$retainer" \
+  --result "$test_root/dirty-worktree-result.json" \
+  --trace-dir "$test_root/dirty-worktree-traces" \
+  --with-arm candidate \
+  --require-clean-case reviewing-with-peer-agents-review-only \
+  >"$test_root/dirty-worktree.stdout" 2>"$test_root/dirty-worktree.stderr"; then
+  fail 'retainer accepted a tee-mutated eval worktree'
+fi
+grep -Fq 'Eval sandbox has unstaged changes' "$test_root/dirty-worktree.stderr" || \
+  fail 'dirty eval worktree diagnostic is missing'
+[[ -d $dirty_worktree_sandbox ]] || fail 'dirty eval sandbox was not preserved'
+if find "$test_root/dirty-worktree-traces" -type f -print -quit 2>/dev/null | grep -q .; then
+  fail 'dirty eval worktree produced partial trace evidence'
+fi
+git -C "$dirty_worktree_sandbox/worktree" add fixture.txt
+if "$retainer" \
+  --result "$test_root/dirty-worktree-result.json" \
+  --trace-dir "$test_root/staged-worktree-traces" \
+  --with-arm candidate \
+  --require-clean-case reviewing-with-peer-agents-review-only \
+  >"$test_root/staged-worktree.stdout" 2>"$test_root/staged-worktree.stderr"; then
+  fail 'retainer accepted a staged eval worktree change'
+fi
+grep -Fq 'Eval sandbox has staged changes' "$test_root/staged-worktree.stderr" || \
+  fail 'staged eval worktree diagnostic is missing'
+git -C "$dirty_worktree_sandbox/worktree" restore --staged --worktree fixture.txt
+printf 'untracked\n' >"$dirty_worktree_sandbox/worktree/untracked.txt"
+if "$retainer" \
+  --result "$test_root/dirty-worktree-result.json" \
+  --trace-dir "$test_root/untracked-worktree-traces" \
+  --with-arm candidate \
+  --require-clean-case reviewing-with-peer-agents-review-only \
+  >"$test_root/untracked-worktree.stdout" 2>"$test_root/untracked-worktree.stderr"; then
+  fail 'retainer accepted an untracked eval worktree file'
+fi
+grep -Fq 'Eval sandbox has untracked files' "$test_root/untracked-worktree.stderr" || \
+  fail 'untracked eval worktree diagnostic is missing'
+
+clean_worktree_sandbox=$(mktemp -d "${TMPDIR:-/tmp}/claude-eval-clean-worktree.XXXXXX")
+clean_worktree_sandbox=$(cd -- "$clean_worktree_sandbox" && pwd -P)
+mkdir -p -- "$clean_worktree_sandbox/out" "$clean_worktree_sandbox/worktree"
+jq -nc '{type:"result", usage:{input_tokens:1}}' \
+  >"$clean_worktree_sandbox/out/trace.jsonl"
+git -C "$clean_worktree_sandbox/worktree" init -q -b main
+git -C "$clean_worktree_sandbox/worktree" config user.name 'Skill Eval'
+git -C "$clean_worktree_sandbox/worktree" config user.email 'skill-eval@example.com'
+git -C "$clean_worktree_sandbox/worktree" config commit.gpgsign false
+printf 'fixture\n' >"$clean_worktree_sandbox/worktree/fixture.txt"
+git -C "$clean_worktree_sandbox/worktree" add fixture.txt
+git -C "$clean_worktree_sandbox/worktree" commit -q -m fixture
+jq -n --arg trace "$clean_worktree_sandbox/out/trace.jsonl" '{
+  schemaVersion:1,
+  cases:[{name:"reviewing-with-peer-agents-review-only", arms:{with:[{tracePath:$trace}]}}]
+}' >"$test_root/clean-worktree-result.json"
+"$retainer" \
+  --result "$test_root/clean-worktree-result.json" \
+  --trace-dir "$test_root/clean-worktree-traces" \
+  --with-arm candidate \
+  --require-clean-case reviewing-with-peer-agents-review-only
+[[ ! -e $clean_worktree_sandbox ]] || fail 'clean eval sandbox was not removed'
+clean_worktree_sandbox=$test_root/already-cleaned-worktree
+[[ -s $test_root/clean-worktree-traces/candidate/reviewing-with-peer-agents-review-only/run-1.jsonl ]] || \
+  fail 'clean eval worktree trace was not retained'
 
 untrusted_root=$test_root/not-a-claude-eval
 mkdir -p -- "$untrusted_root/out"

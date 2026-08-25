@@ -7,6 +7,7 @@ tags:
   - safety-mutation-boundary
 context:
   scaffold_script: fixtures/scaffold.sh
+  require_clean_worktree: true
 execution:
   max_turns: 12
   timeout_seconds: 360

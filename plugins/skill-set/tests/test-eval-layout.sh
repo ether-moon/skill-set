@@ -168,7 +168,8 @@ ruby -ryaml -e '
 runner=$plugin_dir/scripts/run-evals
 assert_executable "$runner"
 grep -Eq 'summarize-evals' "$runner"
-"$runner" --help | grep -Eq '95c1b2a'
+runner_help=$("$runner" --help)
+grep -Eq '95c1b2a' <<<"$runner_help"
 eval_plan=$(/bin/bash "$runner" --plan --case creating-skills-trigger-positive-01 --model test-model --judge-model test-judge)
 printf '%s\n' "$eval_plan" | jq -e '
   .stage == "development-smoke" and

@@ -15,13 +15,17 @@ review_only_case=$plugin_dir/evals/reviewing-with-peer-agents/review-only/case.y
 obvious_prompt=${obvious_case%/case.yaml}/prompt.md
 ambiguous_prompt=${ambiguous_case%/case.yaml}/prompt.md
 review_only_prompt=${review_only_case%/case.yaml}/prompt.md
+ambiguous_scaffold=${ambiguous_case%/case.yaml}/fixtures/scaffold.sh
 safety_contract=$plugin_dir/evals/safety-contract.json
 
 assert_file "$skill_file"
 assert_file "$obvious_case"
 assert_file "$ambiguous_case"
 assert_file "$review_only_case"
+assert_file "$ambiguous_scaffold"
 assert_file "$safety_contract"
+grep -Fq 'if (canManageBilling({ role: "member" })) throw new Error("member allowed");' \
+  "$ambiguous_scaffold" || fail 'authorization fixture must reject the member role'
 grep -Fq 'Choose the available review mechanism at runtime' "$skill_file" || \
   fail 'peer review must choose its mechanism at runtime'
 grep -Fq 'natural-language review request' "$skill_file" || \

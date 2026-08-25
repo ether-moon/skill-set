@@ -4,11 +4,12 @@ set -euo pipefail
 
 usage() {
   printf '%s\n' \
-    'Usage: retain-eval-traces --result FILE --trace-dir DIR --with-arm NAME [--without-arm NAME]' \
+    'Usage: retain-eval-traces --result FILE --trace-dir DIR --with-arm NAME [--without-arm NAME] [--require-clean-case NAME]...' \
     '' \
     'Copy Claude eval agent traces into the durable result artifact, rewrite' \
     'tracePath values to those copies, and remove only verified claude-eval-*' \
-    'sandboxes below the process temporary directory.'
+    'sandboxes below the process temporary directory. Cases declared with' \
+    '--require-clean-case must have clean worktree, index, and untracked state.'
 }
 
 is_safe_component() {
@@ -27,10 +28,11 @@ result=
 trace_dir=
 with_arm=
 without_arm=
+required_clean_cases=()
 
 while (($#)); do
   case $1 in
-    --result|--trace-dir|--with-arm|--without-arm)
+    --result|--trace-dir|--with-arm|--without-arm|--require-clean-case)
       (($# >= 2)) || { printf '%s requires a value\n' "$1" >&2; exit 2; }
       option=$1
       value=$2
@@ -40,6 +42,7 @@ while (($#)); do
         --trace-dir) trace_dir=$value ;;
         --with-arm) with_arm=$value ;;
         --without-arm) without_arm=$value ;;
+        --require-clean-case) required_clean_cases+=("$value") ;;
       esac
       ;;
     -h|--help) usage; exit 0 ;;
@@ -54,6 +57,9 @@ is_safe_component "$with_arm" || { printf 'Unsafe --with-arm: %s\n' "$with_arm" 
 if [[ -n $without_arm ]]; then
   is_safe_component "$without_arm" || { printf 'Unsafe --without-arm: %s\n' "$without_arm" >&2; exit 2; }
 fi
+for case_name in "${required_clean_cases[@]}"; do
+  is_safe_component "$case_name" || { printf 'Unsafe --require-clean-case: %s\n' "$case_name" >&2; exit 2; }
+done
 jq -e '.schemaVersion == 1 and (.cases | type) == "array"' "$result" >/dev/null || {
   printf 'Result is not Claude plugin eval JSON schema 1: %s\n' "$result" >&2
   exit 2
@@ -118,6 +124,87 @@ validate_unique_arm() {
     | (.arms[$arm] // [])
     | to_entries[]
     | [$case, (.key + 1), (.value.tracePath // "")]
+    | @tsv
+  ' "$result")
+}
+
+requires_clean_worktree() {
+  local candidate=$1
+  local required
+  for required in "${required_clean_cases[@]}"; do
+    [[ $candidate == "$required" ]] && return 0
+  done
+  return 1
+}
+
+validate_clean_worktrees_arm() {
+  local json_arm=$1
+  local case_name
+  local source_trace
+  local source_root
+  local canonical_root
+  local canonical_trace
+  local git_entry
+  local worktree
+  local found_worktree
+  local untracked
+
+  while IFS=$'\t' read -r case_name source_trace; do
+    requires_clean_worktree "$case_name" || continue
+    [[ -f $source_trace && ! -L $source_trace ]] || {
+      printf 'Retained eval trace is missing or is a symlink: %s\n' "$source_trace" >&2
+      return 1
+    }
+    source_root=$(dirname -- "$(dirname -- "$source_trace")")
+    canonical_root=$(cd -- "$source_root" && pwd -P)
+    canonical_trace=$(cd -- "$(dirname -- "$source_trace")" && pwd -P)/$(basename -- "$source_trace")
+    case $(basename -- "$canonical_root") in claude-eval-*) ;; *)
+      printf 'Refusing to inspect unrecognized eval sandbox: %s\n' "$canonical_root" >&2
+      return 1
+      ;;
+    esac
+    [[ $(dirname -- "$canonical_root") == "$temporary_root" ]] || {
+      printf 'Refusing eval sandbox outside %s: %s\n' "$temporary_root" "$canonical_root" >&2
+      return 1
+    }
+    [[ $canonical_trace == "$canonical_root/out/trace.jsonl" ]] || {
+      printf 'Unexpected eval trace location: %s\n' "$canonical_trace" >&2
+      return 1
+    }
+
+    found_worktree=false
+    while IFS= read -r -d '' git_entry; do
+      [[ ! -L $git_entry ]] || {
+        printf 'Eval sandbox Git metadata is a symlink for %s: %s\n' "$case_name" "$git_entry" >&2
+        return 1
+      }
+      worktree=$(dirname -- "$git_entry")
+      git -C "$worktree" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue
+      found_worktree=true
+      if ! git -C "$worktree" diff --quiet --; then
+        printf 'Eval sandbox has unstaged changes for %s: %s\n' "$case_name" "$worktree" >&2
+        return 1
+      fi
+      if ! git -C "$worktree" diff --cached --quiet --; then
+        printf 'Eval sandbox has staged changes for %s: %s\n' "$case_name" "$worktree" >&2
+        return 1
+      fi
+      untracked=$(git -C "$worktree" ls-files --others)
+      if [[ -n $untracked ]]; then
+        printf 'Eval sandbox has untracked files for %s: %s\n' "$case_name" "$worktree" >&2
+        return 1
+      fi
+    done < <(find "$canonical_root" -name .git -print0)
+    [[ $found_worktree == true ]] || {
+      printf 'Eval sandbox has no Git worktree for required clean case %s: %s\n' \
+        "$case_name" "$canonical_root" >&2
+      return 1
+    }
+  done < <(jq -r --arg arm "$json_arm" '
+    .cases[]
+    | .name as $case
+    | (.arms[$arm] // [])[]
+    | [$case, (.tracePath // "")]
     | @tsv
   ' "$result")
 }
@@ -206,6 +293,9 @@ retain_arm() {
 
 validate_unique_arm with "$with_arm"
 if [[ -n $without_arm ]]; then validate_unique_arm without "$without_arm"; fi
+
+validate_clean_worktrees_arm with
+if [[ -n $without_arm ]]; then validate_clean_worktrees_arm without; fi
 
 retain_arm with "$with_arm"
 if [[ -n $without_arm ]]; then retain_arm without "$without_arm"; fi

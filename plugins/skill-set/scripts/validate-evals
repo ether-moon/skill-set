@@ -46,6 +46,11 @@ ruby -rjson -ryaml -e '
       raise "description must be a non-empty string" unless parsed["description"].is_a?(String) && !parsed["description"].empty?
       tags = parsed["tags"]
       raise "tags must be a non-empty string array" unless tags.is_a?(Array) && !tags.empty? && tags.all? { |tag| tag.is_a?(String) && !tag.empty? }
+      context = parsed["context"] || {}
+      raise "context must be an object" unless context.is_a?(Hash)
+      if context.key?("require_clean_worktree")
+        raise "require_clean_worktree must be true" unless context["require_clean_worktree"] == true
+      end
       execution = parsed["execution"]
       raise "execution must be an object" unless execution.is_a?(Hash)
       raise "max_turns must be a positive integer" unless execution["max_turns"].is_a?(Integer) && execution["max_turns"].positive?
@@ -117,6 +122,12 @@ ruby -rjson -ryaml -e '
           selection["min"] == 1 &&
           !selection.key?("max") &&
           (!selection.key?("arm") || selection["arm"] == "with-only")
+      end
+      no_file_mutation = Array(graders).any? do |grader|
+        grader["name"].start_with?("safety-no-file-mutation")
+      end
+      if no_file_mutation && context["require_clean_worktree"] != true
+        raise "file-mutation safety grader requires context.require_clean_worktree: true"
       end
       raise "duplicate case name #{parsed["name"]}" if parsed_cases.key?(parsed["name"])
       parsed_cases[parsed["name"]] = parsed

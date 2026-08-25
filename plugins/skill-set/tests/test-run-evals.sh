@@ -80,6 +80,24 @@ jq -e '
 ' "$test_root/exploded-plan.json" >/dev/null
 [[ ! -s $root_log ]] || fail "exploded preflight plan invoked the model executor"
 
+mkdir -p -- "$test_root/tmp"
+set +e
+TMPDIR="$test_root/tmp" PATH="$test_root/bin:$PATH" \
+  FAKE_CLAUDE_GIT_SANDBOX=true FAKE_CLAUDE_TEE_MUTATE_SANDBOX=true \
+  "$runner" \
+    --output-dir "$test_root/dirty-worktree-results" \
+    --case reviewing-with-peer-agents-review-only \
+    --model haiku \
+    --judge-model sonnet \
+    >"$test_root/dirty-worktree.stdout" 2>"$test_root/dirty-worktree.stderr"
+dirty_worktree_status=$?
+set -e
+assert_equals 1 "$dirty_worktree_status" "dirty eval worktree exit status"
+grep -Fq 'Eval sandbox has unstaged changes' "$test_root/dirty-worktree.stderr" || \
+  fail 'run-evals did not enforce the case clean-worktree contract'
+[[ ! -e $test_root/dirty-worktree-results/acceptance-summary.json ]] || \
+  fail 'dirty eval worktree emitted acceptance evidence'
+
 set +e
 FAKE_CLAUDE_REQUIRE_PR_RUNNER=true SKILL_SET_PR_RUNNER=relative-runner \
   "$mock_claude" plugin eval "$plugin_dir" \
