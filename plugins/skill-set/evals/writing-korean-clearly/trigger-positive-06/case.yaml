@@ -1,0 +1,19 @@
+schema_version: "1.1"
+name: writing-korean-clearly-trigger-positive-06
+description: Should select writing-korean-clearly for a representative request
+tags:
+  - writing-korean-clearly
+  - trigger-positive
+execution:
+  prompt: "다음 API 차이를 자연스럽고 정확한 한국어로 설명해 줘: `layout=legacy` is the default, while `layout=artifact` is opt-in."
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 1
+graders:
+  - type: tool_used
+    name: selected-writing-korean-clearly
+    tool: Skill
+    input_match: "writing-korean-clearly"
+    min: 1

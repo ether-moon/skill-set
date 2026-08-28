@@ -1,0 +1,23 @@
+schema_version: "1.1"
+name: writing-korean-clearly-substantive-document-composition
+description: Composes Korean prose preferences with substantive document revision
+tags:
+  - writing-korean-clearly
+  - functional
+execution:
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 1
+graders:
+  - type: tool_used
+    name: selected-writing-korean-clearly
+    tool: Skill
+    input_match: writing-korean-clearly
+    min: 1
+  - type: tool_used
+    name: selected-writing-clear-prose
+    tool: Skill
+    input_match: writing-clear-prose
+    min: 1

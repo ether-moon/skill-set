@@ -1,0 +1,19 @@
+schema_version: "1.1"
+name: re-explain-clearly-trigger-positive-02
+description: Should select re-explain-clearly for a representative request
+tags:
+  - re-explain-clearly
+  - trigger-positive
+execution:
+  prompt: "이 문장이 무슨 뜻이야? 어려운 용어를 바로 풀어서 짧게 설명해 줘: eventual consistency allows temporary divergence."
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 1
+graders:
+  - type: tool_used
+    name: selected-re-explain-clearly
+    tool: Skill
+    input_match: "re-explain-clearly"
+    min: 1

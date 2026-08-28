@@ -1,0 +1,21 @@
+schema_version: "1.1"
+name: re-explain-clearly-trigger-negative-01
+description: Should not select re-explain-clearly for a near-miss request
+tags:
+  - re-explain-clearly
+  - trigger-negative
+execution:
+  prompt: "Write a beginner's tutorial on OAuth 2.0 from scratch."
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 1
+graders:
+  - type: tool_used
+    name: did-not-select-re-explain-clearly
+    tool: Skill
+    input_match: "re-explain-clearly"
+    min: 0
+    max: 0
+    arm: both
