@@ -1,0 +1,31 @@
+## Decisions Made
+
+- Added `re-explain-clearly` for faithful clarification of existing supplied content and `writing-korean-clearly` as a composable Korean prose preference overlay.
+
+- Kept the skills separate so task-specific behavior, output-language selection, and Korean surface style remain independently routable.
+
+- Incorporated verified peer-review findings for explicit output-language priority, ordinary Korean triggering, and composition with `writing-clear-prose`.
+
+## Problems Encountered
+
+- The trigger generator's locale-sensitive duplicate check grouped semantically different Korean prompts; the ordinary Korean case was made distinct with the `deployJob` identifier.
+
+- A peer reviewer proposed an upstream MIT notice, but pinned source comparison showed the skill paraphrases principles without copying the source or a substantial portion, so no notice file was added.
+
+## Constraints Identified
+
+- Repository content remains in English except multilingual evaluation prompts, while runtime output follows the user's language and explicit output-language requests.
+
+- No model-backed evaluation campaign was authorized; only deterministic validators, peer review, and the repository test suite were run.
+
+- The change adds no scripts or references and stays within the isolated skill-set worktree.
+
+## Open Questions
+
+- Actual model selection and qualitative output behavior remain unmeasured until a separately authorized model-backed evaluation stage is run.
+
+## Context
+
+- The commit contains the two new skills, 8 positive and 8 negative trigger cases per skill, seven functional cases across the two skills, and required generated inventory updates.
+
+- `mise exec -- plugins/skill-set/tests/run.sh` passed with 250 valid evaluation cases before the commit.
