@@ -1,0 +1,18 @@
+schema_version: "1.1"
+name: writing-korean-clearly-casual-register-status
+description: Keeps complete Korean sentences and preserved facts when the user writes in a clipped, telegraphic register
+tags:
+  - writing-korean-clearly
+  - functional
+execution:
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 1
+graders:
+  - type: tool_used
+    name: selected-writing-korean-clearly
+    tool: Skill
+    input_match: writing-korean-clearly
+    min: 1

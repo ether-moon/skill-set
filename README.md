@@ -75,6 +75,8 @@ plugins/skill-set/
 
 Skills are also model-invocable and load automatically when their descriptions match the current task.
 
+`writing-korean-clearly` is a preference overlay that loads only when the model selects it and is not part of the system prompt, so it is not always-on. For always-on Korean prose enforcement, pair it with a session-level instruction such as the [fluent-korean](https://github.com/snflkd/fluent-korean) output style or a CLAUDE.md rule; the skill then supplies rule-level examples and composes with task skills such as `re-explain-clearly` and `writing-clear-prose`.
+
 ## release-workflow plugin
 
 The opt-in release plugin provides the `bumping-version` skill. It inspects version manifests, prepares a semantic-version commit in an isolated worktree, and requires explicit approval before a direct base-branch push.

@@ -2,11 +2,11 @@
 
 Common mistakes in AI-assisted and human writing. Check output against these lists during revision.
 
-Sources: Orwell, Strunk & White, [tropes.fyi](https://tropes.fyi/tropes-md), [Wikipedia: Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing)
+Sources: Orwell, Strunk & White, [tropes.fyi](https://tropes.fyi/tropes-md), [Wikipedia: Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing), [louisabraham/load-bearing at `6a79d8c`](https://github.com/louisabraham/load-bearing/tree/6a79d8c)
 
 ## Table of Contents
 
-- [AI Vocabulary](#ai-vocabulary) — Cliche phrases, inflated vocabulary, filler words, magic adverbs, fabricated precision
+- [AI Vocabulary](#ai-vocabulary) — Cliche phrases, inflated vocabulary, filler words, magic adverbs, fabricated precision, assertive verification narrative
 - [AI Sentence Patterns](#ai-sentence-patterns) — Negative parallelism, dramatic countdown, rhetorical questions, anaphora, tricolon, -ing analysis, false ranges, serves-as dodge
 - [AI Tone Patterns](#ai-tone-patterns) — Stakes inflation, inflated symbolism, asserting obviousness, vague attributions, promotional tone, despite-challenges dismissal
 - [AI Structural Patterns](#ai-structural-patterns) — Fractal summaries, dead metaphor repetition, one-point dilution, listicle in a trench coat, paragraph uniformity, over-smooth tone
@@ -74,6 +74,17 @@ Inventing specific numbers, percentages, or metrics to appear concrete when no r
 | "Saved the team 20 hours per sprint." (no tracking) | "Reduced manual work for the team." |
 
 **Rule**: Numbers require sources. If you can't link a number to a benchmark, profiling result, user requirement, or documented threshold, delete it. Qualitative descriptions are honest; fabricated metrics are misinformation.
+
+### Assertive Verification Narrative
+
+A vocabulary cluster that describes intent and verification in assertive, narrative terms instead of citing what was done. It rose sharply during 2025–2026 in GitHub pull-request descriptions from non-bot accounts (source: [louisabraham/load-bearing at `6a79d8c`](https://github.com/louisabraham/load-bearing/tree/6a79d8c), per-word charts read on 2026-08-28; the corpus updates daily). That study measured co-occurrence and growth, not the quality of any word: the words below are signals of the pattern, not faults by themselves, and a word used for its precise meaning with supporting evidence is fine. Expect the list to drift between model generations; treat the category as the durable test and refresh the dated examples when the source's leading words change.
+
+| Pattern | Dated examples | Fix |
+|---|---|---|
+| Structural metaphors for ordinary nouns | load-bearing, seam, chokepoint, backstop, blast-radius | Name the dependency, boundary, or affected scope. Keep a term only where the document defines it as a term of art |
+| Self-validating verification claims | re-verified, cross-checked, mutation-checked, proved, survived, falsified | State the command or check that ran and its result; name what was not run |
+| Narrative intensifiers | plainly, genuinely, deliberately | Delete, or replace with the observable fact; keep an adverb that discriminates cases, as in "genuinely ambiguous" |
+| Absolute outcome words | byte-identical, bit-for-bit, root-caused, fail-loud, self-heals | Keep only with the evidence that shows it: a diff, a hash comparison, a reproduced failure |
 
 ## AI Sentence Patterns
 

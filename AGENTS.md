@@ -95,6 +95,8 @@ All repository content MUST be written in **English** by default:
 
 **Exception**: Runtime user-facing output should adapt to user's language (see "Runtime Language Detection" below).
 
+**Exception**: A skill that governs prose in a specific language, and its evaluation prompts and graders, may embed short example strings in that language as illustrative data inside English prose. The rule and its rationale stay in English; see `plugins/skill-set/skills/creating-skills/reference/structure.md`.
+
 ---
 
 **RUNTIME LANGUAGE DETECTION:**
@@ -120,7 +122,7 @@ When a skill is executed, detect and use the user's preferred language for conve
 - File paths and directory names
 - Technical API calls and function names
 - Tool commands
-- Repository documentation (SKILL.md, README.md)
+- Repository documentation (SKILL.md, README.md), apart from the illustrative example strings permitted above
 
 **Template Pattern:**
 ```text
