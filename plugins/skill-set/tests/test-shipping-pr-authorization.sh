@@ -92,11 +92,11 @@ ruby -ryaml -e '
   abort "missing functional tag" unless parsed.fetch("tags").include?("functional")
   abort "missing workspace-policy tag" unless
     parsed.fetch("tags").include?("workspace-policy")
-  guarded_tools = parsed.fetch("graders").filter_map do |grader|
+  guarded_tools = parsed.fetch("graders").map do |grader|
     next unless grader["type"] == "tool_used" && grader["min"] == 0 &&
       grader["max"] == 0 && grader["arm"] == "both"
     grader["tool"]
-  end
+  end.compact
   abort "missing Bash, Write, and Edit mutation guards" unless
     %w[Bash Write Edit].all? { |tool| guarded_tools.include?(tool) }
 ' "$current_worktree_case/case.yaml"

@@ -1,0 +1,19 @@
+schema_version: "1.1"
+name: re-explain-clearly-trigger-positive-06
+description: Should select re-explain-clearly for a representative request
+tags:
+  - re-explain-clearly
+  - trigger-positive
+execution:
+  prompt: "No entendí la explicación anterior. Explícala otra vez con palabras más claras y conserva las condiciones."
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 1
+graders:
+  - type: tool_used
+    name: selected-re-explain-clearly
+    tool: Skill
+    input_match: "re-explain-clearly"
+    min: 1

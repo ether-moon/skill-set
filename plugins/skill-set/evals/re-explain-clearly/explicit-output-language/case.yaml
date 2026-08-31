@@ -1,0 +1,18 @@
+schema_version: "1.1"
+name: re-explain-clearly-explicit-output-language
+description: Honors an explicit output language over the conversation language
+tags:
+  - re-explain-clearly
+  - functional
+execution:
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 1
+graders:
+  - type: tool_used
+    name: selected-re-explain-clearly
+    tool: Skill
+    input_match: re-explain-clearly
+    min: 1

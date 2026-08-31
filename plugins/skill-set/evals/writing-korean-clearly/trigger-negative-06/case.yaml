@@ -1,0 +1,21 @@
+schema_version: "1.1"
+name: writing-korean-clearly-trigger-negative-06
+description: Should not select writing-korean-clearly for a near-miss request
+tags:
+  - writing-korean-clearly
+  - trigger-negative
+execution:
+  prompt: "다음 문장을 한 글자도 바꾸지 말고 그대로 인용해 줘: 배포가 완료되었습니다."
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 1
+graders:
+  - type: tool_used
+    name: did-not-select-writing-korean-clearly
+    tool: Skill
+    input_match: "writing-korean-clearly"
+    min: 0
+    max: 0
+    arm: both

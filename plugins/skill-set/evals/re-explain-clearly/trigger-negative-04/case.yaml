@@ -1,0 +1,21 @@
+schema_version: "1.1"
+name: re-explain-clearly-trigger-negative-04
+description: Should not select re-explain-clearly for a near-miss request
+tags:
+  - re-explain-clearly
+  - trigger-negative
+execution:
+  prompt: "Fix the grammar and punctuation in this email."
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 1
+graders:
+  - type: tool_used
+    name: did-not-select-re-explain-clearly
+    tool: Skill
+    input_match: "re-explain-clearly"
+    min: 0
+    max: 0
+    arm: both

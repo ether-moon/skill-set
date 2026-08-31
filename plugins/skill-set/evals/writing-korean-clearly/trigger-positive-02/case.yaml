@@ -1,0 +1,19 @@
+schema_version: "1.1"
+name: writing-korean-clearly-trigger-positive-02
+description: Should select writing-korean-clearly for a representative request
+tags:
+  - writing-korean-clearly
+  - trigger-positive
+execution:
+  prompt: "왜 `cache_key`가 비어 있는지 한국어로 설명해 줘. 코드 식별자는 그대로 써."
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 1
+graders:
+  - type: tool_used
+    name: selected-writing-korean-clearly
+    tool: Skill
+    input_match: "writing-korean-clearly"
+    min: 1

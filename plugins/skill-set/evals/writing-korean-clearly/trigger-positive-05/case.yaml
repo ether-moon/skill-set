@@ -1,0 +1,19 @@
+schema_version: "1.1"
+name: writing-korean-clearly-trigger-positive-05
+description: Should select writing-korean-clearly for a representative request
+tags:
+  - writing-korean-clearly
+  - trigger-positive
+execution:
+  prompt: "`deployJob`이 실패한 이유와 확인한 사실을 짧게 알려 줘."
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 1
+graders:
+  - type: tool_used
+    name: selected-writing-korean-clearly
+    tool: Skill
+    input_match: "writing-korean-clearly"
+    min: 1

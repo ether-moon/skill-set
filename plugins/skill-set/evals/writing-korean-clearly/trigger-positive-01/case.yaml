@@ -1,0 +1,19 @@
+schema_version: "1.1"
+name: writing-korean-clearly-trigger-positive-01
+description: Should select writing-korean-clearly for a representative request
+tags:
+  - writing-korean-clearly
+  - trigger-positive
+execution:
+  prompt: "이 변경의 핵심과 검증 결과를 한국어로 간결하게 보고해 줘."
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 1
+graders:
+  - type: tool_used
+    name: selected-writing-korean-clearly
+    tool: Skill
+    input_match: "writing-korean-clearly"
+    min: 1

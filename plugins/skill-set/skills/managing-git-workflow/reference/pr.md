@@ -26,6 +26,8 @@ The allocated file contains exactly `SKILL_SET_INPUT_REPLACE_ME`. Use the scoped
 
 Suggested body sections are Summary, Changes, and Test Plan when the committed evidence supports them. Do not invent tests.
 
+Write the body as plain statements of what changed and why. In Summary, state the change and its reason. In Changes, describe the committed files and behavior in factual terms. When a Test Plan section is included, list only checks that ran in this session or are evidenced in committed artifacts, with their results; if none ran, say so in one line. Do not describe verification with evaluative modifiers or self-validating claims such as "thoroughly verified", "fully hardened", or "battle-tested"; cite the check instead. Keep the technical terms the reader needs.
+
 ## 3. Preview
 
 ```bash
