@@ -1,0 +1,23 @@
+## Decisions Made
+- Ruby 2.6 호환성을 위해 `Array#filter_map` 대신 의미가 동일한 `map … end.compact`를 사용했습니다.
+- PR merge 전에 로컬 전체 테스트 suite가 통과해야 한다는 통합 조건을 유지했습니다.
+
+## Problems Encountered
+- 전체 테스트가 Ruby 2.6.10에서 `Array#filter_map` NoMethodError로 중단되었습니다. 해당 테스트만 재현한 뒤 호환 표현으로 수정했습니다.
+- 자동 simplifier와 reviewer agent가 설정된 `claude-opus-4-0` 모델의 404 오류로 시작하지 못했습니다. 두 agent 모두 파일을 변경하지 않았고, 최소 diff를 직접 검토했습니다.
+
+## Constraints Identified
+- macOS 기본 Ruby 2.6.10에서도 repository test runner가 실행되어야 합니다.
+- PR HEAD가 변경되면 이전 shipping clean 판정을 재사용할 수 없으므로 새 HEAD를 다시 검증해야 합니다.
+
+## Open Questions
+None
+
+## Context
+PR #42를 merge하기 전 전체 테스트 suite를 실행했습니다. `plugins/skill-set/tests/test-shipping-pr-authorization.sh`의 Ruby 2.7 전용 호출을 Ruby 2.6 호환 표현으로 바꿨고, targeted test와 전체 suite가 통과했습니다.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
