@@ -5,6 +5,21 @@ All notable changes to plugins in the skill-set marketplace will be documented i
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16.0] - 2026-08-31
+
+### Added
+
+- feat: add re-explanation and Korean writing skills
+
+### Improved
+
+- Merge pull request #42 from ether-moon/re-explain-clearly-skill
+
+### Fixed
+
+- fix: support Ruby 2.6 in shipping authorization test
+- fix: strengthen Korean writing guidance and evals
+
 ## [1.15.0] - 2026-08-25
 
 ### Added
