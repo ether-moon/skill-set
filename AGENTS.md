@@ -18,7 +18,7 @@ Runtime totals: **13 skills, 7 legacy commands, 4 PR agents, 0 hooks, 0 MCP serv
 | `autofixing-and-escalating` | Classifies actionable findings from linters, tests, security scans, audits, and PR reviews, automatically applies unambiguous fixes, and pauses only for decisions required by ambiguous findings before applying the complete chosen resolution. |
 | `creating-skills` | This skill is the primary entry point for creating, modifying, evaluating, and governing the lifecycle of agent skills. |
 | `driving-with-tests` | Guides implementation and verification through Orient, Red/Green/Refactor, Probe, and Guard. |
-| `grilling-plans` | Stress-tests an existing plan, RFC, design, or proposal by resolving one decision per turn and maintaining a decision ledger. |
+| `grilling-plans` | Stress-tests an existing plan, RFC, design, or proposal by presenting all evidence-backed decision questions in one batch and maintaining a decision ledger. |
 | `guarding-agent-directives` | Verifies proposed agent-directive additions and audits existing CLAUDE.md, AGENTS.md, and referenced instruction files for bloat, duplication, ambiguity, and placement. |
 | `improving-architecture` | Finds and ranks evidence-backed deep-module and seam refactor candidates in a codebase. |
 | `managing-git-workflow` | Safely inspects repository state and executes explicitly authorized commits, pushes, and pull-request creation through a constrained runner. |
@@ -37,7 +37,7 @@ Runtime totals: **13 skills, 7 legacy commands, 4 PR agents, 0 hooks, 0 MCP serv
 | `/skill-set:git:commit` | Create a scoped commit without pushing |
 | `/skill-set:git:pr` | Create or find a pull request from committed changes |
 | `/skill-set:git:push` | Push existing commits with remote SHA protection |
-| `/skill-set:plan:grill` | Stress-test an existing plan one decision per turn, stopping after five user questions with a Confirmed, Rejected, and Unresolved ledger. |
+| `/skill-set:plan:grill` | Stress-test an existing plan by asking every evidence-backed decision question in one batch and maintaining a Confirmed, Rejected, and Unresolved ledger. |
 | `/skill-set:pr:fix` | Resolve PR blockers in the current PR worktree through one publication-gated cycle |
 | `/skill-set:pr:ship` | Ship a PR through resumable CI, review, and blocker-resolution cycles |
 

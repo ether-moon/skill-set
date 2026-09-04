@@ -37,9 +37,23 @@ Status: queued | awaiting-user | applied | failed | skipped
 
 ## Decision Gate
 
-If any item is AMBIGUOUS, keep every fix queued and start a decision dialogue before any mutation. For each AMBIGUOUS item, provide `Why ambiguous`, severity, concrete alternatives, and a recommendation. Ask only for the unresolved choice; never ask whether to proceed with OBVIOUS fixes.
+If any item is AMBIGUOUS, keep every fix queued before any mutation. Present all unresolved AMBIGUOUS items in one batch and ask only for those choices; never ask whether to proceed with OBVIOUS fixes. Use this format for each item:
 
-Continue until every AMBIGUOUS item has an exact selected resolution or is explicitly skipped. A skipped choice counts as a completed decision. Do not edit between decision turns.
+```text
+Question <ID> — <decision>
+
+Severity: CRITICAL | MAJOR | MINOR
+Evidence: <finding and verified context>
+Why this matters: <consequence, downstream choice, or failure mode>
+Why ambiguous: <trade-off or missing policy decision>
+Options:
+1. <option>
+2. <option>
+3. <option, when materially distinct>
+Recommendation: <one option and concrete reason>
+```
+
+Use stable finding identifiers so one reply can map answers to questions. Include 2–3 concrete options per item and do not impose a per-batch item limit. If the user answers only part of the batch, update those decisions and present every remaining AMBIGUOUS item together in the next batch. Continue until every item has an exact selected resolution or is explicitly skipped. A skipped choice counts as a completed decision. Do not edit between decision batches.
 
 ## Automatic Resolution
 

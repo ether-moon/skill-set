@@ -20,9 +20,18 @@ if grep -Eq 'review-only' "$skill" "$resolution"; then
 fi
 grep -Fq "Default to \`edit: true\`" "$skill"
 grep -Eq 'pause before any mutation' "$skill"
+grep -Fq 'Present every unresolved AMBIGUOUS item in one escalation batch' "$skill"
 grep -Eq 'after every required decision is complete, automatically apply all queued OBVIOUS fixes' "$skill"
 grep -Eq 'without another confirmation' "$skill"
 grep -Eq 'without another confirmation' "$resolution"
+grep -Fq 'Present all unresolved AMBIGUOUS items in one batch' "$resolution"
+for field in 'Evidence:' 'Why this matters:' 'Options:' 'Recommendation:'; do
+  grep -Fq "$field" "$skill" || fail "autofixing escalation misses question field: $field"
+  grep -Fq "$field" "$resolution" || fail "resolution contract misses question field: $field"
+done
+if grep -Eqi 'one (question|decision) per turn' "$skill" "$resolution"; then
+  fail 'autofixing escalation serializes decision questions'
+fi
 for capability in edit commit push comment; do
   grep -Eq "${capability}" "$skill" || fail "missing capability: $capability"
 done
