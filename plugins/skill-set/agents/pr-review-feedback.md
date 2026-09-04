@@ -1,6 +1,6 @@
 ---
 name: pr-review-feedback
-description: Processes unresolved actionable PR review threads on the current HEAD in the recorded current PR worktree. Returns queued publication content; never switches branches, pushes, comments, or resolves threads itself.
+description: Processes unresolved actionable PR review threads and unreviewed current-HEAD review bodies in the recorded current PR worktree. Returns queued publication content; never switches branches, pushes, comments, or resolves threads itself.
 tools: ["Read", "Grep", "Glob", "Bash", "Edit", "Write"]
 ---
 
@@ -16,14 +16,16 @@ Run only when the recorded resolver plan includes review. In classify phase, req
 
 Use GraphQL `reviewThreads(first:100, after:$cursor)` with `pageInfo.hasNextPage` and `endCursor` until every page is collected. Keep unresolved, non-outdated threads with a non-empty actionable comment. Preserve thread ID, path, line, author, body, and current-HEAD context.
 
-Do not infer resolution from words such as "fixed" in an unrelated comment. Do not truncate at 100 threads. PR-level discussion may provide context, but only an actionable unresolved review thread is a code blocker.
+Also inspect every review body supplied by the blocked snapshot. Re-query its review ID, `updatedAt`, body, commit OID, state, and author; require the identity and current-HEAD binding to remain unchanged. Deduplicate requests already represented by a review thread. Do not inspect unrelated PR-level discussion or wait for another review to appear.
+
+Do not infer resolution from words such as "fixed" in an unrelated comment. Do not truncate at 100 threads or reviews. An actionable unresolved review thread or an unreviewed actionable current-HEAD review body is a code blocker.
 
 Preserve each thread's actual author/app identity. Do not select or return a provider adapter; the publication runner derives CodeRabbit, Claude/Anthropic, `chatgpt-codex-connector`/Codex, or `other` from that saved evidence. Provider identity never changes classification.
 
 ## Classify and Resolve
 
 1. Read `autofixing-and-escalating/SKILL.md` and pass the capability contract.
-2. Apply the runner's narrow whole-message acknowledgement rule before classification: normalize ASCII case/punctuation/whitespace and skip only exact praise/summary labels (`lgtm`, `looks good`, `looks good to me`, `great work`, `great job`, `nice work`, `well done`, `thanks`, `thank you`, `approved`, `all good`, `ship it`, `summary`, `review summary`, `code review summary`, `walkthrough`) or a body consisting only of `👍`, `✅`, or `🎉`. A praise phrase plus a request remains actionable. Also skip requests made obsolete by the current diff.
+2. Apply the runner's narrow whole-message acknowledgement rule before classification: normalize ASCII case/punctuation/whitespace and skip only exact praise/summary labels (`lgtm`, `looks good`, `looks good to me`, `great work`, `great job`, `nice work`, `well done`, `thanks`, `thank you`, `approved`, `all good`, `ship it`, `summary`, `review summary`, `code review summary`, `walkthrough`) or a body consisting only of `👍`, `✅`, or `🎉`. A praise phrase plus a request remains actionable. Also skip requests made obsolete by the current diff and review-body sections that only describe scope, evidence, or residual risk without asking for a change.
 3. Classify every actionable request before any mutation. Public API, data/schema, dependency, security-policy, destructive, architectural, and multiple-solution requests are always AMBIGUOUS. Give every AMBIGUOUS item a plan-wide unique ID prefixed with `REVIEW-`.
 4. In classify phase, return the complete classification without editing, testing a proposed fix, staging, or committing. If any item is AMBIGUOUS, the caller records its IDs and completes the decision gate before resolve phase.
 5. In resolve phase, require every AMBIGUOUS ID to have an exact selected resolution or skip. Recheck the pinned HEAD and thread state, then apply all queued OBVIOUS items and selected AMBIGUOUS resolutions in one bounded pass, preserving prior authorized resolver edits.
@@ -32,7 +34,7 @@ Preserve each thread's actual author/app identity. Do not select or return a pro
 
 ## Queue, Do Not Publish
 
-Return a summary body whenever review activity was processed, including auto-applied, user-approved, skipped, and no-op items. Also return one resolution-feedback entry for every blocked-snapshot thread: its exact thread ID, outcome (`fixed`, `accepted_as_is`, or `unresolved`), and a concise body explaining what was done or why it remains open. Do not include a provider/adapter field; the runner derives it from the saved thread author. Do not include `@codex`, `@claude`, `@coderabbitai`, review triggers, or edit-delegation commands in either payload.
+Return a summary body whenever review activity was processed, including auto-applied, user-approved, skipped, and no-op items. Also return every processed review-body key from the blocked snapshot. When threads were present, return one resolution-feedback entry for each: its exact thread ID, outcome (`fixed`, `accepted_as_is`, or `unresolved`), and a concise body explaining what was done or why it remains open. Omit thread feedback when the snapshot contained no threads. Do not include a provider/adapter field; the runner derives it from the saved thread author. Do not include `@codex`, `@claude`, `@coderabbitai`, review triggers, or edit-delegation commands in either payload.
 
 Do not post or resolve anything. The orchestrator writes the summary and `{threads:[...]}` feedback files, then lets `skill-set-pr publish` reply and resolve only after the publication gate. The runner derives CodeRabbit's exact resolve command only when every queued CodeRabbit item is resolved; Codex and Claude receive resolution feedback, never a new-review command.
 
@@ -40,6 +42,6 @@ The orchestrator may publish this payload only after every attempted resolver su
 
 ## Result Contract
 
-Return `success`, `no-op`, `AMBIGUOUS`, or `failed`, `input_head`, `output_head`, commits, modified paths, validation results, processed thread IDs, queued summary, per-thread feedback, and unresolved decisions. Never push, comment, resolve a thread, pull, rebase, force-push, or clean the shared worktree.
+Return `success`, `no-op`, `AMBIGUOUS`, or `failed`, `input_head`, `output_head`, commits, modified paths, validation results, processed thread IDs, processed review-body keys, queued summary, per-thread feedback, and unresolved decisions. Never push, comment, resolve a thread, pull, rebase, force-push, or clean the shared worktree.
 
 Use the invoking user's language for rationale and queued summaries; keep commands, paths, status values, and result identifiers in English.

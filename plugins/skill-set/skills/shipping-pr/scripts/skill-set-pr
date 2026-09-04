@@ -241,6 +241,8 @@ read_state() {
     (.deadlines.registration_epoch | type == "number") and
     (.blocker_fingerprint | type == "string") and
     (.checks_observed | type == "boolean") and
+    ((.reviewed_review_keys // []) | type == "array") and
+    all((.reviewed_review_keys // [])[]; type == "string" and length > 0) and
     (.options | type == "object") and
     (.options.ci_timeout_seconds | type == "number") and
     (.options.review_timeout_seconds | type == "number") and
@@ -701,7 +703,8 @@ command_init() {
       head_repo:$head_repo,head_branch:$head_branch,base_branch:$base_branch,
       pr:$pr,head_sha:$head,cycle:0,
       deadlines:{checks_epoch:$checks,review_epoch:$review,registration_epoch:$registration},
-      blocker_fingerprint:"",checks_observed:false,resolver_attempt:null,resolution:null,status:$status,
+      blocker_fingerprint:"",checks_observed:false,reviewed_review_keys:[],
+      resolver_attempt:null,resolution:null,status:$status,
       options:{ci_timeout_seconds:$ci_timeout,review_timeout_seconds:$review_timeout,
         max_cycles:$max_cycles,required_only:$required_only,reviewer_detection:"auto"},
       reviewers:{active:$reviewers}}')
@@ -859,6 +862,93 @@ collect_threads() {
         "Retry after GitHub finishes computing review data."
   done
   THREAD_PAGES=$pages
+}
+
+collect_review_bodies() {
+  local repo=$1
+  local pr=$2
+  local head_sha=$3
+  local reviewed_keys=$4
+  local owner=${repo%%/*}
+  local name=${repo#*/}
+  local cursor=
+  local pages=0
+  local response
+  # GraphQL variables must remain literal for gh to bind them.
+  # shellcheck disable=SC2016
+  local query='query($owner:String!,$repo:String!,$number:Int!,$cursor:String){repository(owner:$owner,name:$repo){pullRequest(number:$number){reviews(first:100,after:$cursor){nodes{id state body submittedAt updatedAt commit{oid} author{login}}pageInfo{hasNextPage endCursor}}}}}'
+  REVIEW_BODY_DETAILS='[]'
+
+  while :; do
+    pages=$((pages + 1))
+    [[ $pages -le 1000 ]] || \
+      die pagination_limit "Review pagination exceeded 1000 pages." "Retry or inspect the GitHub API response."
+    if [[ -n $cursor ]]; then
+      response=$(gh_json api graphql -f query="$query" -F owner="$owner" -F repo="$name" \
+        -F number="$pr" -f cursor="$cursor")
+    else
+      response=$(gh_json api graphql -f query="$query" -F owner="$owner" -F repo="$name" \
+        -F number="$pr")
+    fi
+    validate_json_response "reviews GraphQL" "$response"
+    jq -e '
+      (.data.repository.pullRequest.reviews | type == "object") and
+      (.data.repository.pullRequest.reviews.nodes | type == "array") and
+      all(.data.repository.pullRequest.reviews.nodes[];
+        type == "object" and
+        (.id | type == "string" and length > 0) and
+        ((.state // "") | type == "string") and
+        ((.body // "") | type == "string") and
+        ((.submittedAt // "") | type == "string") and
+        ((.updatedAt // "") | type == "string" and length > 0) and
+        ((.commit? // {}) | type == "object") and
+        ((.commit?.oid? // "") | type == "string") and
+        ((.author?.login? // "") | type == "string")) and
+      (.data.repository.pullRequest.reviews.pageInfo | type == "object") and
+      (.data.repository.pullRequest.reviews.pageInfo.hasNextPage | type == "boolean") and
+      ((.data.repository.pullRequest.reviews.pageInfo.endCursor == null) or
+       (.data.repository.pullRequest.reviews.pageInfo.endCursor | type == "string"))
+    ' >/dev/null 2>&1 <<<"$response" || \
+      die invalid_github_response "GraphQL reviews returned an invalid nested shape." \
+        "Verify GitHub permissions, update gh, and retry."
+    REVIEW_BODY_DETAILS=$(jq -c --argjson existing "$REVIEW_BODY_DETAILS" \
+      --argjson reviewed "$reviewed_keys" --arg head "$head_sha" '
+      def non_actionable_body:
+        . as $raw
+        | ($raw | ascii_downcase | gsub("[[:punct:]]"; " ")
+          | gsub("[[:space:]]+"; " ")
+          | gsub("^[[:space:]]+|[[:space:]]+$"; "")) as $normalized
+        | ($raw | gsub("^[[:space:]]+|[[:space:]]+$"; "")) as $trimmed
+        | ((["lgtm","looks good","looks good to me","great work","great job",
+              "nice work","well done","thanks","thank you","approved","all good",
+              "ship it","summary","review summary","code review summary","walkthrough"]
+            | index($normalized)) != null)
+          or ((["👍","✅","🎉"] | index($trimmed)) != null);
+      $existing + [.data.repository.pullRequest.reviews.nodes[]?
+        | select((.commit.oid // "") == $head)
+        | select((.state // "") != "DISMISSED" and (.state // "") != "PENDING")
+        | (.body // "") as $body
+        | select((($body | gsub("^[[:space:]]+|[[:space:]]+$"; "")) | length) > 0)
+        | select(($body | non_actionable_body) | not)
+        | (.id + ":" + .updatedAt) as $key
+        | select(($reviewed | index($key)) == null)
+        | {key:$key,id:.id,author:(.author.login // ""),body:$body,state:(.state // ""),
+            submitted_at:(.submittedAt // ""),updated_at:.updatedAt,
+            commit_oid:(.commit.oid // "")}]
+      | sort_by(.key)
+    ' <<<"$response" 2>/dev/null) || \
+      die invalid_github_response "Unable to normalize GraphQL review bodies." \
+        "Inspect the GraphQL response shape and retry."
+    local has_next
+    has_next=$(jq -r '.data.repository.pullRequest.reviews.pageInfo.hasNextPage' \
+      <<<"$response" 2>/dev/null) || \
+      die invalid_github_response "Unable to read review pagination metadata." "Retry the snapshot."
+    [[ $has_next == true ]] || break
+    cursor=$(jq -er '.data.repository.pullRequest.reviews.pageInfo.endCursor' <<<"$response") || \
+      die invalid_github_response "Reviews indicated another page without an end cursor." \
+        "Retry after GitHub finishes computing review data."
+  done
+  REVIEW_BODY_PAGES=$pages
 }
 
 collect_pr_reactions() {
@@ -1064,6 +1154,7 @@ command_snapshot() {
       "Handle $current_status with the state transition workflow before polling again."
 
   local repo prior_head prior_head_repo prior_head_branch prior_base_branch prior_host required_only reviewers_active cycle
+  local reviewed_review_keys review_keys_for_head
   repo=$(jq -r .repo <<<"$STATE")
   prior_head=$(jq -r .head_sha <<<"$STATE")
   prior_head_repo=$(jq -r .head_repo <<<"$STATE")
@@ -1079,6 +1170,7 @@ command_snapshot() {
     if .options.required_only == null then true else .options.required_only end
   ' <<<"$STATE")
   reviewers_active=$(jq -c '.reviewers.active // []' <<<"$STATE")
+  reviewed_review_keys=$(jq -c '.reviewed_review_keys // []' <<<"$STATE")
   cycle=$(jq -r '.cycle // 0' <<<"$STATE")
 
   local before_json start_head start_head_repo start_head_branch start_base_branch start_host pr_state mergeable merge_state
@@ -1181,6 +1273,42 @@ command_snapshot() {
   local unresolved_count
   unresolved_count=$(jq 'length' <<<"$THREAD_DETAILS")
 
+  REVIEW_BODY_DETAILS='[]'
+  REVIEW_BODY_PAGES=0
+  local review_sweep_ready=true prior_checks_observed review_now review_registration_epoch
+  local review_registration_pending=false review_checks_missing=false
+  local review_fail_count review_cancel_count review_pending_count
+  prior_checks_observed=$(jq -r .checks_observed <<<"$STATE")
+  review_now=$(now_epoch)
+  review_registration_epoch=$(jq -r .deadlines.registration_epoch <<<"$STATE")
+  review_fail_count=$(jq -r .fail <<<"$check_counts")
+  review_cancel_count=$(jq -r .cancel <<<"$check_counts")
+  review_pending_count=$(jq -r .pending <<<"$check_counts")
+  if [[ $check_total -eq 0 ]]; then
+    if [[ $prior_checks_observed == true ]]; then
+      review_checks_missing=true
+    elif [[ $review_now -lt $review_registration_epoch ]]; then
+      review_registration_pending=true
+    fi
+  fi
+  if [[ $mergeable == CONFLICTING || $mergeable == UNKNOWN || $merge_state == DIRTY || \
+    $merge_state == UNKNOWN || $review_fail_count -gt 0 || $review_cancel_count -gt 0 || \
+    $review_pending_count -gt 0 || $unresolved_count -gt 0 || \
+    $review_registration_pending == true || $review_checks_missing == true ]]; then
+    review_sweep_ready=false
+  fi
+  if [[ $review_sweep_ready == true ]]; then
+    review_keys_for_head=$reviewed_review_keys
+    if [[ $prior_head != "$start_head" || \
+      $(lowercase "$prior_head_repo") != "$(lowercase "$start_head_repo")" || \
+      $prior_head_branch != "$start_head_branch" || $prior_host != "$start_host" ]]; then
+      review_keys_for_head='[]'
+    fi
+    collect_review_bodies "$repo" "$PR" "$start_head" "$review_keys_for_head"
+  fi
+  local unreviewed_review_count
+  unreviewed_review_count=$(jq 'length' <<<"$REVIEW_BODY_DETAILS")
+
   collect_optional_reviewer_telemetry "$repo" "$PR" "$start_head" "$reviewers_active" "$cycle"
   reviewers_active=$REVIEWERS_ACTIVE
   local reviewer_required reviewer_states reviewer_telemetry_available coderabbit_state
@@ -1282,7 +1410,7 @@ command_snapshot() {
       registration_pending=true
     fi
     if [[ $conflict == true || $fail_count -gt 0 || $cancel_count -gt 0 || \
-      $unresolved_count -gt 0 ]]; then
+      $unresolved_count -gt 0 || $unreviewed_review_count -gt 0 ]]; then
       status=blocked
     elif [[ $pending_count -gt 0 || $merge_pending == true || \
       $registration_pending == true || $checks_missing == true ]]; then
@@ -1309,11 +1437,11 @@ command_snapshot() {
       --arg base_branch "$effective_base_branch" --arg host "$effective_host" \
       --argjson required "$required_contexts" \
       --argjson conflict "$conflict" --argjson merge_pending "$merge_pending" \
-      --argjson threads "$THREAD_DETAILS" \
+      --argjson threads "$THREAD_DETAILS" --argjson review_bodies "$REVIEW_BODY_DETAILS" \
       '{head:$head,head_repo:$head_repo,head_branch:$head_branch,base_branch:$base_branch,
         github_host:$host,required:$required,checks:$checks,conflict:$conflict,
         merge_pending:$merge_pending,
-        threads:$threads}')
+        threads:$threads,review_bodies:$review_bodies}')
   fi
   fingerprint=$(printf '%s' "$fingerprint_material" | git hash-object --stdin)
   if [[ $status == blocked && $resolver_attempt != null && \
@@ -1324,8 +1452,10 @@ command_snapshot() {
   last_snapshot=$(jq -cn --argjson checks "$check_counts" --argjson check_details "$check_details" \
     --argjson required_checks "$required_summary" \
     --arg merge_state "$merge_state" --argjson conflict "$conflict" \
-    --argjson threads "$THREAD_DETAILS" \
+    --argjson threads "$THREAD_DETAILS" --argjson review_bodies "$REVIEW_BODY_DETAILS" \
     --argjson unresolved "$unresolved_count" --argjson pages "$THREAD_PAGES" \
+    --argjson unreviewed_reviews "$unreviewed_review_count" \
+    --argjson review_pages "$REVIEW_BODY_PAGES" \
     --arg coderabbit "$coderabbit_state" --argjson reviewers "$reviewer_states" \
     --argjson reviewer_required "$reviewer_required" --argjson observed_at "$now" \
     --argjson reviewer_telemetry_available "$reviewer_telemetry_available" \
@@ -1334,6 +1464,8 @@ command_snapshot() {
       merge_state:$merge_state,
       conflict:$conflict,review_threads:$threads,
       unresolved_actionable_threads:$unresolved,review_thread_pages:$pages,coderabbit:$coderabbit,
+      review_bodies:$review_bodies,unreviewed_review_bodies:$unreviewed_reviews,
+      review_body_pages:$review_pages,
       reviewers:{states:$reviewers,required:$reviewer_required,
         telemetry_available:$reviewer_telemetry_available},
       registration_pending:$registration_pending,checks_missing:$checks_missing,observed_at:$observed_at}')
@@ -1341,25 +1473,32 @@ command_snapshot() {
     last_snapshot=$(jq -cn --argjson observed_at "$now" \
       '{discarded:true,reason:"snapshot_binding_changed",observed_at:$observed_at}')
   fi
+  if [[ $head_changed == true || $discarded == true ]]; then
+    reviewed_review_keys='[]'
+  fi
   new_state=$(jq -c --arg head "$effective_head" --arg head_repo "$effective_head_repo" \
     --arg head_branch "$effective_head_branch" --arg base_branch "$effective_base_branch" \
     --arg github_host "$effective_host" --arg status "$status" \
     --argjson deadlines "$deadlines" --arg fingerprint "$fingerprint" \
     --argjson snapshot "$last_snapshot" --argjson checks_observed "$checks_observed" \
-    --argjson reviewers_active "$reviewers_active" \
+    --argjson reviewers_active "$reviewers_active" --argjson reviewed_reviews "$reviewed_review_keys" \
     '. + {head_sha:$head,head_repo:$head_repo,head_branch:$head_branch,base_branch:$base_branch,
       github_host:$github_host,
       status:$status,deadlines:$deadlines,
       blocker_fingerprint:$fingerprint,checks_observed:$checks_observed,
+      reviewed_review_keys:$reviewed_reviews,
       reviewers:{active:$reviewers_active},
       resolver_attempt:null,last_snapshot:$snapshot}' <<<"$STATE")
   [[ $dry_run == true ]] || write_state "$new_state"
 
   jq -cn --argjson state "$new_state" --argjson checks "$check_counts" \
     --argjson check_details "$check_details" --argjson threads "$THREAD_DETAILS" \
+    --argjson review_bodies "$REVIEW_BODY_DETAILS" \
     --argjson required_checks "$required_summary" --arg merge_state "$merge_state" \
     --argjson head_changed "$head_changed" --argjson discarded "$discarded" \
     --argjson unresolved "$unresolved_count" --argjson pages "$THREAD_PAGES" \
+    --argjson unreviewed_reviews "$unreviewed_review_count" \
+    --argjson review_pages "$REVIEW_BODY_PAGES" \
     --arg coderabbit "$coderabbit_state" --argjson reviewers_active "$reviewers_active" \
     --argjson reviewer_states "$reviewer_states" --argjson reviewer_required "$reviewer_required" \
     --argjson reviewer_telemetry_available "$reviewer_telemetry_available" \
@@ -1369,6 +1508,8 @@ command_snapshot() {
       review_threads:$threads,head_changed:$head_changed,
       discarded:$discarded,unresolved_actionable_threads:$unresolved,
       review_thread_pages:$pages,coderabbit:$coderabbit,
+      review_bodies:$review_bodies,unreviewed_review_bodies:$unreviewed_reviews,
+      review_body_pages:$review_pages,
       reviewers:{active:$reviewers_active,states:$reviewer_states,required:$reviewer_required,
         telemetry_available:$reviewer_telemetry_available},dry_run:$dry_run}'
 }
@@ -1536,10 +1677,11 @@ command_transition() {
       resolver_agents_json=$(jq -cn --argjson agents "$resolver_agents_json" --arg agent "$agent" \
         '$agents + [$agent]')
     done
-    local snapshot_conflict snapshot_failures snapshot_threads
+    local snapshot_conflict snapshot_failures snapshot_threads snapshot_review_bodies
     snapshot_conflict=$(jq -r '.last_snapshot.conflict // false' <<<"$STATE")
     snapshot_failures=$(jq -r '(.last_snapshot.checks.fail // 0) + (.last_snapshot.checks.cancel // 0)' <<<"$STATE")
     snapshot_threads=$(jq -r '.last_snapshot.unresolved_actionable_threads // 0' <<<"$STATE")
+    snapshot_review_bodies=$(jq -r '.last_snapshot.unreviewed_review_bodies // 0' <<<"$STATE")
     if [[ $snapshot_conflict == true ]]; then
       [[ $(jq -r 'length == 1 and .[0] == "merge-conflict-resolver"' <<<"$resolver_agents_json") == true ]] || \
         die invalid_resolver_plan "A merge conflict must use the merge resolver as the sole cycle." \
@@ -1551,8 +1693,8 @@ command_transition() {
       [[ $snapshot_failures -eq 0 || $seen_ci == true ]] || \
         die incomplete_resolver_plan "Failed or cancelled checks require ci-failure-resolver." \
           "Add --resolver-agent ci-failure-resolver."
-      [[ $snapshot_threads -eq 0 || $seen_review == true ]] || \
-        die incomplete_resolver_plan "Actionable review threads require pr-review-feedback." \
+      [[ $((snapshot_threads + snapshot_review_bodies)) -eq 0 || $seen_review == true ]] || \
+        die incomplete_resolver_plan "Actionable review threads or unreviewed review bodies require pr-review-feedback." \
           "Add --resolver-agent pr-review-feedback after CI resolution."
     fi
     local resolution_now
@@ -1674,8 +1816,9 @@ command_transition() {
       "Remove resolver flags or transition from resolving."
   fi
 
-  local cycle new_state
+  local cycle new_state reviewed_review_keys
   cycle=$(jq -r .cycle <<<"$STATE")
+  reviewed_review_keys=$(jq -c '.reviewed_review_keys // []' <<<"$STATE")
   if [[ $from == blocked && $to == resolving && $increment_cycle != true ]]; then
     die cycle_increment_required "A new resolver attempt must increment the cycle." "Pass --increment-cycle."
   fi
@@ -1698,6 +1841,13 @@ command_transition() {
       --arg fingerprint "$(jq -r .blocker_fingerprint <<<"$STATE")" \
       --arg result "$resolver_result" --argjson observed_at "$transition_now" \
       '{head_sha:$head,blocker_fingerprint:$fingerprint,result:$result,observed_at:$observed_at}')
+    if [[ $resolver_result == success || $resolver_result == no-op ]] && \
+      jq -e '.resolution.expected_agents | index("pr-review-feedback") != null' \
+        >/dev/null 2>&1 <<<"$STATE"; then
+      reviewed_review_keys=$(jq -c '
+        [(.reviewed_review_keys // [])[],.last_snapshot.review_bodies[]?.key] | unique
+      ' <<<"$STATE")
+    fi
   fi
   local transition_now
   transition_now=$(now_epoch)
@@ -1716,7 +1866,9 @@ command_transition() {
   fi
   new_state=$(jq -c --arg status "$to" --argjson cycle "$cycle" \
     --argjson resolver "$resolver_observation" --argjson resolution "$resolution_json" \
-    '. + {status:$status,cycle:$cycle,resolver_attempt:$resolver,resolution:$resolution}' <<<"$STATE")
+    --argjson reviewed_reviews "$reviewed_review_keys" \
+    '. + {status:$status,cycle:$cycle,resolver_attempt:$resolver,resolution:$resolution,
+      reviewed_review_keys:$reviewed_reviews}' <<<"$STATE")
   [[ $dry_run == true ]] || write_state "$new_state"
   emit_state transition "$new_state" false "$dry_run"
 }
@@ -1877,34 +2029,36 @@ command_publish() {
   local expected_thread_ids='[]'
   if jq -e 'index("pr-review-feedback") != null' >/dev/null 2>&1 <<<"$expected_agents"; then
     expected_thread_ids=$(jq -c '[.last_snapshot.review_threads[]?.id] | sort' <<<"$STATE")
-    [[ -n $thread_feedback_file ]] || \
-      die review_feedback_required "A planned review resolver must queue per-thread resolution feedback." \
-        "Pass --thread-feedback-file with one outcome for every actionable thread."
-    jq -e --argjson expected "$expected_thread_ids" \
-      '([.threads[].id] | sort) == $expected' >/dev/null 2>&1 <<<"$thread_feedback_json" || \
-      die incomplete_review_feedback "Thread feedback does not cover the blocked snapshot exactly." \
-        "Return one fixed, accepted_as_is, or unresolved outcome for every actionable thread."
-    thread_feedback_json=$(jq -c --argjson snapshot \
-      "$(jq -c '.last_snapshot.review_threads' <<<"$STATE")" '
-      def reviewer_provider:
-        ascii_downcase
-        | if contains("coderabbit") then "coderabbit"
-          elif contains("chatgpt-codex-connector") or contains("codex-connector") then "codex"
-          elif contains("claude") or contains("anthropic") then "claude"
-          else "other" end;
-      .threads |= map(. as $feedback
-        | ($snapshot[] | select(.id == $feedback.id)) as $thread
-        | $feedback + {provider:(($thread.latest_comment.author // "") | reviewer_provider)})
-    ' <<<"$thread_feedback_json" 2>/dev/null) || \
-      die invalid_publication_input "Unable to derive reviewer providers from the blocked snapshot." \
-        "Take a fresh snapshot and retry without reviewer adapter fields."
-    coderabbit_resolve=$(jq -r '
-      [.threads[] | select(.provider == "coderabbit")] as $items
-      | (($items | length) > 0 and all($items[]; .outcome != "unresolved"))
-    ' <<<"$thread_feedback_json")
-    [[ $coderabbit_resolve == false || -n $summary_file ]] || \
-      die invalid_publication_input "Resolved CodeRabbit feedback requires --summary-file." \
-        "Queue the summary and CodeRabbit resolve signal as one post-gate comment."
+    if [[ $(jq -r 'length' <<<"$expected_thread_ids") -gt 0 ]]; then
+      [[ -n $thread_feedback_file ]] || \
+        die review_feedback_required "A planned review resolver must queue per-thread resolution feedback." \
+          "Pass --thread-feedback-file with one outcome for every actionable thread."
+      jq -e --argjson expected "$expected_thread_ids" \
+        '([.threads[].id] | sort) == $expected' >/dev/null 2>&1 <<<"$thread_feedback_json" || \
+        die incomplete_review_feedback "Thread feedback does not cover the blocked snapshot exactly." \
+          "Return one fixed, accepted_as_is, or unresolved outcome for every actionable thread."
+      thread_feedback_json=$(jq -c --argjson snapshot \
+        "$(jq -c '.last_snapshot.review_threads' <<<"$STATE")" '
+        def reviewer_provider:
+          ascii_downcase
+          | if contains("coderabbit") then "coderabbit"
+            elif contains("chatgpt-codex-connector") or contains("codex-connector") then "codex"
+            elif contains("claude") or contains("anthropic") then "claude"
+            else "other" end;
+        .threads |= map(. as $feedback
+          | ($snapshot[] | select(.id == $feedback.id)) as $thread
+          | $feedback + {provider:(($thread.latest_comment.author // "") | reviewer_provider)})
+      ' <<<"$thread_feedback_json" 2>/dev/null) || \
+        die invalid_publication_input "Unable to derive reviewer providers from the blocked snapshot." \
+          "Take a fresh snapshot and retry without reviewer adapter fields."
+      coderabbit_resolve=$(jq -r '
+        [.threads[] | select(.provider == "coderabbit")] as $items
+        | (($items | length) > 0 and all($items[]; .outcome != "unresolved"))
+      ' <<<"$thread_feedback_json")
+      [[ $coderabbit_resolve == false || -n $summary_file ]] || \
+        die invalid_publication_input "Resolved CodeRabbit feedback requires --summary-file." \
+          "Queue the summary and CodeRabbit resolve signal as one post-gate comment."
+    fi
   elif [[ -n $thread_feedback_file ]]; then
     die unexpected_review_feedback "Thread feedback is valid only when pr-review-feedback was planned." \
       "Remove --thread-feedback-file from CI-only or merge-only publication."

@@ -250,6 +250,8 @@ jq -e '
   .status == "clean" and
   .checks.pass == 1 and
   .unresolved_actionable_threads == 0 and
+  .unreviewed_review_bodies == 0 and
+  .review_body_pages == 1 and
   .reviewers.states.claude == "not_expected" and
   .reviewers.states.codex == "not_expected" and
   .reviewers.required.claude == false and
@@ -267,6 +269,50 @@ jq -e '
   .unresolved_actionable_threads == 1 and
   .review_threads[0].id == "thread-signal-gated"
 ' <<<"$signal_gated_thread" >/dev/null
+
+make_fixture unthreaded-review
+export MOCK_GH_SCENARIO=unthreaded-review
+unthreaded_review_init=$(init_case)
+unthreaded_review_run_id=$(jq -r .run_id <<<"$unthreaded_review_init")
+unthreaded_review=$(run_ok snapshot --pr 17 --expected-run-id "$unthreaded_review_run_id" --now 101)
+jq -e '
+  .status == "blocked" and
+  .checks.pass == 1 and
+  .unresolved_actionable_threads == 0 and
+  .unreviewed_review_bodies == 1 and
+  .review_bodies[0].id == "review-unthreaded" and
+  .review_bodies[0].body == "Suggestion: inspect this before declaring the PR clean."
+' <<<"$unthreaded_review" >/dev/null
+resolver_branch=$(git -C "$repo" branch --show-current)
+missing_review_resolver=$(run_fail transition --pr 17 --from blocked --to resolving \
+  --expected-run-id "$unthreaded_review_run_id" --increment-cycle --worktree "$repo" \
+  --resolver-branch "$resolver_branch" --remote origin --remote-branch feature \
+  --expected-remote-sha "$head_sha" --base-sha "$head_sha" --base-branch main \
+  --workspace-mode current --resolver-agent ci-failure-resolver)
+assert_equals incomplete_resolver_plan "$(jq -r .error.code <<<"$missing_review_resolver")" \
+  "unthreaded review requires review resolver"
+
+make_fixture unthreaded-review-once
+export MOCK_GH_SCENARIO=unthreaded-review
+unthreaded_once_init=$(init_case)
+unthreaded_once_run_id=$(jq -r .run_id <<<"$unthreaded_once_init")
+snapshot_case 101 >/dev/null
+start_resolution "$unthreaded_once_run_id" --resolver-agent pr-review-feedback >/dev/null
+results_file=$repo/resolver-results.json
+summary_file=$repo/summary.md
+write_single_result "$results_file" pr-review-feedback no-op "$head_sha" "$head_sha"
+printf 'Reviewed the current-HEAD review body with no code change.\n' >"$summary_file"
+publish_single_result "$unthreaded_once_run_id" "$head_sha" "$head_sha" "$results_file" \
+  --summary-file "$summary_file" >/dev/null
+run_ok transition --pr 17 --from resolving --to polling \
+  --expected-run-id "$unthreaded_once_run_id" --resolver-attempt --resolver-result no-op >/dev/null
+unthreaded_once_clean=$(snapshot_case 102)
+jq -e '
+  .status == "clean" and
+  .unreviewed_review_bodies == 0 and
+  (.review_bodies | length) == 0 and
+  (.reviewed_review_keys | length) == 1
+' <<<"$unthreaded_once_clean" >/dev/null
 
 make_fixture conflict
 export MOCK_GH_SCENARIO=conflict
@@ -301,7 +347,8 @@ init_case >/dev/null
 paginated=$(snapshot_case 101)
 assert_equals blocked "$(jq -r .status <<<"$paginated")" "paginated review state"
 assert_equals 1 "$(jq -r .unresolved_actionable_threads <<<"$paginated")" "page-two unresolved thread"
-assert_equals 2 "$(count_log 'api graphql')" "GraphQL page count"
+assert_equals 2 "$(count_log 'reviewThreads\(first:100')" "review thread GraphQL page count"
+assert_equals 0 "$(count_log 'reviews\(first:100')" "review body query before clean candidate"
 
 make_fixture head-change
 export MOCK_GH_SCENARIO=head-change
@@ -1058,7 +1105,7 @@ export MOCK_GH_SCENARIO=malformed-pr-list
 malformed_list=$(run_fail init --pr 17 --repo owner/repo)
 assert_equals invalid_github_response "$(jq -r .error.code <<<"$malformed_list")" "nested PR list response"
 
-for scenario in malformed-checks malformed-threads malformed-rules malformed-protection; do
+for scenario in malformed-checks malformed-threads malformed-reviews malformed-rules malformed-protection; do
   make_fixture "$scenario"
   export MOCK_GH_SCENARIO=$scenario
   initialized=$(init_case)

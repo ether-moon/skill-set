@@ -21,7 +21,7 @@ If no conflict exists, use this order in both phases:
 1. run `ci-failure-resolver` when selected checks failed;
 2. in classify phase, collect CI classifications before review classification without applying fixes;
 3. in resolve phase, require CI to succeed or no-op before continuing;
-4. run `pr-review-feedback` only when actionable threads put it in the recorded plan; a review-only plan begins there;
+4. run `pr-review-feedback` only when actionable threads or unreviewed current-HEAD review bodies put it in the recorded plan; a review-only plan begins there;
 5. when both are planned, keep them sequential in the current worktree and branch.
 
 Do not run resolvers in parallel. Classifiers share one decision gate; resolve-phase agents see earlier authorized edits and share one publication decision.
@@ -34,14 +34,14 @@ Each resolver returns:
 - `phase`: `classify` or `resolve`;
 - commits and modified paths;
 - HEAD before and after;
-- queued PR summary and per-thread resolution feedback, if review activity occurred;
+- queued PR summary and processed review-body keys, plus per-thread resolution feedback when threads were present;
 - classifications with stable decision IDs, selected resolutions, and recovery instructions.
 
 An AMBIGUOUS classify result is not success. Confirm that the resolver made no worktree or index mutation, record every decision ID, and wait for the user. Resolve phase must not begin until the complete decision set is persisted.
 
 ## Executable Publication Gate
 
-Write `{results:[...]}` to a regular, non-symlink file inside the resolver worktree. Each ordered result contains `agent`, `result`, `input_head`, and `output_head`; adjacent HEAD values form one chain from the blocked snapshot to the actual local HEAD. Write the queued summary and thread feedback to separate files in that worktree. The thread-feedback shape is `{threads:[{id,outcome,body}]}` with one exact blocked-snapshot thread ID per entry and an outcome of `fixed`, `accepted_as_is`, or `unresolved`. Do not supply a reviewer/provider adapter: the runner derives `claude`, `coderabbit`, `codex`, or `other` from the snapshot thread author. Bodies explain the resolution and contain no bot mentions or commands. Apart from those declared inputs, the index and worktree must contain no staged, unstaged, or untracked files.
+Write `{results:[...]}` to a regular, non-symlink file inside the resolver worktree. Each ordered result contains `agent`, `result`, `input_head`, and `output_head`; adjacent HEAD values form one chain from the blocked snapshot to the actual local HEAD. Write the queued summary and, when threads were present, thread feedback to separate files in that worktree. The thread-feedback shape is `{threads:[{id,outcome,body}]}` with one exact blocked-snapshot thread ID per entry and an outcome of `fixed`, `accepted_as_is`, or `unresolved`. Omit the file for a review-body-only pass. Do not supply a reviewer/provider adapter: the runner derives `claude`, `coderabbit`, `codex`, or `other` from the snapshot thread author. Bodies explain the resolution and contain no bot mentions or commands. Apart from those declared inputs, the index and worktree must contain no staged, unstaged, or untracked files.
 
 Resolve `scripts/skill-set-pr` from the `shipping-pr` skill directory and call its absolute path with `publish`, the run ID, blocked HEAD, validated local HEAD, results file, summary file, and `--thread-feedback-file`. Do not call `git push`, `skill-set-git push`, `gh pr comment`, a thread-reply API, or a resolve API outside this command.
 
@@ -56,7 +56,7 @@ When the live PR HEAD changes before publication, do not treat ordinary stalenes
 After a resolver attempt:
 
 - a new remote HEAD or changed blocker fingerprint returns to `polling`;
-- review-only publication returns to `polling` so thread state can be observed;
+- review-only publication returns to `polling` so thread state and processed review-body identities can be observed;
 - the same HEAD and same fingerprint on the required post-resolver snapshot becomes `stalled`.
 
 Do not infer progress from local commits alone. Only verified remote state or changed review state counts.
