@@ -1,0 +1,21 @@
+## Decisions Made
+
+- Merged PR #43 with a merge commit after verifying the exact reviewed HEAD and clean PR state.
+
+## Problems Encountered
+
+- None.
+
+## Constraints Identified
+
+- The merge was restricted to reviewed HEAD dbda9b973dc9ec1e760b1e30384fffa3b4a2ea8b.
+
+- The source branch was left intact because branch deletion was not requested.
+
+## Open Questions
+
+- None.
+
+## Context
+
+- deterministic-validation and CodeRabbit succeeded, actionable review threads were zero, and GitHub reported MERGEABLE/CLEAN before the merge.
