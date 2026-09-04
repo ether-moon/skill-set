@@ -1,0 +1,19 @@
+Decisions Made
+
+Added a one-shot final review-body sweep on the current PR HEAD before clean completion. Review bodies are keyed by review ID and updatedAt so unchanged bodies are processed once and edited bodies are reconsidered.
+
+Problems Encountered
+
+The optional system quick validator could not run because PyYAML was unavailable, and shellcheck was not installed. Repository-native validation and the full deterministic suite passed.
+
+Constraints Identified
+
+The workflow must not wait indefinitely for a review that may never arrive. Only review bodies already present when all other clean gates pass are inspected, and publication remains bound to the same PR HEAD.
+
+Open Questions
+
+None.
+
+Context
+
+Implements the requested shipping-pr behavior demonstrated by karrot-emu/geo-grid PR 159. Changes include runner state, resolver contracts, docs, mocks, and deterministic tests.
