@@ -25,9 +25,17 @@ grep -Eq 'after every required decision is complete, automatically apply all que
 grep -Eq 'without another confirmation' "$skill"
 grep -Eq 'without another confirmation' "$resolution"
 grep -Fq 'Present all unresolved AMBIGUOUS items in one batch' "$resolution"
+skill_escalation_section=$(
+  sed -n '/^## Escalation Question Format$/,/^## Ownership Boundaries$/p' "$skill"
+)
+resolution_decision_gate_section=$(
+  sed -n '/^## Decision Gate$/,/^## Automatic Resolution$/p' "$resolution"
+)
 for field in 'Evidence:' 'Why this matters:' 'Options:' 'Recommendation:'; do
-  grep -Fq "$field" "$skill" || fail "autofixing escalation misses question field: $field"
-  grep -Fq "$field" "$resolution" || fail "resolution contract misses question field: $field"
+  grep -Fq "$field" <<<"$skill_escalation_section" || \
+    fail "autofixing escalation misses question field: $field"
+  grep -Fq "$field" <<<"$resolution_decision_gate_section" || \
+    fail "resolution contract misses question field: $field"
 done
 if grep -Eqi 'one (question|decision) per turn' "$skill" "$resolution"; then
   fail 'autofixing escalation serializes decision questions'
