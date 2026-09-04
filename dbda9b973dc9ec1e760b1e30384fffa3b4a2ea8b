@@ -1,0 +1,22 @@
+## Decisions Made
+- CodeRabbit의 escalation field test finding은 section-local extraction 방식으로 해결했습니다: 사용자가 option 1을 선택했고 기존 shell test 스타일을 유지합니다.
+- legacy `Question N/5`를 matcher에서 제외하라는 finding은 적용하지 않았습니다: early-stop ledger에는 형식과 관계없이 후속 질문이 없어야 하므로 현재 matcher가 의도에 맞습니다.
+
+## Problems Encountered
+- 문서 전체를 검사하던 test가 `resolution.md`의 classification record에 있는 `Evidence:`와 `Recommendation:`으로 일부 malformed escalation을 놓칠 수 있었습니다: escalation 관련 section만 추출해 검사하도록 수정했습니다.
+
+## Constraints Identified
+- 수정 범위는 `plugins/skill-set/tests/test-autofixing-contract.sh` 한 파일로 제한했습니다: reviewer finding이 지목한 false-positive 경계만 변경했습니다.
+- review reply와 thread resolve는 shipping publication gate를 통해서만 수행합니다: commit 단계에서는 GitHub thread 상태를 변경하지 않았습니다.
+
+## Open Questions
+- None
+
+## Context
+PR #43의 CodeRabbit actionable thread 두 건을 검토했습니다. 한 건은 의도된 matcher 동작이므로 accepted as is로 분류했고, 다른 한 건은 사용자가 선택한 section-local 검증으로 수정했습니다. 대상 contract test, shell syntax, diff formatting 검증이 통과했습니다.
+
+## Recorded Decisions
+None
+
+## Vault Entries Referenced
+None
