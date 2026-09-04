@@ -28,8 +28,8 @@ grep -Eqi 'stop after.*candidates' "$architecture"
 for ledger in Confirmed Rejected Unresolved; do
   grep -Eq "$ledger" "$grill" || fail "grilling ledger misses $ledger"
 done
-grep -Eqi 'one question per turn' "$grill"
-grep -Eqi '(default|maximum).*5|5.*user questions' "$grill"
+grep -Fq 'Ask every currently identifiable question in one response' "$grill"
+grep -Fq 'Do not impose a question-count limit' "$grill"
 grep -Eqi 'stop.*Unresolved|Unresolved.*stop' "$grill"
 
 grep -Eq 'verify-addition' "$directives"
