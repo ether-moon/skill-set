@@ -77,7 +77,7 @@ Convert minute flags to seconds, then run:
   --required-only "$REQUIRED_ONLY"
 ```
 
-Reviewer discovery is always automatic and reporting-only. The runner detects CodeRabbit, Claude, and `chatgpt-codex-connector` from recent merged-PR activity, but their absent, pending, or failed telemetry never affects status, deadlines, or blocker fingerprints. Do not ask the user to select an adapter or pass reviewer-specific flags. A review-related status or check gates completion only when it is an effective required context; `--required-only false` intentionally broadens the selected set to every observed check. Existing actionable review threads still participate through the review-thread gate.
+Reviewer discovery is always automatic and reporting-only. The runner detects CodeRabbit, Claude, and `chatgpt-codex-connector` from recent merged-PR activity, but their absent, pending, or failed telemetry never affects status, deadlines, or blocker fingerprints. Do not ask the user to select an adapter or pass reviewer-specific flags. A review-related status or check gates completion only when it is an effective required context; `--required-only false` intentionally broadens the selected set to every observed check. Existing actionable review threads still participate through the review-thread gate. Separately, once checks, mergeability, and review threads would otherwise permit `clean`, the snapshot performs one bounded sweep of non-empty review bodies already attached to the current HEAD. It never waits for a review body to appear.
 
 Use `--resume` only when the runner reports an active run. State lives under the repository's Git common directory, so linked worktrees share one lock and one run. Branch on the returned status: snapshot only `polling`; handle `blocked`, `awaiting_user`, and `resolving` before polling again. A resumed `resolving` run must use its recorded `resolution` metadata, including `decision_requirements` and `decisions`, and must never dispatch a duplicate resolver. Resume a journaled `prepared`, `gate_passed`, or `commenting` publication by calling `publish` with the unchanged files; the runner reconciles the remote HEAD and hidden comment marker. If its phase is `pending`, report the recorded worktree/branch and treat the interrupted attempt as `partial-failure`. A resumed `awaiting_user` run remains paused with its saved result and recovery paths until the user explicitly decides every recorded ID.
 
@@ -97,7 +97,7 @@ Read `headRefOid`, `headRefName`, `headRepository.nameWithOwner`, `baseRefOid`, 
 
 Fetch the exact PR HEAD and base SHAs without checking out another branch. Preserve the complete current branch state. If new authorized working-tree changes exist, commit them through the Git runner before resolver classification. When local and remote PR history differ, reconcile it in place and continue: fast-forward the current branch when local HEAD is an ancestor of the fetched PR HEAD; keep local commits when the remote HEAD is their ancestor; otherwise merge the fetched exact PR HEAD into the current branch without rebasing. Resolve reconciliation conflicts under the same decision gate and preserve genuinely ambiguous conflicts for the user's decision. Re-read a concurrently changed PR HEAD and repeat this reconciliation instead of creating another checkout or stopping merely because the SHAs differ.
 
-Bind `$REMOTE` to a push URL whose canonical host and `owner/repo` equal the PR head repository; for a fork PR this is normally a fork remote, not the base repository's `origin`. Select the ordered resolver plan: merge alone for a base conflict; otherwise CI first when checks failed, then review when actionable threads exist.
+Bind `$REMOTE` to a push URL whose canonical host and `owner/repo` equal the PR head repository; for a fork PR this is normally a fork remote, not the base repository's `origin`. Select the ordered resolver plan: merge alone for a base conflict; otherwise CI first when checks failed, then review when actionable threads or unreviewed current-HEAD review bodies exist.
 
 Transition from `blocked` to `resolving` with the returned `run_id`, `--increment-cycle`, one `--resolver-agent` per planned agent, and all recovery fields:
 
@@ -124,7 +124,7 @@ Follow [blocker-resolution.md](reference/blocker-resolution.md). First classify 
 
 ### 5. Publish and record the resolver outcome
 
-Each attempted agent writes one ordered entry to a results file inside the resolver worktree with `agent`, `result`, `input_head`, and `output_head`. When review feedback was processed, also queue one summary file and one thread-feedback JSON file there. Only the runner may push, reply, resolve, or comment:
+Each attempted agent writes one ordered entry to a results file inside the resolver worktree with `agent`, `result`, `input_head`, and `output_head`. When review feedback was processed, also queue one summary file and, when threads were present, one thread-feedback JSON file there. Only the runner may push, reply, resolve, or comment:
 
 ```bash
 <pr-runner> publish \
@@ -134,7 +134,7 @@ Each attempted agent writes one ordered entry to a results file inside the resol
   --thread-feedback-file "$THREAD_FEEDBACK_FILE"
 ```
 
-`publish` rejects missing, reordered, ambiguous, failed, or partial results before mutation. Except for the declared results/summary/thread-feedback inputs, the resolver worktree must have no staged, unstaged, or untracked changes; this prevents publishing a committed subset while leaving partial edits behind. It revalidates the live PR head repository/ref and the remote push URL, including once immediately before a code push. For code changes it invokes exactly one expected-SHA `skill-set-git push`; for no-code activity it revalidates the unchanged remote HEAD. After that gate it posts each queued resolution reply once and resolves only threads whose outcome is `fixed` or `accepted_as_is`. If every queued CodeRabbit item is resolved, it derives the exact `@coderabbitai resolve` command and places it in the identified summary comment. It never emits `@codex review`, `@claude review`, edit-delegation commands, or free-form bot mentions. Its publication journal makes the same intent safe to resume without a second successful push or duplicate feedback.
+`publish` rejects missing, reordered, ambiguous, failed, or partial results before mutation. Except for the declared results/summary/thread-feedback inputs, the resolver worktree must have no staged, unstaged, or untracked changes; this prevents publishing a committed subset while leaving partial edits behind. It revalidates the live PR head repository/ref and the remote push URL, including once immediately before a code push. For code changes it invokes exactly one expected-SHA `skill-set-git push`; for no-code activity it revalidates the unchanged remote HEAD. After that gate it posts each queued resolution reply once and resolves only threads whose outcome is `fixed` or `accepted_as_is`. A review-body-only pass publishes its summary without an empty thread-feedback file, then records the processed review identity so the next snapshot does not loop on unchanged feedback. If every queued CodeRabbit item is resolved, it derives the exact `@coderabbitai resolve` command and places it in the identified summary comment. It never emits `@codex review`, `@claude review`, edit-delegation commands, or free-form bot mentions. Its publication journal makes the same intent safe to resume without a second successful push or duplicate feedback.
 
 - Successful `publish`: transition `resolving -> polling` with `--resolver-attempt` and `--resolver-result success` or `no-op`, then snapshot again. The transition is rejected unless the publication journal is `complete`.
 - PR HEAD changed before publication: preserve the reconciled current branch, transition `resolving -> polling` with `--resolver-attempt --resolver-result stale`, take a fresh snapshot, and continue automatically. `stale` never publishes the old result chain and does not require a completed publication journal.
@@ -154,14 +154,15 @@ Declare clean only when one snapshot confirms all of the following for the same 
 - no fail, cancel, pending, or timeout result;
 - GitHub mergeability is known;
 - no unresolved actionable review thread;
+- no unreviewed substantive review body attached to the current HEAD;
 
-An effective required context that has not appeared on the current HEAD is `pending`, not absent from the verdict. Auto-detected reviewer signals are telemetry only and never override this rule; a reviewer affects the verdict only through a required check context or an existing actionable thread. `mergeStateStatus=BLOCKED` is reported but does not independently gate completion because it can include approval requirements outside the required check set.
+An effective required context that has not appeared on the current HEAD is `pending`, not absent from the verdict. Auto-detected reviewer signals are telemetry only and never override this rule; a reviewer affects the verdict only through a required check context, an existing actionable thread, or a substantive current-HEAD review body found by the final sweep. Absence of such a body never delays completion. `mergeStateStatus=BLOCKED` is reported but does not independently gate completion because it can include approval requirements outside the required check set.
 
 If HEAD changes, discard the old results. The runner resets the check deadline and check-registration grace before snapshotting the new HEAD.
 
 ## Output
 
-Use the user's language for progress and the final report. Include PR URL/number, terminal status, HEAD, cycle count, check summary, review-thread count, and preserved recovery path if resolution failed. Keep commands, state names, and file paths in English.
+Use the user's language for progress and the final report. Include PR URL/number, terminal status, HEAD, cycle count, check summary, review-thread count, unreviewed review-body count, and preserved recovery path if resolution failed. Keep commands, state names, and file paths in English.
 
 ## Safety Rules
 
