@@ -5,6 +5,21 @@ All notable changes to plugins in the skill-set marketplace will be documented i
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.0] - 2026-09-07
+
+### Added
+
+- feat: batch decision questions across skills
+
+### Improved
+
+- Merge pull request #43 from ether-moon/ether/explain-grilling-plans-skill
+
+### Fixed
+
+- fix: inspect review bodies before completing PR shipping (#44)
+- fix: scope escalation contract checks
+
 ## [1.16.0] - 2026-08-31
 
 ### Added
