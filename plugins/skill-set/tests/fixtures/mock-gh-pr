@@ -243,6 +243,22 @@ if [[ ${1:-} == api && ${2:-} == graphql ]]; then
     fi
     jq -cn --arg id "$graphql_id" --argjson resolved "$resolved" --argjson replies "$reply_nodes" \
       '{data:{node:{id:$id,isResolved:$resolved,comments:{nodes:$replies}}}}'
+  elif [[ "$*" == *'reviews(first:100'* ]]; then
+    if [[ $MOCK_GH_SCENARIO == malformed-reviews ]]; then
+      jq -cn '{data:{repository:{pullRequest:{reviews:{nodes:[{
+        id:"review-malformed",state:"COMMENTED",body:42,updatedAt:"2026-09-04T00:00:00Z"
+      }],pageInfo:{hasNextPage:false,endCursor:null}}}}}}'
+    elif [[ $MOCK_GH_SCENARIO == unthreaded-review ]]; then
+      jq -cn --arg sha "$(<"$MOCK_GH_HEAD_FILE")" \
+        '{data:{repository:{pullRequest:{reviews:{nodes:[{
+          id:"review-unthreaded",state:"COMMENTED",
+          body:"Suggestion: inspect this before declaring the PR clean.",
+          submittedAt:"2026-09-04T00:00:00Z",updatedAt:"2026-09-04T00:00:00Z",
+          commit:{oid:$sha},author:{login:"github-actions"}
+        }],pageInfo:{hasNextPage:false,endCursor:null}}}}}}'
+    else
+      jq -cn '{data:{repository:{pullRequest:{reviews:{nodes:[],pageInfo:{hasNextPage:false,endCursor:null}}}}}}'
+    fi
   elif [[ $MOCK_GH_SCENARIO == malformed-threads ]]; then
     jq -cn '{data:{repository:{pullRequest:{reviewThreads:{nodes:[{id:"thread-1",isResolved:false,isOutdated:false,comments:{nodes:[{body:42}]}}],pageInfo:{hasNextPage:false,endCursor:null}}}}}}'
   elif [[ $MOCK_GH_SCENARIO == pagination ]]; then

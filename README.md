@@ -55,7 +55,7 @@ Runtime totals: **13 skills, 7 legacy commands, 4 PR agents, 0 hooks, 0 MCP serv
 |---|---|
 | `ci-failure-resolver` | Analyzes current-HEAD CI failures and applies authorized, unambiguous fixes in the recorded current PR worktree. |
 | `merge-conflict-resolver` | Resolves an authorized merge conflict in the recorded current PR worktree. |
-| `pr-review-feedback` | Processes unresolved actionable PR review threads on the current HEAD in the recorded current PR worktree. |
+| `pr-review-feedback` | Processes unresolved actionable PR review threads and unreviewed current-HEAD review bodies in the recorded current PR worktree. |
 | `resolving-pr-blockers` | Resolves one authorized PR-blocker cycle in the current PR worktree, then performs a single publication gate. |
 
 ### Standard Layout

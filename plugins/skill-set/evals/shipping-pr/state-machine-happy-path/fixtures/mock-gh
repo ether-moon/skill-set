@@ -66,6 +66,8 @@ if [[ ${1:-} == api && ${2:-} == graphql ]]; then
     fi
     jq -cn --arg id "$graphql_id" --argjson resolved "$resolved" --argjson replies "$reply_nodes" \
       '{data:{node:{id:$id,isResolved:$resolved,comments:{nodes:$replies}}}}'
+  elif [[ "$*" == *'reviews(first:100'* ]]; then
+    printf '%s\n' '{"data":{"repository":{"pullRequest":{"reviews":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}'
   elif [[ -f $MOCK_GH_DIR/publication-complete ]]; then
     printf '%s\n' '{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}'
   else

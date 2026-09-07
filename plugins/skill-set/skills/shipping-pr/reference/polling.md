@@ -35,9 +35,17 @@ Praise and summary-only acknowledgements are filtered by one deliberately narrow
 
 Any unresolved actionable thread makes the snapshot `blocked`.
 
+## Final Review-Body Sweep
+
+When checks, mergeability, registration grace, and review threads would otherwise permit `clean`, the snapshot performs one bounded, paginated `reviews(first:100, after:$cursor)` query. It does not poll or wait for a review body to appear. No matching review means the snapshot may become `clean` immediately.
+
+The sweep keeps non-empty, non-dismissed, non-pending review bodies whose review commit equals the current HEAD. It applies the same narrow whole-message acknowledgement filter as review threads. Each candidate is keyed by review ID plus `updatedAt`; a successfully published review pass records that key, while an edited body or new HEAD becomes eligible for inspection again.
+
+An unreviewed body makes the snapshot `blocked` so `pr-review-feedback` can classify its requests. The resolver deduplicates requests already represented by review threads. A body with no actionable request returns `no-op`; after the publication gate records it as inspected, the next snapshot can become `clean` without seeing the unchanged body again.
+
 ## Automated Reviewers
 
-Reviewer discovery is always `auto`; there is no adapter-selection flag. Initialization detects CodeRabbit, Claude, and `chatgpt-codex-connector` from authors and apps found in the ten most recent merged PRs. Every snapshot unions that history with current-PR commit statuses, check-runs, reviews, comments, and reactions for reporting only.
+Reviewer discovery is always `auto`; there is no adapter-selection flag. Initialization detects CodeRabbit, Claude, and `chatgpt-codex-connector` from authors and apps found in the ten most recent merged PRs. Every snapshot unions that history with current-PR commit statuses, check-runs, reviews, comments, and reactions for reporting only. This provider telemetry is distinct from the bounded review-body sweep above.
 
 CodeRabbit telemetry comes from its current-HEAD commit status or check-run. Claude telemetry comes from its current-HEAD check-run, status, or review. Codex telemetry comes from a current-HEAD review or, before any resolver push, the connector's `+1` reaction. These signals are observational and are never independently required. Their absence, pending state, standalone failure, or change cannot affect polling, timeout, blocking, clean, or stalled decisions. A telemetry query or normalization failure is reported as `telemetry_available:false` with `unavailable` provider states.
 
@@ -49,4 +57,4 @@ Reviewer results that match effective required contexts use the normal check cla
 
 ## Fingerprint
 
-The blocker fingerprint covers the observed HEAD and base branch; effective required contexts; normalized check identities, states, and buckets; conflict or unknown-mergeability state; and unresolved thread IDs and latest-comment content. Reviewer telemetry and non-gating `mergeStateStatus` values never affect the fingerprint. After a resolver returns to polling, only a fresh snapshot can declare `stalled`, and only when both HEAD and fingerprint remain unchanged.
+The blocker fingerprint covers the observed HEAD and base branch; effective required contexts; normalized check identities, states, and buckets; conflict or unknown-mergeability state; unresolved thread IDs and latest-comment content; and unreviewed current-HEAD review bodies. Reviewer telemetry and non-gating `mergeStateStatus` values never affect the fingerprint. After a resolver returns to polling, only a fresh snapshot can declare `stalled`, and only when both HEAD and fingerprint remain unchanged.
