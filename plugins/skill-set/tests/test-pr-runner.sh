@@ -109,9 +109,17 @@ write_single_result() {
   local result=$3
   local input_head=$4
   local output_head=$5
-  jq -cn --arg agent "$agent" --arg result "$result" --arg input "$input_head" \
-    --arg output "$output_head" \
-    '{results:[{agent:$agent,result:$result,input_head:$input,output_head:$output}]}' >"$path"
+  local processed_review_body_keys=${6:-}
+  if [[ -n $processed_review_body_keys ]]; then
+    jq -cn --arg agent "$agent" --arg result "$result" --arg input "$input_head" \
+      --arg output "$output_head" --argjson processed "$processed_review_body_keys" \
+      '{results:[{agent:$agent,result:$result,input_head:$input,output_head:$output,
+        processed_review_body_keys:$processed}]}' >"$path"
+  else
+    jq -cn --arg agent "$agent" --arg result "$result" --arg input "$input_head" \
+      --arg output "$output_head" \
+      '{results:[{agent:$agent,result:$result,input_head:$input,output_head:$output}]}' >"$path"
+  fi
 }
 
 publish_single_result() {
@@ -302,8 +310,29 @@ results_file=$repo/resolver-results.json
 summary_file=$repo/summary.md
 write_single_result "$results_file" pr-review-feedback no-op "$head_sha" "$head_sha"
 printf 'Reviewed the current-HEAD review body with no code change.\n' >"$summary_file"
+missing_review_body_keys=$(run_fail publish --pr 17 --expected-run-id "$unthreaded_once_run_id" \
+  --expected-head-sha "$head_sha" --expected-local-head-sha "$head_sha" \
+  --results-file "$results_file" --summary-file "$summary_file")
+assert_equals incomplete_review_body_results \
+  "$(jq -r .error.code <<<"$missing_review_body_keys")" \
+  "review-body publication requires processed keys"
+write_single_result "$results_file" pr-review-feedback no-op "$head_sha" "$head_sha" \
+  '["review-unthreaded:2026-09-04T00:00:00Z","review-unexpected:2026-09-04T00:00:00Z"]'
+unexpected_review_body_key=$(run_fail publish --pr 17 --expected-run-id "$unthreaded_once_run_id" \
+  --expected-head-sha "$head_sha" --expected-local-head-sha "$head_sha" \
+  --results-file "$results_file" --summary-file "$summary_file")
+assert_equals incomplete_review_body_results \
+  "$(jq -r .error.code <<<"$unexpected_review_body_key")" \
+  "review-body publication rejects unexpected processed keys"
+write_single_result "$results_file" pr-review-feedback no-op "$head_sha" "$head_sha" \
+  '["review-unthreaded:2026-09-04T00:00:00Z"]'
 publish_single_result "$unthreaded_once_run_id" "$head_sha" "$head_sha" "$results_file" \
   --summary-file "$summary_file" >/dev/null
+state_file=$(git -C "$repo" rev-parse --git-common-dir)/skill-set/shipping-pr/17.json
+jq -e '
+  .resolution.publication.processed_review_body_keys ==
+    ["review-unthreaded:2026-09-04T00:00:00Z"]
+' "$repo/$state_file" >/dev/null
 run_ok transition --pr 17 --from resolving --to polling \
   --expected-run-id "$unthreaded_once_run_id" --resolver-attempt --resolver-result no-op >/dev/null
 unthreaded_once_clean=$(snapshot_case 102)

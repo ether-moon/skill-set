@@ -289,6 +289,9 @@ read_state() {
        (.resolution.publication.thread_feedback_file | type == "string") and
        (.resolution.publication.thread_feedback_hash | type == "string") and
        (.resolution.publication.thread_feedback_published | type == "number" and . >= 0) and
+       ((.resolution.publication.processed_review_body_keys // []) | type == "array") and
+       all((.resolution.publication.processed_review_body_keys // [])[];
+         type == "string" and length > 0) and
        (.resolution.publication.marker | type == "string") and
        (.resolution.publication.coderabbit_resolve | type == "boolean") and
        (.resolution.publication.final_remote_sha | type == "string"))) and
@@ -1715,7 +1718,8 @@ command_transition() {
         publication:{phase:"pending",pushed:false,
           comments_published:0,comment_hashes:[],results_hash:"",intent_hash:"",
           summary_file:"",thread_feedback_file:"",thread_feedback_hash:"",
-          thread_feedback_published:0,marker:"",coderabbit_resolve:false,final_remote_sha:""}}')
+          thread_feedback_published:0,processed_review_body_keys:[],
+          marker:"",coderabbit_resolve:false,final_remote_sha:""}}')
   elif [[ $has_resolution_flags == true ]]; then
     die invalid_resolution_metadata "Resolver metadata is valid only for blocked -> resolving." \
       "Remove resolver metadata or start a new resolver cycle from blocked."
@@ -1726,7 +1730,7 @@ command_transition() {
           . + {result:null,publication:{phase:"pending",pushed:false,comments_published:0,
             comment_hashes:[],results_hash:"",intent_hash:"",summary_file:"",marker:"",
             thread_feedback_file:"",thread_feedback_hash:"",thread_feedback_published:0,
-            coderabbit_resolve:false,final_remote_sha:""}}
+            processed_review_body_keys:[],coderabbit_resolve:false,final_remote_sha:""}}
         end
     ' <<<"$STATE")
     [[ $resolution_json != null ]] || \
@@ -1845,7 +1849,8 @@ command_transition() {
       jq -e '.resolution.expected_agents | index("pr-review-feedback") != null' \
         >/dev/null 2>&1 <<<"$STATE"; then
       reviewed_review_keys=$(jq -c '
-        [(.reviewed_review_keys // [])[],.last_snapshot.review_bodies[]?.key] | unique
+        [(.reviewed_review_keys // [])[],
+          (.resolution.publication.processed_review_body_keys // [])[]] | unique
       ' <<<"$STATE")
     fi
   fi
@@ -2132,7 +2137,12 @@ command_publish() {
       (.agent | IN("merge-conflict-resolver","ci-failure-resolver","pr-review-feedback")) and
       (.result | IN("success","no-op","partial-failure","ambiguous","AMBIGUOUS","failed")) and
       (.input_head | type == "string" and test("^[0-9a-fA-F]{40}$")) and
-      (.output_head | type == "string" and test("^[0-9a-fA-F]{40}$")))
+      (.output_head | type == "string" and test("^[0-9a-fA-F]{40}$")) and
+      ((.processed_review_body_keys // []) | type == "array") and
+      ((.processed_review_body_keys // []) | length == (unique | length)) and
+      all((.processed_review_body_keys // [])[]; type == "string" and length > 0) and
+      (.agent == "pr-review-feedback" or
+        ((.processed_review_body_keys // []) | length == 0)))
   ' >/dev/null 2>&1 <<<"$results_json" || \
     die invalid_resolver_results "Resolver results have an invalid nested schema." \
       "Write the complete ordered result chain and retry."
@@ -2151,6 +2161,19 @@ command_publish() {
     >/dev/null 2>&1 <<<"$results_json" || \
     die unsafe_publication "At least one resolver did not succeed or no-op." \
       "Do not push or comment; preserve the worktree and transition to awaiting_user or failed."
+
+  local expected_review_body_keys processed_review_body_keys
+  expected_review_body_keys=$(jq -c '[.last_snapshot.review_bodies[]?.key] | sort' <<<"$STATE")
+  processed_review_body_keys=$(jq -c '
+    [.results[] | select(.agent == "pr-review-feedback")
+      | (.processed_review_body_keys // [])[]] | sort
+  ' <<<"$results_json")
+  jq -e --argjson expected "$expected_review_body_keys" \
+    --argjson processed "$processed_review_body_keys" \
+    '$processed == $expected' >/dev/null 2>&1 <<<null || \
+    die incomplete_review_body_results \
+      "Processed review-body keys do not cover the blocked snapshot exactly." \
+      "Return every blocked-snapshot review-body key from pr-review-feedback and no others."
 
   local worktree_status
   if [[ -n $summary_relative && -n $thread_feedback_relative ]]; then
@@ -2236,10 +2259,12 @@ command_publish() {
       --arg thread_feedback_hash "$thread_feedback_hash" \
       --arg marker "$marker" --argjson comments "$comment_hashes" \
       --argjson coderabbit "$coderabbit_resolve" --argjson prepared_at "$publication_now" \
+      --argjson processed_review_body_keys "$processed_review_body_keys" \
       --argjson results "$(jq -c .results <<<"$results_json")" '
       .resolution.publication += {phase:"prepared",intent_hash:$intent,results_hash:$results_hash,
         results_file:$results_file,results:$results,summary_file:$summary_file,marker:$marker,
         thread_feedback_file:$thread_feedback_file,thread_feedback_hash:$thread_feedback_hash,
+        processed_review_body_keys:$processed_review_body_keys,
         comment_hashes:$comments,coderabbit_resolve:$coderabbit,prepared_at:$prepared_at}
     ' <<<"$STATE")
     if [[ $dry_run == true ]]; then

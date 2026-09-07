@@ -124,7 +124,7 @@ Follow [blocker-resolution.md](reference/blocker-resolution.md). First classify 
 
 ### 5. Publish and record the resolver outcome
 
-Each attempted agent writes one ordered entry to a results file inside the resolver worktree with `agent`, `result`, `input_head`, and `output_head`. When review feedback was processed, also queue one summary file and, when threads were present, one thread-feedback JSON file there. Only the runner may push, reply, resolve, or comment:
+Each attempted agent writes one ordered entry to a results file inside the resolver worktree with `agent`, `result`, `input_head`, and `output_head`. The `pr-review-feedback` entry also includes `processed_review_body_keys` covering the blocked snapshot exactly. When review feedback was processed, also queue one summary file and, when threads were present, one thread-feedback JSON file there. Only the runner may push, reply, resolve, or comment:
 
 ```bash
 <pr-runner> publish \

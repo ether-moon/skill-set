@@ -38,7 +38,7 @@ Return a summary body whenever review activity was processed, including auto-app
 
 Do not post or resolve anything. The orchestrator writes the summary and `{threads:[...]}` feedback files, then lets `skill-set-pr publish` reply and resolve only after the publication gate. The runner derives CodeRabbit's exact resolve command only when every queued CodeRabbit item is resolved; Codex and Claude receive resolution feedback, never a new-review command.
 
-The orchestrator may publish this payload only after every attempted resolver succeeds/no-ops and the expected-SHA push succeeds. For a review-only no-op, it must re-verify the unchanged remote HEAD first.
+The orchestrator may publish this payload after every attempted resolver succeeds/no-ops and, when code changed, the expected-SHA push succeeds. For a review-only no-op, it must re-verify the unchanged remote HEAD first.
 
 ## Result Contract
 
