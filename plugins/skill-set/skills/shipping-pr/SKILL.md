@@ -85,7 +85,7 @@ Use `--resume` only when the runner reports an active run. State lives under the
 
 Call `skill-set-pr snapshot --pr "$PR" --expected-run-id "$RUN_ID"`. The JSON result is authoritative. See [polling.md](reference/polling.md) for classification rules.
 
-- `polling`: report current counts, wait 30 seconds, then call `snapshot` again with the same run ID. Do not reset the run or poll more frequently.
+- `polling`: report current counts, wait 10 seconds, then call `snapshot` again with the same run ID. Do not reset the run or poll more frequently.
 - `blocked`: continue to resolution.
 - `awaiting_user`: present only the unresolved decisions. After the user selects every resolution or skip, transition with one `--resolver-decision '<ID>=<selected-resolution>'` per recorded ID and resume the recorded resolver plan without another confirmation.
 - `clean`, `timed_out`, `closed`, or `failed`: call `finish` with the same `--from`, `--status`, and `--expected-run-id`, then report that terminal result.

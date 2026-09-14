@@ -1194,7 +1194,7 @@ for file in "$plugin_dir"/agents/*.md "$plugin_dir"/skills/shipping-pr/*.md \
 done
 
 grep -Fq 'Bash(sleep:*)' "$plugin_dir/skills/shipping-pr/SKILL.md"
-grep -Eq '30-second|30 seconds' "$plugin_dir/skills/shipping-pr/SKILL.md" \
+grep -Eq '10-second|10 seconds' "$plugin_dir/skills/shipping-pr/SKILL.md" \
   "$plugin_dir/skills/shipping-pr/reference/polling.md"
 
 printf 'PASS: PR state runner\n'
