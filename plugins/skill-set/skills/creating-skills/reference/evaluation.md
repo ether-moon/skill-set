@@ -13,7 +13,7 @@
 
 ## Ownership Boundary
 
-When a compatible `skill-creator` is available, delegate prompt generation, budgeted candidate runs, grading, aggregation, review, description optimization, and packaging to it. Baseline runs and campaigns require the separate purpose and budget defined below.
+Use this reference when planning or interpreting model evaluation. A compatible creator may execute supported work when useful or explicitly requested; local execution uses the same evidence and budget contract. Baseline runs and campaigns require the separate purpose and budget defined below.
 
 `creating-skills` defines the project contract around that loop: durable evidence format, safety invariants, comparison arms, required metrics, acceptance thresholds, and final lifecycle decision. Translate supported creator output into this contract. Do not discard valid evidence merely because its temporary workspace uses another schema.
 
@@ -50,7 +50,7 @@ Define success before execution and keep four dimensions distinct:
 | Outcome | Did the artifact or workflow actually work? | Executable checks, rendered output, state transition |
 | Conformance | Did it follow user and project requirements? | Schema checks, targeted assertions, human review |
 | Safety | Did it remain within authority and mutation boundaries? | Command logs, negative assertions, unchanged state |
-| Efficiency | Did it avoid material waste or regressions? | Turns, retries, tool calls, tokens, duration, cost |
+| Efficiency | Did it avoid material waste or regressions? | Unnecessary approvals and reads, turns, retries, tool calls, tokens, duration, cost |
 
 Grade outcomes, not paths. Assert a tool, order, or intermediate step only when that path is a safety invariant, protocol requirement, or user-visible contract. Otherwise allow the agent to reach the required result through a better route.
 
@@ -69,14 +69,14 @@ deterministic validation
 
 | Stage | Scope | Authorization |
 |---|---|---|
-| Deterministic validation | Structure, scripts, fixtures, schemas, and objective assertions | No model invocations |
-| Development smoke | Changed or highest-signal cases, candidate-only, one trial | Default ceiling: 4 calls and 100,000 projected tokens |
+| Deterministic validation | Structure, scripts, fixtures, schemas, and objective assertions | Within the requested local work; no model invocations |
+| Development smoke | Changed or highest-signal cases, candidate-only, one trial | Approved model stage; default ceiling: 4 calls and 100,000 projected tokens |
 | Focused comparison | Only cases where a pinned baseline is needed | Separate purpose and freshly approved budget |
 | Campaign | Full suite, repeated trials, cross-model evaluation, or broad optimization | Explicit request and separate budget |
 
-Do not advance to another stage automatically, infer approval from a broad authoring request, or reuse an earlier stage's approval.
+Do not advance to another stage automatically, infer model-evaluation approval from a broad authoring request, or reuse an earlier stage's approval. Budget limits are not permission to make calls. Existing approval remains valid for the uncompleted work in that plan; do not request it again.
 
-Before every model stage, run the stateless `scripts/plan_eval_budget.py` preflight. Compute:
+Count every fresh model-backed worker, qualitative judge, optimizer, or other delegated model call. Deterministic validators and aggregation scripts do not count. Before execution, run the stateless `scripts/plan_eval_budget.py` preflight for all calls in the approved plan. Compute:
 
 ```text
 execution calls = cases × arms × trials
@@ -86,7 +86,11 @@ projected tokens = total calls × estimated tokens per call
 
 Use the recent equivalent-trace p95 when available or 25,000 tokens per call otherwise. The defaults are `max-calls=4` and `max-total-tokens=100000`. The planner must exit with code 2 before any model invocation if either limit is exceeded. `max-total-tokens` is a conservative planning estimate, not a runtime hard cap.
 
-Do not add calls, arms, trials, graders, optimizers, models, retries, or iterations after preflight. A blocked or exhausted plan stops; a different plan requires a new purpose and approval.
+Do not add calls, arms, trials, graders, optimizers, models, retries, or iterations after preflight. A blocked or exhausted plan stops model invocation; complete any independent authorized local work and report the remaining evidence gap. A different plan requires a new purpose and approval.
+
+Retries or iterations are not implicit in unused budget. If a campaign explicitly includes correction and rerun, preflight every planned call, identify the affected cases and stop condition, and stay within that plan. Development smoke remains single-trial.
+
+Do not add provider-specific adapters, capability-negotiation protocols, post-call token-debit state machines, execution-history databases, or provider token normalization. Do not add automatic retries or automatic iterations outside the approved plan.
 
 ## Baselines and Provenance
 
@@ -102,7 +106,9 @@ Record the candidate fingerprint, baseline identity when approved, evaluation-ad
 
 Every approved case × arm × trial must start with a fresh eval-worker context, reset fixture state, and an independent output directory. Prevent earlier outputs, edits, diagnoses, or expected answers from leaking into later runs.
 
-Development smoke uses one trial. If that result cannot answer the question because variance matters, stop and propose a separately budgeted campaign; do not add trials automatically. For an approved repeated-trial campaign, retain the distribution rather than only a collapsed pass/fail.
+Development smoke uses one trial and can identify a failure, but cannot establish a reliable performance improvement. If variance matters, propose a separately budgeted campaign; do not add trials automatically. For an approved repeated-trial campaign, retain the distribution rather than only a collapsed pass/fail.
+
+When testing simplification, hold the model, tools, fixtures, and authority constant. Compare completion and policy violations alongside unnecessary approvals, unrelated reads, calls, tokens, and time. A shorter instruction file is not sufficient evidence of improvement.
 
 ## Acceptance and Maintenance
 
@@ -129,4 +135,4 @@ Classify each failure before editing:
 | Fixture defect | Reset the scenario to realistic, deterministic state |
 | Environmental failure | Preserve diagnostics and rerun after the environment is valid |
 
-Inspect traces and outputs before changing instructions. After a fix, rerun only affected cases within a new accepted preflight plan; never start an automatic iteration or full-suite rerun. Stop only when the approved acceptance criteria hold and no missing evidence hides a regression.
+Inspect traces and outputs before changing instructions. After a fix, rerun only affected cases when that rerun is already in the approved plan; otherwise obtain approval for a new preflight plan. Do not start an unplanned iteration or full-suite rerun. Accept only when the approved criteria hold and no missing evidence hides a regression; if required evaluation is unavailable or unauthorized, report that limit without claiming behavioral acceptance.

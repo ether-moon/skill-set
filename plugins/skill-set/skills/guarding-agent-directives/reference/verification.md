@@ -1,49 +1,44 @@
-# Directive Verification Criteria
+# Directive Verification Examples
 
-## Q1 Recurring?
+Use these examples to resolve uncertain judgments; the five questions in `SKILL.md` are the decision criteria.
 
-Would the same agent behavior recur across sessions without this instruction?
+## Necessity and Added Value
 
-- Pass: a custom project command is repeatedly replaced with a familiar default.
-- Fail: a one-time outage or incident note.
+- **Capability guidance:** A custom test runner is repeatedly replaced by a familiar default. Keep the project-specific command; distinguish a recorded failure from a prediction that it might happen.
+- **Environment fact:** A legacy endpoint returns XML despite surrounding JSON APIs. Check the current contract before retaining the exception.
+- **Explicit policy:** The user requires English commit messages. Familiarity or generality is not grounds for removal; check whether the policy is already expressed at the correct scope.
+- **No established need:** A one-time outage or generic advice to handle errors carefully does not establish a durable rule. Recommend omission or concrete wording without inventing recurrence evidence.
 
-## Q2 Non-obvious?
+A shorter duplicate may replace an older rule, but should not become another copy. Search for equivalent behavior in the applicable directive chain, not just identical words.
 
-Can a capable agent infer the rule from code, configuration, standard practice, or nearby documentation?
+When a guide duplicates a schema, response example, or directory inventory, prefer an authoritative path or section plus a reading condition. Check that source before claiming the copy is stale. Preserve non-obvious constraints such as data routing, state transitions, and test isolation, even when removing generic advice around them.
 
-- Pass: a legacy endpoint returns XML despite the surrounding JSON APIs.
-- Fail: handle errors carefully.
+## Clarity
 
-## Q3 Novel?
+“Run `make lint` before committing” has an observable trigger and action. “Value code quality” does not. Split mixed rules so a concrete requirement is not discarded with vague advice.
 
-Does the loaded directive chain already express the same behavior?
+For optional approaches, give the desired result and relevant constraints. Keep an exact sequence when order is required by a protocol, fragile operation, or explicit policy.
 
-- Pass: a new constraint absent from all parent and referenced files.
-- Fail: “test before committing” when an existing rule already requires the same check.
+Resolve routine implementation choices from code and conventions. For conflicting test commands or policies, use established authority; if requirements, external behavior, or permission remain unclear, ask for that decision. Do not silently select one or invent a compromise. A translation exception should name the affected keys or files, rather than implying an application-wide exemption.
 
-Search semantic duplicates, not only exact wording. If new wording is better, recommend replacing the old rule.
+## Scope and Cost
 
-## Q4 Actionable?
+A database migration rule belongs in a reference loaded for migration work. A rule hidden in an unreferenced file will not help; a rule that forces deployment-guide reading for spelling corrections adds unrelated work.
 
-Can compliance be observed or tested?
+Evaluate induced work as well as text length: broad exploration, repeated unchanged tests, unnecessary delegation, and duplicate approval requests. Do not invent measured savings from a shorter file.
 
-- Pass: run `make lint` before committing.
-- Fail: value code quality.
+Inspect applicable parent directives even during narrow work. Follow additional references when they govern the task or resolve a suspected duplicate or conflict. A full audit covers the requested chain; a scoped inspection must identify what remains unverified.
 
-Split a mixed vague/actionable rule and evaluate only the concrete part.
+## Authority and Completion
 
-## Q5 Correct location?
+- A request to audit directives is read-only, even if the fixes seem obvious.
+- A user-confirmed exact diff can be applied without another confirmation.
+- A scoped editing request permits completing that revision, but not inventing additional policy or expanding external authority.
+- A request to show a proposal and wait must stop before mutation.
+- An agent proposing production-write permission cannot approve its own proposal.
 
-Is this the narrowest directive location that both applies to the intended tasks and is loaded when needed?
+If a rule needlessly interrupts already authorized local work, recommend wording that identifies the completion condition and the actual external or policy decision boundary. Do not infer authorization from model competence.
 
-- Pass: a database migration rule in the database workflow reference loaded by migration tasks.
-- Fail: the same rule in a top-level file loaded for every unrelated session.
-- Fail: a rule hidden in a file that the relevant directive never references.
+## Reporting
 
-A general but explicit user policy can pass. Q5 evaluates scope and loading, not whether the policy is unique to one repository.
-
-## Overrides and Audits
-
-In verify-addition, any failed question requires the choices `Add anyway`, `Revise`, and `Don't add`. A user may override the recommendation after seeing the evidence and exact diff.
-
-In audit-existing, the same checks support keep, revise, or remove recommendations, but no file changes occur.
+Use a compact rule/verdict/reason table unless a full five-question report is requested. Keep explicit policy, uncertainty, and inspection limits visible. In `verify-addition`, a failed proposal still offers `Add anyway`, `Revise`, and `Don't add`. In `audit-existing`, recommendations never mutate files.

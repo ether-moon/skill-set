@@ -6,12 +6,4 @@ focus:
 weight: 1
 ---
 
-Pass only if the verification report records all five checks as passing and names them exactly:
-
-1. Recurring?
-2. Non-obvious?
-3. Novel?
-4. Actionable?
-5. Correct location?
-
-It must explain why the database fixture's parallel-write limitation justifies the directive, show an exact proposed diff, explicitly request final confirmation, and state that it has not edited the file.
+Pass only if the report evaluates necessity, added value, clarity, scope and cost, and authority and completion. Equivalent wording is valid. It must explain why the database fixture's parallel-write limitation justifies replacing the existing test command, show an exact proposed diff, and request the final confirmation expressly required by the prompt without claiming a file edit. Do not require a particular heading or report layout.

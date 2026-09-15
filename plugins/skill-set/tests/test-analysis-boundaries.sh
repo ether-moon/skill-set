@@ -34,7 +34,8 @@ grep -Eqi 'stop.*Unresolved|Unresolved.*stop' "$grill"
 
 grep -Eq 'verify-addition' "$directives"
 grep -Eq 'audit-existing' "$directives"
-grep -Eq 'Q5.*Correct location' "$directives"
+grep -Eq 'Q4.*Scope and cost' "$directives"
+grep -Eq 'Q5.*Authority and completion' "$directives"
 grep -Eqi 'keep.*revise.*remove' "$directives"
 grep -Eqi 'audit-existing.*read-only|read-only.*audit-existing' "$directives"
 grep -Eqi 'user override' "$directives"
@@ -63,7 +64,8 @@ for read_only_case in \
   "$plugin_dir/evals/improving-architecture/shallow-validators-cluster" \
   "$plugin_dir/evals/grilling-plans/early-stop-ledger" \
   "$plugin_dir/evals/guarding-agent-directives/audit-existing"; do
-  if grep -Erq -- '- Write|- Edit|outputs/' "$read_only_case"; then
+  if grep -Eq '^    - (Write|Edit)$' "$read_only_case/case.yaml" ||
+    grep -Eq 'outputs/' "$read_only_case/prompt.md"; then
     fail "read-only eval grants or requests mutation: $read_only_case"
   fi
 done

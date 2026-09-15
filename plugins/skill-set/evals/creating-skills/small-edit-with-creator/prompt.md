@@ -1,0 +1,1 @@
+Use `creating-skills` to correct `Deploymant` to `Deployment` in the heading of `outputs/skills/deploying-safely/SKILL.md`, preserving everything else. Complete the local edit and run `./validate-skill.sh`. A compatible creator is available at `optional-creator/SKILL.md`. No model evaluation is authorized.

@@ -16,10 +16,10 @@ Runtime totals: **13 skills, 7 legacy commands, 4 PR agents, 0 hooks, 0 MCP serv
 | Skill | Description |
 |---|---|
 | `autofixing-and-escalating` | Classifies actionable findings from linters, tests, security scans, audits, and PR reviews, automatically applies unambiguous fixes, and pauses only for decisions required by ambiguous findings before applying the complete chosen resolution. |
-| `creating-skills` | This skill is the primary entry point for creating, modifying, evaluating, and governing the lifecycle of agent skills. |
+| `creating-skills` | Creates, revises, and evaluates agent skills. |
 | `driving-with-tests` | Guides implementation and verification through Orient, Red/Green/Refactor, Probe, and Guard. |
 | `grilling-plans` | Stress-tests an existing plan, RFC, design, or proposal by presenting all evidence-backed decision questions in one batch and maintaining a decision ledger. |
-| `guarding-agent-directives` | Verifies proposed agent-directive additions and audits existing CLAUDE.md, AGENTS.md, and referenced instruction files for bloat, duplication, ambiguity, and placement. |
+| `guarding-agent-directives` | Reviews agent directives for necessity, clarity, scope, and authority. |
 | `improving-architecture` | Finds and ranks evidence-backed deep-module and seam refactor candidates in a codebase. |
 | `managing-git-workflow` | Safely inspects repository state and executes explicitly authorized commits, pushes, and pull-request creation through a constrained runner. |
 | `re-explain-clearly` | Re-explains an existing explanation, passage, term, or other supplied content in clearer language when the user says they do not understand, asks what it means, or requests a simpler explanation. |

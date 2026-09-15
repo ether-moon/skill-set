@@ -19,3 +19,8 @@ graders:
     tool: Skill
     input_match: guarding-agent-directives
     min: 1
+  - type: tool_used
+    name: read-authoritative-report-schema
+    tool: Read
+    input_match: 'schemas/report\.json'
+    min: 1
