@@ -7,7 +7,3 @@ tmp/playwright/
 
 # Local/manual Claude plugin evaluation output
 plugins/skill-set/evals/results/
-
-# Knowledge Distillery — vault is committed as binary, reports are committed
-# Only ignore temporary/working files
-.knowledge/tmp/
