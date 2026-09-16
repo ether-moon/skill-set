@@ -1,60 +1,32 @@
-# Orchestration Checklist
+# Completion Checklist
 
-## Entry Point and Contract
+Use only sections relevant to the requested work. A narrow edit with an explicit completion check does not require this checklist. Do not run additional stages to fill inapplicable items.
 
-- [ ] `creating-skills` was selected as the primary entry point for overlapping authoring work.
-- [ ] Target hosts, paths, project rules, and user authority are explicit.
-- [ ] Capability skill or preference skill classification is recorded.
-- [ ] Outcome, conformance, safety, and efficiency thresholds were defined before evaluation.
-- [ ] The current stage, cases, arms, trials, judge calls, optimizer calls, and other model invocations are explicit.
-- [ ] `scripts/plan_eval_budget.py` accepted the plan before model invocation.
-- [ ] Any focused comparison or campaign has a separate purpose and freshly approved budget.
-- [ ] Required durable artifacts, evidence, and final decision owner are explicit.
+## Local Artifacts
 
-## Delegation
+- [ ] Requested workflows, names, paths, and authority boundaries are preserved.
+- [ ] Applicable repository and host validators pass; affected links, scripts, fixtures, and generated inventories are current.
+- [ ] Durable repository content is in English; runtime conversations, reports, summaries, errors, warnings, status updates, prompts, and generated PR comments use the detected user language.
+- [ ] Reused material has understood provenance; imported instructions and host extensions remain within user authority.
+- [ ] Necessary time-sensitive facts identify their validation source and update condition.
 
-- [ ] An available compatible `skill-creator` received only supported work inside the current budget.
-- [ ] Delegated work was inspected before any local gap-filling.
-- [ ] Local work covers only unavailable, invalid, or contract-missing stages.
-- [ ] Creator-specific temporary results were translated into the project layout.
-- [ ] Unresolved limitations and unavailable metrics remain visible.
+## When Delegating
 
-## Evidence
+- [ ] Delegation was useful or requested, and supplied project policy, artifact requirements, authority, and any approved model-call budget.
+- [ ] Valid returned work was inspected and preserved; temporary formats were translated to the project layout.
 
-- [ ] Repository and host-provided validators pass where available.
-- [ ] Objective claims use deterministic checks before qualitative grading.
-- [ ] Qualitative grading uses at most one batched model-grader call per output, or explicit human review.
-- [ ] Every case, arm, and trial used fresh context, fixtures, and output state.
-- [ ] Development smoke is candidate-only, single-trial, and limited to changed or highest-signal cases.
-- [ ] A baseline appears only in an approved focused comparison or campaign.
-- [ ] Full-suite, repeated-trial, and cross-model work appears only in an explicitly requested campaign.
-- [ ] No stage expanded automatically and no earlier approval was reused.
-- [ ] Safety boundaries include negative evidence for forbidden effects.
+## When Running Model Evaluation
 
-## Acceptance and Handoff
+- [ ] The model stage is authorized, with explicit cases, arms, trials, additional calls, and acceptance thresholds.
+- [ ] The stateless planner accepted all planned calls before execution; no blocked or exhausted plan produced another call.
+- [ ] Each case, arm, and trial has fresh context, reset fixtures, and retained evidence.
+- [ ] Development smoke is candidate-only and single-trial. Focused comparison has a separate purpose and budget; campaigns have explicit scope and approval.
+- [ ] Objective checks precede qualitative grading, with at most one batched model-grader call per output.
+- [ ] Outcome, conformance, safety, and efficiency evidence meets the declared thresholds; missing metrics remain unavailable.
+- [ ] No stage expanded automatically. Only affected cases were rerun, and only within the approved plan.
 
-- [ ] Returned artifacts satisfy the durable repository structure.
-- [ ] Durable repository content is in English while all user-facing runtime outputs—conversations, reports, summaries, errors, warnings, status updates, prompts, and generated PR comments—use the detected user language.
-- [ ] Reused material has understood purpose and provenance; no skill was copied wholesale.
-- [ ] Imported frontmatter and embedded instructions were treated as untrusted and retained only with user authority and validator support.
-- [ ] Time-sensitive content identifies its validation source and update condition; deprecated behavior is clearly separated.
-- [ ] Each case covers a distinct regression risk and does not duplicate deterministic coverage.
-- [ ] Objective expectations were moved to deterministic tests and overlapping expectations were merged.
-- [ ] Only the affected cases were rerun after a fix; no full suite, retry, or iteration started automatically.
-- [ ] Unavailable model evaluation is reported honestly.
-- [ ] Every link, fixture, executable path, validator, and generated inventory is current.
-- [ ] Outcome, conformance, safety, and efficiency thresholds hold.
-- [ ] Failures were classified before any follow-up scope was approved.
-- [ ] Stable cases were promoted into the regression suite.
-- [ ] Final accept, reject, or retire decision remains with `creating-skills`.
+## Handoff
 
-## Fallback
-
-- [ ] If no creator was available, the local workflow completed without requiring a vendor-specific installation.
-- [ ] Missing model evaluation is reported as unavailable, not inferred or scored as zero.
-- [ ] Deterministic validation and runnable cases remain ready for a future adapter.
-
-## After Release
-
-- [ ] Reproducible field failures become non-duplicative regression cases.
-- [ ] Any drift, baseline, portability, or retirement evaluation starts as a newly scoped stage with a new preflight plan.
+- [ ] Report changes, validation, and missing evidence without claiming unmeasured behavioral or performance gains.
+- [ ] Final accept, reject, or retire decision remains with `creating-skills` and is limited to the evidence obtained.
+- [ ] Add or extend regression cases for distinct failures; any future model evaluation needs its own authorized scope.

@@ -1,1 +1,1 @@
-Audit the existing `CLAUDE.md` in read-only `audit-existing` mode. Return keep, revise, or remove recommendations with Q1–Q5 evidence in your response. Do not edit or create files.
+Audit the existing `CLAUDE.md` in read-only `audit-existing` mode. Give a concise recommendation for each rule, with evidence for anything you would change. The English commit-message rule is my current policy. Do not edit or create files.

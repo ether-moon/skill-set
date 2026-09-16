@@ -20,7 +20,7 @@ Read `CONTEXT.md` and relevant ADRs if they exist, using them only as vocabulary
 - **Locality** — related knowledge, change, and failure are concentrated.
 - **Leverage** — multiple callers stop repeating knowledge or coordination.
 
-See `reference/deep-modules.md` for examples and `reference/deletion-test.md` for the deletion test.
+Read [deep-module examples](reference/deep-modules.md) when depth or seam value is unclear, and [the deletion test](reference/deletion-test.md) when evaluating a suspected pass-through. Caller or adapter counts alone do not establish value; inspect the invariant or coordination the boundary contains.
 
 ## Process
 

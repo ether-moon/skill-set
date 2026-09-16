@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "properties": {
+    "id": { "type": "string" },
+    "title": { "type": "string" },
+    "created_at": { "type": "string" }
+  },
+  "required": ["id", "title", "created_at"]
+}

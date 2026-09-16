@@ -1,6 +1,6 @@
 # Core Principles
 
-Four principles for clear non-fiction prose. Apply in order: concreteness grounds the argument, transcreation makes it accessible, steel man makes it credible, brevity makes it readable.
+Use the relevant principle when a draft needs supported detail, language adaptation, argument fidelity, or concision. The factual contract takes precedence over stylistic examples.
 
 ## 1. Concreteness Over Abstraction
 
@@ -15,13 +15,14 @@ Replace vague claims with specific, observable details. Abstract language feels 
 | We leveraged cutting-edge technology. | We used PostgreSQL 16's parallel query execution. |
 | Stakeholder alignment was achieved. | The engineering lead, PM, and designer signed off on the spec. |
 
-**Critical caveat**: Concreteness demands real evidence, not invented precision. If no measurement, benchmark, or data point exists, do NOT fabricate one. Describe the observable change qualitatively instead. A vague truth is always better than a precise lie.
+**Critical caveat**: The examples above illustrate form, not facts to insert. Specificity and qualitative claims both need evidence. Without a measurement, report a supplied observation as an observation; without an observation, report only the known action and the missing evidence. Do not infer improvement or causation from the presence of a change.
 
 | Situation | Wrong | Right |
 |---|---|---|
-| No performance data exists | "Response time improved by 40%." | "Response time improved noticeably after caching was added." |
+| Caching was added; no performance observation or measurement exists | "Response time improved by 40%." | "Caching was added; its effect on response time has not been measured." |
 | User didn't specify a target | "Reduce bundle size by 30%." | "Reduce bundle size." |
-| No benchmark was run | "Throughput increased 3x." | "Throughput increased after switching to batch processing." |
+| Batch processing was introduced; no benchmark was run | "Throughput increased 3x." | "Batch processing was introduced; throughput has not been benchmarked." |
+| The team reports faster responses; cause is untested | "Caching made responses faster." | "The team observed faster responses after enabling caching; the cause has not been isolated." |
 
 **Diagnostic questions**:
 - Can someone verify this claim with a measurement?
@@ -67,7 +68,7 @@ Present opposing viewpoints in their strongest possible form before offering you
 | Approach | Example |
 |---|---|
 | Straw man | "Some people think testing is a waste of time, but they're wrong." |
-| Steel man | "Integration tests catch real user-facing bugs that unit tests miss, and they require less mocking. However, their 10x longer runtime creates a feedback loop that slows development — a tradeoff we measured at 45 minutes per PR cycle." |
+| Steel man | "The proposal favors integration tests because they exercise real wiring. Its runtime cost remains unknown until measured; the comparison should retain both that benefit and that uncertainty." |
 
 **When to apply**:
 - Persuasive proposals where decision-makers will have objections

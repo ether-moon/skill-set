@@ -1,6 +1,6 @@
 # Supplemental Workflow Patterns
 
-Use this catalog only when the orchestration contract needs a pattern that is not already supplied by `skill-creator`, or when the local fallback must make the choice. Describe the required outcome and constraints first. Require an exact sequence only when order is a safety invariant or external protocol.
+Use this catalog when a multi-step or fragile workflow needs a reusable structure. Describe the required outcome and constraints first. Require an exact sequence only when order is a safety invariant or external protocol.
 
 ## Plan, Validate, Execute
 

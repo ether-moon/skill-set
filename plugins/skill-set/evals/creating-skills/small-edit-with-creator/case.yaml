@@ -1,0 +1,37 @@
+schema_version: "1.1"
+name: creating-skills-small-edit-with-creator
+description: Completes a narrow local correction without unnecessary orchestration
+tags:
+  - creating-skills
+  - functional
+context:
+  scaffold_script: fixtures/scaffold.sh
+execution:
+  max_turns: 8
+  timeout_seconds: 240
+  allowed_tools:
+    - Skill
+    - Read
+    - Write
+    - Edit
+    - "Bash(./validate-skill.sh:*)"
+runs: 1
+graders:
+  - type: tool_used
+    name: selected-creating-skills
+    tool: Skill
+    input_match: creating-skills
+    min: 1
+  - type: tool_used
+    name: ran-local-validation
+    tool: Bash
+    input_match: validate-skill
+    min: 1
+  - type: regex
+    name: corrected-heading
+    target:
+      source: file
+      path: outputs/skills/deploying-safely/SKILL.md
+    pattern: '^# Deployment$'
+    flags: m
+    match: contains

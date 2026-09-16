@@ -33,22 +33,9 @@ Establish evidence before editing:
 
 1. Read project directives for required commands and test policy.
 2. Detect the relevant test command from project manifests and nearby tests.
-3. Run the smallest trustworthy baseline, expanding to the full suite when feasible.
+3. Run the smallest trustworthy baseline that covers the affected behavior. Expand only for project-required checks or a concrete unresolved risk.
 4. Record pre-existing failures, slow tests, and coverage gaps separately from the requested change.
 5. Identify the user-visible behavior and the cheapest test layer that can prove it.
-
-Common commands:
-
-| Project signal | Likely command |
-|---|---|
-| `package.json` | project test script, Jest, or Vitest |
-| `pyproject.toml`, `pytest.ini` | `pytest` |
-| `Gemfile` | `bundle exec rspec` |
-| `go.mod` | `go test ./...` |
-| `Cargo.toml` | `cargo test` |
-| `build.gradle`, `pom.xml` | Gradle or Maven test task |
-
-Project instructions override this detection table.
 
 ## Red/Green/Refactor
 
@@ -61,11 +48,11 @@ For new behavior and bug fixes, run one vertical slice:
 
 Do not batch speculative tests ahead of implementation. Do not count syntax, import, or fixture errors as RED. Do not weaken an assertion to obtain GREEN.
 
-For the full discipline, existing-code path, and failure handling, read `reference/tdd.md`.
+Read [TDD details](reference/tdd.md) when applying strict Red/Green/Refactor, preserving existing implementation, or diagnosing a RED/GREEN failure.
 
 ## Probe
 
-Automated tests cover anticipated behavior. Exercise the changed path as a user or caller would:
+Exercise the changed path as a user or caller would when it resolves a risk not already covered by the relevant checks. Choose probes appropriate to the artifact:
 
 - run the CLI with valid, invalid, and boundary inputs;
 - exercise HTTP or library APIs through a realistic entry point;
@@ -73,7 +60,7 @@ Automated tests cover anticipated behavior. Exercise the changed path as a user 
 - inspect persisted state and observable side effects;
 - test boundaries, empty input, concurrency, and recovery where relevant.
 
-When probing finds a gap, add a regression test and return to the appropriate Red/Green/Refactor slice. See `reference/probing.md`.
+Keep probes within authorized environments and side effects; a test request does not authorize live data changes. When probing finds a gap, add a regression test or the artifact's alternative validation. Read [probing guidance](reference/probing.md) when selecting a probe or diagnosing repeated failures.
 
 ## Guard
 
@@ -84,6 +71,8 @@ Tests are executable specifications. Review test changes with production-code ri
 - weakening or deleting a test to make a run green is a stop condition;
 - flaky tests require root-cause work, not skip/retry-and-ignore;
 - a targeted suite supports iteration, but the project-required broader suite gates completion.
+
+Once relevant checks pass, broaden or repeat them only after a change, failure, or unresolved concern. Do not add tests that merely restate a reversible documentation or configuration edit.
 
 Report the baseline, new test evidence, probe evidence, full validation, and any known pre-existing failures separately.
 

@@ -26,10 +26,10 @@ Handle those requests directly or with a more specific workflow. Do not hand off
 
 ## Choose the Workflow
 
-- **Draft** when the user supplies goals, facts, and constraints but no document. Read `reference/drafting.md`.
-- **Revise** when text already exists. Read `reference/revising.md` and preserve its factual contract.
+- **Draft** when the user supplies goals, facts, and constraints but no document. Read [drafting guidance](reference/drafting.md) when the structure or audience needs work.
+- **Revise** when text already exists. Preserve its factual contract; read [revision guidance](reference/revising.md) for a substantial restructure or a problem that needs a systematic pass.
 
-Both paths use `reference/principles.md`; use `reference/anti-patterns.md` as a diagnostic, not a style generator.
+Read [principles](reference/principles.md) when concreteness, adaptation, or argument fidelity needs clarification. Use [anti-patterns](reference/anti-patterns.md) to diagnose observed prose problems. A focused correction does not require loading every reference or completing unrelated passes.
 
 ## Establish the Factual Contract
 
@@ -87,12 +87,12 @@ When a hard fail appears, restore the source meaning and revise again. Never tra
 
 - Prefer concrete, verifiable language to abstraction, but never fabricate precision.
 - Adapt jargon and translated material for the audience while preserving intent.
-- Present the strongest relevant counterargument before rebutting it.
+- For persuasive or comparative work, represent relevant counterarguments faithfully before rebutting them; do not add a debate to an explanatory note.
 - Prefer direct verbs, stable terms, and the shortest wording that preserves meaning.
 
 ## Failure Handling
 
-- Missing evidence: keep the claim qualitative or mark it as unknown.
+- Missing evidence: report only the supplied observation or action and mark the unknown. Removing a number does not make an unsupported improvement or causal claim valid.
 - Conflicting sources: expose the conflict; do not silently choose one.
 - Unclear requirement strength: preserve the original modal verb and ask if needed.
 - Revision would change scope: identify the proposed addition separately rather than inserting it.

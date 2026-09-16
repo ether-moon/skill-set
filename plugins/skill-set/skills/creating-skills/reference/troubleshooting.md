@@ -1,59 +1,33 @@
-# Orchestration Troubleshooting
+# Authoring Troubleshooting
 
-## `skill-creator` Wins the Entry Point
+## Unnecessary Orchestration
 
-**Symptom:** An overlapping skill-authoring request selects `skill-creator` directly and bypasses project policy.
+A small edit does not require a creator, full contract document, or lifecycle checklist. Complete the requested correction and relevant validation. When the user explicitly requests delegation, preserve that requirement and inspect the returned work before filling gaps.
 
-**Response:** Strengthen the `creating-skills` description as the primary entry point, keep the creator described as its execution engine, and add a competitive trigger case. Do not narrow `skill-creator` globally; other environments may use it directly without this orchestrator.
+## Creator Capability Is Partial or Unavailable
 
-## Creator Is Available but Not Delegated
-
-**Symptom:** The run reads creator guidance as optional advice, then recreates the entire loop locally.
-
-**Response:** Require creator invocation before artifact-producing work, pass the orchestration contract and accepted preflight envelope, and inspect returned artifacts before filling gaps. Review traces for duplicated drafting, test generation, or model invocation.
-
-## Creator Capability Is Partial
-
-**Symptom:** The creator can draft artifacts but cannot run a model, viewer, validator, or host-specific stage.
-
-**Response:** Preserve valid output and execute only the unsupported work through an available evaluation adapter. Record the missing capability; do not require a provider-specific adapter or rerun supported work from scratch.
+Preserve valid output and complete unsupported work locally with ordinary host capabilities. Do not require a particular installation or recreate completed stages. Report unavailable model evaluation without inventing evidence.
 
 ## Preflight Blocks the Plan
 
-**Symptom:** `scripts/plan_eval_budget.py` exits with code 2 because total calls or projected tokens exceed the selected limits.
+Do not start a model call. Report the calls, projected tokens, limits, and reasons returned by `scripts/plan_eval_budget.py`. Reduce scope or obtain a separately approved budget. The planner is stateless; `max-total-tokens` is a conservative estimate, not a runtime hard cap.
 
-**Response:** Do not start any model invocation. Report execution calls, additional calls, projected tokens, limits, and every reason returned by the planner. Reduce the current stage's scope or request a separately purposed budget; do not reuse an earlier approval.
+## Work Stops at Every Step
 
-Remember that `max-total-tokens` is a conservative preflight estimate, not a runtime hard cap. The planner is stateless and does not debit tokens after calls.
+Check whether the next action is already within the user's scope and approved model plan. Continue covered work without asking again. Unused budget does not authorize new trials, graders, or iteration. A blocked or exhausted plan stops model calls, not independent authorized local fixes.
 
-## Model Usage Grows Unexpectedly
+## Model Usage Expands
 
-**Symptom:** A plan combines cases, baseline arms, trials, graders, optimizers, or models into a larger batch than intended.
-
-**Response:** Stop before the next model invocation. Return to deterministic validation, then define a development smoke with changed or highest-signal cases, candidate-only, and one trial. A focused comparison or campaign requires a new purpose, approval, and preflight; never add retries or iterations automatically.
-
-## Creator Is Unavailable
-
-Use the local fallback without asking the user to install a particular creator. Run deterministic validation, retain runnable cases, and report unavailable model evaluation exactly.
+Stop before the next unplanned call. Do not add cases, arms, models, retries, or graders to an accepted plan. Use the stages and approval rules in the evaluation policy; do not turn a successful smoke into an automatic campaign.
 
 ## Working and Durable Formats Differ
 
-**Symptom:** The creator returns a single-file evaluation manifest, a sibling workspace, `references/`, or another supported temporary layout while the project expects case directories or `reference/`.
+Translate returned artifacts into the project's case directories and `reference/` layout. Preserve raw evidence and avoid embedding a creator's private workspace paths in durable instructions.
 
-**Response:** Translate the returned artifacts and evidence at the adapter boundary. Preserve raw results for audit, validate the durable repository layout, and avoid embedding creator-private paths in the skill.
+## Scores or Graders Hide a Problem
 
-## Aggregate Scores Hide a Problem
+Inspect outputs, traces, policy violations, and missing metrics. Repair contaminated fixtures or incorrect grading before attributing failure to instructions. Keep user-required procedures; remove incidental path or heading requirements. Rerun only affected cases already covered by the approved plan; otherwise obtain approval for a new preflight plan.
 
-Inspect approved outputs, raw traces, safety violations, and grader evidence. Treat missing metrics as unavailable, not zero. Repair non-discriminating graders or contaminated fixtures before editing instructions. Rerun only affected cases.
+## Trigger Selection or Long-Term Value Regresses
 
-## Trigger Metrics Improve but Behavior Regresses
-
-Hold functional instructions constant during description optimization. Recheck outcome, conformance, safety, and efficiency after trigger changes; selection accuracy alone cannot approve the skill.
-
-## Cases or Instructions Keep Growing
-
-Classify the failure first. Make the smallest general correction, move objective checks into deterministic tests, merge overlapping expectations, and remove cases or guidance that duplicate existing coverage. A repeated failure may be a grader, fixture, environment, or use-case defect rather than an instruction gap.
-
-## Post-Release Value Declines
-
-Scope a focused comparison only when retirement or workflow drift is the explicit question. Use a pinned baseline, stated acceptance criteria, and a new preflight budget; do not launch a periodic comparison automatically.
+Use concrete task language to fix a demonstrated selection collision. Keep delegation procedures out of descriptions. Compare capability value or preference fidelity only when that question is in scope, with an approved evaluation plan. Do not infer success from shorter text or selection accuracy alone.

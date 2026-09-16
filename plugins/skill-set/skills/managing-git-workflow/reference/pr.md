@@ -16,7 +16,7 @@ Show staged, unstaged, and untracked paths as **excluded from the PR**. If any e
 
 ## 2. Prepare the Body File
 
-Generate a concrete title and body in the user's language while preserving technical identifiers. Allocate the body file first:
+Generate a concrete title and body using the artifact-language policy in `SKILL.md`, preserving technical identifiers. Allocate the body file first:
 
 ```bash
 <git-runner> input-prepare --kind pr-body
@@ -34,12 +34,12 @@ Write the body as plain statements of what changed and why. In Summary, state th
 <git-runner> pr-create \
   --base "<base-branch>" \
   --title "<pull-request-title>" \
-  --body-file /tmp/pull-request-body.md \
+  --body-file "<managed-body-file>" \
   --confirm-dirty-excluded \
   --dry-run
 ```
 
-Omit `--confirm-dirty-excluded` when the working tree and index are clean. The preview reports the exact committed scope and whether existing commits need publication.
+Replace `<managed-body-file>` with the exact path returned by `input-prepare`. Omit `--confirm-dirty-excluded` when the working tree and index are clean. The preview reports the exact committed scope and whether existing commits need publication.
 
 ## 4. Create or Reuse
 

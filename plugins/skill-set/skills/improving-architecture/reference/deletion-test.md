@@ -6,7 +6,7 @@ The single most useful heuristic for distinguishing deep from shallow modules.
 
 Imagine deleting the module. Inline its body at every call site.
 
-- **If complexity vanishes:** the module was a pass-through. It added vocabulary but no leverage. *Shallow.* Delete or merge.
+- **If complexity vanishes:** the module may be a pass-through. Check compatibility and ownership before proposing deletion or consolidation.
 - **If complexity reappears across N callers:** the module was concentrating something. Each caller would now have to reproduce the work. *Deep.* Keep it.
 - **If the module mostly disappears but a small invariant has to be re-asserted at each call site:** the module was earning its keep at exactly that invariant. Keep it, possibly trim the surrounding code.
 
@@ -16,7 +16,7 @@ You don't need to literally delete the file. Run it as a thought experiment in t
 
 ### Step 1 — list callers
 
-Use `LSP findReferences` on the public API of the module. Get the actual call sites.
+Use symbol-aware references when available, otherwise targeted imports, registrations, and call-site searches. Record dynamic callers or search limits rather than assuming no callers exist.
 
 ### Step 2 — for each call site, write what would need to change
 
@@ -26,9 +26,9 @@ For each caller, ask: if the module disappeared, what would I have to put here?
 - The function body plus a couple of guards / coercions / wrap-unwraps? → Borderline; think about whether those guards are the same at every site.
 - The function body plus state, error handling, retries, ordering? → The module is doing real work.
 
-### Step 3 — count the duplication
+### Step 3 — identify the responsibility that would move
 
-If the same non-trivial thing would be repeated at 3+ call sites, the module is deep enough to keep. Two callers can be a coincidence; three suggests a pattern worth concentrating in one place.
+Identify the invariant, state, or coordination each caller would inherit. Repetition across callers strengthens the evidence, but even one caller can benefit from a boundary that owns a protocol or safety condition. There is no minimum caller count.
 
 If the "complexity" is just type coercion and could be replaced by a one-liner everywhere, it's shallow.
 
@@ -56,7 +56,7 @@ If the "complexity" is just type coercion and could be replaced by a one-liner e
 
 ## When the test is ambiguous
 
-Apply the **two-adapter test**: does this module have two real, used adapters? If yes, the seam is real. If no, the seam is hypothetical and can usually be deleted.
+Inspect any real adapters and the responsibility they isolate. Multiple adapters demonstrate variation; a single adapter does not disprove depth. If deletion would spread an invariant or protocol into callers, retain that boundary regardless of adapter count.
 
 If still ambiguous, leave it alone. Architectural review should not propose changes the team is unsure about. List it under "watch" rather than "propose."
 
@@ -68,4 +68,6 @@ If still ambiguous, leave it alone. Architectural review should not propose chan
 | Clearly shallow, multiple callers | Inline; if duplication appears across callers, propose a different deepening that captures the *real* invariant |
 | Clearly deep | Leave alone. Possibly improve naming or trim incidental complexity. |
 | Borderline | Note it; come back when you have more callers or more friction |
-| Two-adapter test fails (only one adapter, no plan for another) | Propose collapsing the seam — the indirection is unjustified |
+| Only one adapter | Inspect its invariant or protocol ownership; propose collapse only when deletion removes indirection without spreading responsibility |
+
+These are candidate recommendations for the read-only report, not authorization to edit files.

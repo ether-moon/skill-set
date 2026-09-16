@@ -1,6 +1,6 @@
 # Drafting Workflow
 
-Step-by-step process for drafting non-fiction prose from scratch.
+Use when a new document needs structure or audience calibration. Scale the process to the requested artifact; the outline and templates are optional working aids.
 
 ## Table of Contents
 
@@ -19,7 +19,7 @@ Before writing anything, answer these three questions:
 2. **Audience**: What does the reader already know? What don't they know?
 3. **Scope**: What is explicitly out of scope?
 
-Write these answers down. They become your filter for every sentence that follows.
+Use the supplied answers as a filter for the draft. Ask only when missing information would materially change the document; do not require a separate planning artifact.
 
 ## Step 2: Create Outline
 
@@ -42,18 +42,18 @@ Title / Summary (1-2 sentences)
 
 ## Step 3: Apply Context Zero
 
-Write as if the reader has zero prior context about this topic.
+Supply the context this audience needs without assuming it has seen the current conversation. Preserve the user's stated expertise; do not turn an expert-facing note into an introductory tutorial.
 
 **Checklist**:
-- [ ] All acronyms defined on first use
-- [ ] Technical terms explained or annotated parenthetically
+- [ ] Unfamiliar acronyms defined on first use
+- [ ] Technical terms explained where the intended audience needs them
 - [ ] References to "the project" / "the system" name it specifically
 - [ ] No pronoun without a clear antecedent in the same paragraph
 - [ ] Background provided where reader's knowledge likely ends (Step 1 audience analysis)
 
 ### Diagrams
 
-When a document needs diagrams, use Mermaid or equivalent markup-based format instead of ASCII art. Markup-based diagrams render consistently across platforms and are easier to maintain.
+When a document needs a diagram, use a format its target can render. Prefer maintainable markup such as Mermaid when supported; do not add a diagram solely to follow the workflow.
 
 ## Step 4: Draft Section by Section
 

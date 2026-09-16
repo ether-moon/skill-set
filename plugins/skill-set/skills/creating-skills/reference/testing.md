@@ -13,7 +13,7 @@
 
 ## Responsibility
 
-Delegate test generation, budgeted execution, grading, aggregation, and review to a compatible `skill-creator` when supported. The preflight envelope remains authoritative; a creator that cannot honor it may produce artifacts but must not launch model invocations. This reference defines the common evidence policy and local fallback.
+Use this reference when creating or changing behavioral cases. Apply the same evidence policy to local and delegated work. Delegate when useful or explicitly requested; a creator that cannot honor the approved preflight envelope may produce artifacts but must not launch model invocations.
 
 ## Test in Layers
 
@@ -50,14 +50,14 @@ Verify both what happened and what did not happen. Command logs and state inspec
 
 ## Efficient Case Design
 
-- Give each case one regression risk that differs from every existing case.
+- Give each case one regression risk that differs from every existing case. Extend existing coverage before adding a case for the same risk.
 - Do not repeat the full policy or a long command matrix in every prompt; reference concise task-local fixtures and contracts.
 - Move checks for strings, file existence, tool calls, and state transitions into deterministic tests.
 - Merge expectations that measure the same meaning.
 - Leave only genuinely qualitative judgment to a model grader.
 - Use at most one batched model-grader call for one output; do not launch one grader per expectation.
 - Do not add a case that duplicates an existing deterministic test or cannot reproduce an actual or credible observed failure.
-- After a fix, rerun only affected cases. Do not automatically rerun the full suite.
+- After a fix, rerun only affected cases covered by the approved plan. Otherwise obtain a new evaluation plan; do not automatically rerun the full suite.
 
 ## Isolated Execution
 
@@ -78,13 +78,13 @@ When a campaign needs qualitative grading, batch the qualitative expectations fo
 Inspect whether the run:
 
 - selected `creating-skills` as the primary entry point for overlapping authoring requests;
-- delegated only supported work inside the accepted preflight plan;
+- used delegation when useful or explicitly requested, and stayed inside the accepted preflight plan;
 - loaded only relevant references and reused bundled scripts;
 - ran deterministic validation before any development smoke;
 - kept development smoke candidate-only and single-trial;
 - added a baseline only for an approved focused comparison;
 - started a campaign only after an explicit request and separate budget;
-- stopped at the intended authority boundary; and
+- completed authorized work without redundant approval and stopped at the intended authority boundary; and
 - returned enough evidence for the policy gate.
 
-Move only critical orchestration and safety rules into `SKILL.md`. Remove guidance that the creator already owns or that never changes outcomes.
+Preserve tests for user-required tools or order. For other cases, accept equivalent routes to the outcome; do not require exact report headings or delegation merely because a creator exists. Keep only shared constraints in `SKILL.md`, and remove guidance that never changes outcomes.

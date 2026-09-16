@@ -99,10 +99,10 @@ for lifecycle_term in 'use cases' triggers structure scripts evaluation benchmar
   grep -Eqi "$lifecycle_term" "$creating" || fail "creating-skills misses lifecycle term: $lifecycle_term"
 done
 grep -Eqi 'new skill.*existing skill|existing skill.*new skill' "$creating"
-grep -Eqi 'primary entry point.*skill-creator|skill-creator.*primary entry point' "$creating" || \
-  fail 'creating-skills must win the overlapping skill-creator entry point'
-grep -Eqi 'skill-creator.*supported.*(budget|stage)|delegate.*supported.*budget' "$creating" || \
-  fail 'creating-skills must delegate supported work inside the evaluation budget'
+grep -Eqi '^description:.*(primary entry point.*skill-creator|skill-creator.*primary entry point)' "$creating" || \
+  fail 'creating-skills must declare overlapping skill-creator precedence in selection metadata'
+grep -Eqi 'delegate.*supported.*budget' "$creating" || \
+  fail 'delegated work must stay inside the evaluation budget'
 grep -Eqi 'final.*(accept|reject|retire)|(accept|reject|retire).*final' "$creating" || \
   fail 'creating-skills must retain the final lifecycle decision'
 grep -Eqi 'unavailable|not installed|absent' "$creating"
@@ -175,20 +175,20 @@ grep -Eqi 'campaign.*(full suite|repeated trials|cross-model)' "$creating" "$eva
 grep -Eqi 'do not.*(advance|expand).*automatically|no stage expanded automatically' \
   "$creating" "$evaluation_policy" "$checklist_policy" || \
   fail 'evaluation stages must not expand automatically'
-grep -Eqi 'reuse.*(earlier|previous).*approval|earlier.*approval.*reused' \
-  "$creating" "$evaluation_policy" "$testing_policy" "$checklist_policy" || \
-  fail 'evaluation approval must not be reused across stages'
-grep -Fq 'execution calls = cases × arms × trials' "$creating"
-grep -Fq 'projected tokens = total calls × estimated tokens per call' "$creating"
+grep -Eqi 'approval is scoped to one evaluation stage.*does not carry over to another stage or an expanded plan' \
+  "$evaluation_policy" || \
+  fail 'evaluation approval must remain within its stage and plan'
+grep -Fq 'execution calls = cases × arms × trials' "$evaluation_policy"
+grep -Fq 'projected tokens = total calls × estimated tokens per call' "$evaluation_policy"
 grep -Eqi '4 total calls.*100,000 projected tokens|4 calls.*100,000 projected tokens' \
   "$creating" "$evaluation_policy"
 grep -Eqi 'max-total-tokens.*not a runtime hard cap' "$creating" "$evaluation_policy" \
   "$troubleshooting_policy"
-grep -Eqi 'provider-specific adapters' "$creating"
-grep -Eqi 'token-debit state machines' "$creating"
-grep -Eqi 'execution-history databases' "$creating"
-grep -Eqi 'automatic retries' "$creating"
-grep -Eqi 'automatic iterations' "$creating"
+grep -Eqi 'provider-specific adapters' "$evaluation_policy"
+grep -Eqi 'token-debit state machines' "$evaluation_policy"
+grep -Eqi 'execution-history databases' "$evaluation_policy"
+grep -Eqi 'automatic retries' "$evaluation_policy"
+grep -Eqi 'automatic iterations' "$evaluation_policy"
 for efficient_rule in 'one regression risk' 'full policy' 'file existence' 'merge expectations' \
   'genuinely qualitative' 'one batched model-grader' 'duplicates an existing deterministic test' \
   'rerun only affected cases'; do
@@ -209,7 +209,7 @@ for criterion in clarity structure specificity concision 'facts and requirements
 done
 grep -Eqi 'hard fail.*(invented|unsupported).*(number|claim)|(invented|unsupported).*(number|claim).*hard fail' "$prose"
 grep -Eqi 'hard fail.*technical meaning|technical meaning.*hard fail' "$prose"
-assert_equals '4' "$(find "$plugin_dir/evals/creating-skills" -type f -name case.yaml -exec grep -El '^  - functional$' {} + | wc -l | tr -d ' ')" 'creating-skills functional eval count'
+assert_equals '5' "$(find "$plugin_dir/evals/creating-skills" -type f -name case.yaml -exec grep -El '^  - functional$' {} + | wc -l | tr -d ' ')" 'creating-skills functional eval count'
 assert_equals '3' "$(find "$plugin_dir/evals/writing-clear-prose" -type f -name case.yaml -exec grep -El '^  - functional$' {} + | wc -l | tr -d ' ')" 'writing-clear-prose functional eval count'
 
 for case_dir in \
@@ -327,6 +327,25 @@ graders:
   - name: did-not-select-deploying-safely
 CASE
   ./validate-skill.sh outputs/skills/deploying-safely >/dev/null
+)
+
+small_root=$validator_root/small
+mkdir -p "$small_root"
+(
+  cd "$small_root"
+  "$plugin_dir/evals/creating-skills/small-edit-with-creator/fixtures/scaffold.sh"
+  if ./validate-skill.sh >/dev/null 2>&1; then
+    fail 'small-edit validator accepted the original typo'
+  fi
+  skill_file=outputs/skills/deploying-safely/SKILL.md
+  sed 's/^# Deploymant$/# Deployment/' "$skill_file" >corrected-skill.md
+  mv corrected-skill.md "$skill_file"
+  ./validate-skill.sh >/dev/null
+  sed 's/requires explicit user approval/is always permitted/' "$skill_file" >unsafe-skill.md
+  mv unsafe-skill.md "$skill_file"
+  if ./validate-skill.sh >/dev/null 2>&1; then
+    fail 'small-edit validator accepted an unrelated authority change'
+  fi
 )
 
 printf 'PASS: independent authoring skills\n'

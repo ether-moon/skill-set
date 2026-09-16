@@ -54,13 +54,6 @@ graders:
     pattern: '^(?=.{1,70}$)(feat|fix|chore|docs|refactor|test|style|perf|ci|build)(\\(.+\\))?: .+$'
     flags: m
   - type: regex
-    name: structured-body
-    target:
-      source: file
-      path: outputs/pr-body.md
-    pattern: '^##? Summary[\\s\\S]*^##? (Test Plan|Testing|How to Test)[\\s\\S]*^- \\[ \\]'
-    flags: im
-  - type: regex
     name: ticket-present
     target:
       source: file

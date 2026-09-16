@@ -23,7 +23,7 @@ Use read-only repository evidence to answer present-state questions before askin
 
 ## Bound the Search
 
-Stop reading and ask one intent question when evidence is unavailable after several targeted searches, requires an unrelated subsystem, or concerns future policy rather than current code. State what was searched, the unresolved fact, and a recommended answer.
+Stop expanding that search when evidence is unavailable after targeted checks, requires an unrelated subsystem, or concerns future policy rather than current code. Add the unresolved intent question to the current decision batch with what was searched, the missing fact, and a recommendation. Finish the other bounded checks before presenting all currently identifiable questions together.
 
 Report evidence concisely:
 

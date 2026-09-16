@@ -47,7 +47,7 @@ Testing through the UI is slow, opaque, and brittle. A **test bus** exposes busi
 - Tests are clearer (assert on data, not DOM)
 - Forces good decoupling between layers
 
-**When to test through UI:** Only for E2E tests verifying user-visible flows. All other tests should go through the API/service layer.
+Test domain behavior through its API or service boundary. Test rendering, accessibility, and interaction behavior at the UI component or end-to-end layer that can actually observe it; do not hide presentation defects behind service-only tests.
 
 ## Specification-by-Example
 

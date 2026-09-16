@@ -1,113 +1,55 @@
 ---
 name: creating-skills
-description: This skill is the primary entry point for creating, modifying, evaluating, and governing the lifecycle of agent skills. Use cases include any new or existing SKILL.md work, including trigger design, structure and resources, evals, benchmarks, model-invocation budgeting, token or cost regressions, description optimization, troubleshooting, or retirement, even when skill-creator is available. It takes precedence over skill-creator for overlapping requests, delegates supported work within an explicit evaluation budget, and retains project policy, evidence requirements, and final acceptance.
+description: Creates, revises, and evaluates agent skills. Use for SKILL.md authoring, trigger tuning, skill evaluations and benchmarks, or retirement decisions. The primary entry point when requests overlap with skill-creator.
 ---
 
 # Creating Skills
 
-## Role and Ownership
+## Scope and Completion
 
-Use this skill as the primary entry point for both new skill and existing skill work, especially whenever a request matches both `creating-skills` and an available `skill-creator`.
+Use this as the primary entry point for new skill and existing skill work; `skill-creator` is an optional authoring capability. Preserve the user's requested hosts, paths, names, workflows, and publication boundaries.
 
-When a compatible `skill-creator` is available, invoke it before local artifact-producing work and delegate only the stages it supports within the current evaluation budget: intent discovery, use cases and triggers, skill structure, scripts and other resources, drafting, evaluation cases, grading, benchmark analysis, human review, separately authorized iteration, description optimization, and packaging.
+Establish the requested outcome, relevant use cases and triggers, and the evidence needed to finish. Resolve implementation choices from code and established conventions. Ask when available evidence cannot settle uncertainty that changes requirements, externally observable behavior, or authority. A narrow edit needs a focused correction and validation, not a full lifecycle plan.
 
-Retain ownership here for:
+Complete authorized local edits, fix resulting validation failures, and rerun affected deterministic checks. Stop for unresolved policy decisions or actions beyond authority. A review-only request remains read-only. Do not treat local completion as permission to publish or run model evaluations.
 
-- target surfaces, repository policy, and durable artifact layout;
-- user authority, safety invariants, and mutation or publication boundaries;
-- required evidence and acceptance thresholds;
-- gaps between the creator's output and the project contract; and
-- the final accept, reject, or retire decision.
+## Author the Smallest Useful Skill
 
-Treat delegated artifacts and results as candidates. Inspect them before filling gaps, and do not duplicate a delegated stage merely to keep control local. Judge an available creator by the capabilities it exposes in the active environment, not by the product name or packaging of one installation.
+Assume the model can choose ordinary implementation steps. Include non-obvious context, explicit preferences, operational constraints, and completion conditions that change observable behavior. Prescribe exact tools or order only for an external contract, fragile operation, or user requirement.
 
-## Establish the Orchestration Contract
+Distinguish **capability skill** guidance from **preference skill** policy; a skill may contain both. Capability guidance needs evidence of added value. Model improvement alone does not invalidate a human preference or authority boundary.
 
-Before delegation, define:
+Keep descriptions short and specific to selection. Put shared constraints in `SKILL.md` and conditional detail in references with clear reading conditions. Point to authoritative code, configuration, or document sections instead of copying their inventories. Preserve non-obvious contracts and rationale. Add scripts only when repeated or fragile deterministic work justifies them.
 
-1. The target hosts, repository paths, and project instructions.
-2. The user's intended workflows, inputs, outputs, and trigger boundaries.
-3. Whether the skill is a **capability skill** or a **preference skill**.
-4. Allowed tools, file mutations, external effects, and publication authority.
-5. Required validators, evaluation stage, evaluation adapter when available, evidence, and acceptance thresholds.
-6. The artifacts and unresolved decisions the creator must return.
+When authoring durable artifacts, read [structure and content policy](reference/structure.md). Preserve project formats and content policies through the contract and policy gate, including English repository content and user-language runtime output.
 
-Use project-native formats as the durable source of truth. Let the creator use its supported working format internally, then adapt returned evidence at the boundary instead of forcing its private workspace layout into the repository.
+## Use a Creator When It Helps
 
-Make durable content policies explicit in the orchestration contract and verify them again at the policy gate; do not expect a delegated creator to rediscover them from the workspace.
+Use a compatible `skill-creator` when its supported structure, resource generation, or evaluation capabilities materially help, or when the user requests delegation. Handle self-contained edits directly even when a creator is available.
 
-## Gate Model Evaluation
+When delegating, pass the target, required artifacts, relevant project policy, authority, and any approved model-call budget. Delegate supported work inside that budget. Inspect returned artifacts before filling gaps; do not duplicate valid work. Translate temporary creator formats into the project's durable layout.
 
-Treat every fresh eval worker, qualitative judge, optimizer, or other model-backed task as a model invocation. Deterministic validators, parsers, and aggregation scripts do not count as model invocations.
+Retain the final accept, reject, or retire decision. If a creator is unavailable or supports only part of the task, complete the remaining work locally. The workflow must not require a vendor-specific CLI, environment variable, or installation layout.
 
-Keep evaluation stages separate and run only the stage currently authorized:
+## Validate Within Authority
 
-1. **Deterministic validation** — validate structure, scripts, fixtures, schemas, and objective assertions without model invocations.
-2. **Development smoke** — run only changed or highest-signal cases, candidate-only, once each, within the default budget.
-3. **Focused comparison** — add a baseline only for cases that need it, with a separate purpose and freshly approved budget.
-4. **Campaign** — run a full suite, repeated trials, or cross-model evaluation only after an explicit request and a separate budget.
+Use deterministic validation first. Check affected structure, links, scripts, and fixtures with repository and host-provided validators where applicable. Run project-required checks; broader or repeated checks need a changed artifact, failure, or unresolved concern.
 
-Do not advance stages automatically or reuse approval from an earlier stage. Do not add cases, arms, trials, graders, optimizers, models, retries, or iterations after approval.
+Before any fresh model-backed worker, judge, optimizer, or other delegated model call, read [evaluation policy](reference/evaluation.md) and run `scripts/plan_eval_budget.py` for the approved plan. The default ceiling is 4 total calls and 100,000 projected tokens; it is a limit, not authorization. Do not start a call after a blocked or exhausted plan.
 
-Before any model invocation, run the stateless `scripts/plan_eval_budget.py` preflight with the planned cases, arms, trials, judge calls, optimizer calls, and other calls. It computes:
+Model stages stay separate: development smoke is candidate-only and single-trial; focused comparison needs a separately approved purpose and budget; a campaign covers full suites, repeated trials, or cross-model evaluation. Do not expand stages automatically. Continue an already approved plan without repeated confirmation, including only iteration explicitly included in that plan.
 
-```text
-execution calls = cases × arms × trials
-total calls = execution calls + judge calls + optimizer calls + other calls
-projected tokens = total calls × estimated tokens per call
-```
+For behavioral case design, read [testing and isolation policy](reference/testing.md). Evaluate outcome, conformance, safety, and efficiency. Grade results rather than incidental paths, inspect traces as well as scores, and report unavailable evaluation honestly. Deterministic validation does not prove model behavior or performance improvement.
 
-The default limits are 4 total calls and 100,000 projected tokens. Use the recent equivalent-trace p95 when available; otherwise use the 25,000-token fallback. If either limit is exceeded, the planner exits with code 2 and no model invocation may start. `max-total-tokens` is a conservative preflight estimate, not a runtime hard cap.
+## Preserve Value
 
-Do not add provider-specific adapters, capability-negotiation protocols, post-call token-debit state machines, execution-history databases, provider token normalization, automatic retries, or automatic iterations. Keep project-specific change detection, safety contracts, and representative-case selection in the project authoring skill.
+Extend an existing regression case when it covers the failure; add a distinct case only for a new risk. Classify failures before adding instructions. Preserve unrelated guarantees and avoid speculative guidance.
 
-## Delegate the Execution Loop
+Use a focused comparison when deciding whether capability guidance still adds value; retire it only when approved evidence shows no material outcome, safety, or efficiency benefit. Test preference fidelity against the current human workflow. Keep model comparisons and portability campaigns separately scoped and budgeted.
 
-Give the creator the orchestration contract and the current stage's budget envelope. Ask it to own the supported work without expanding that envelope. Require inspectable outputs: changed artifacts, test cases, baseline identity when approved, per-case results, raw traces or logs, benchmark metrics, user feedback when collected, and unresolved limitations.
+## Handoff and Conditional References
 
-If the creator cannot honor the budget, delegate artifact production but not model invocation. If it supports only part of the contract, preserve its valid output and execute only the unsupported work locally. If it is unavailable, use the local fallback below without requiring a particular product.
+Report the completed change, validation evidence, and remaining uncertainty. Apply only the relevant sections of [the completion checklist](reference/checklist.md); do not load it for a self-contained edit with an explicit completion check.
 
-## Apply the Policy Gate
-
-Evaluate returned evidence across four dimensions defined in `reference/evaluation.md`:
-
-- **Outcome** — the skill produces a usable result.
-- **Conformance** — it follows the user's and project's rules.
-- **Safety** — it stays within authority and mutation boundaries.
-- **Efficiency** — it avoids material tool, token, retry, latency, or cost regressions.
-
-Grade outcomes rather than incidental paths. Require a particular tool or order only when it is itself a safety invariant or external contract. Inspect traces and artifacts, not only aggregate scores.
-
-Classify failures before proposing any separately authorized follow-up. Accept only when declared thresholds hold and no grader, fixture, environmental, or missing-evidence defect hides a regression.
-
-## Preserve Long-Term Value
-
-- For a **capability skill**, use a focused comparison only when proving value or preventing a specific regression requires a baseline. Retire the skill when approved evidence shows no material outcome, safety, or efficiency value.
-- For a **preference skill**, test fidelity to the current human workflow when that question is explicitly in scope. Model capability alone does not make the preference obsolete.
-- Promote stable development evaluations into regression cases. Turn each reproducible field failure into a case rather than another paragraph of speculative instruction.
-- Test portability only as an explicitly requested campaign with its own budget.
-
-## Local Fallback
-
-The workflow must remain usable without an external creator. With ordinary host capabilities:
-
-1. Produce the smallest skill structure and resources that satisfy the orchestration contract.
-2. Run repository and environment-provided validators, then a budgeted development smoke only when that stage is authorized and an evaluation adapter is available.
-3. Use deterministic checks before qualitative grading and retain per-case evidence.
-4. Classify failures, make the smallest general correction, and rerun only affected cases.
-5. Stop at the same policy gate used for delegated work.
-
-The portable fallback must not require a vendor-specific CLI, environment variable, or installation layout. Report unavailable model evaluation honestly while keeping deterministic validation and runnable cases ready.
-
-## Handoff
-
-Validate every linked path and executable resource. Confirm that temporary formats have been translated into the project's durable structure, the approved regression scope is green, and `reference/checklist.md` has no unresolved item.
-
-## References
-
-- [Portable and project structure policy](reference/structure.md)
-- [Supplemental workflow patterns](reference/patterns.md)
-- [Evaluation policy and acceptance](reference/evaluation.md)
-- [Testing and isolation policy](reference/testing.md)
-- [Orchestration troubleshooting](reference/troubleshooting.md)
-- [Completion checklist](reference/checklist.md)
+- [Workflow patterns](reference/patterns.md) — when choosing a structure for a multi-step or fragile workflow.
+- [Troubleshooting](reference/troubleshooting.md) — when delegation, evaluation, or acceptance is blocked.
