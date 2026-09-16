@@ -26,7 +26,7 @@ Translate returned artifacts into the project's case directories and `reference/
 
 ## Scores or Graders Hide a Problem
 
-Inspect outputs, traces, policy violations, and missing metrics. Repair contaminated fixtures or incorrect grading before attributing failure to instructions. Keep user-required procedures; remove incidental path or heading requirements. Rerun only affected cases within authorized scope.
+Inspect outputs, traces, policy violations, and missing metrics. Repair contaminated fixtures or incorrect grading before attributing failure to instructions. Keep user-required procedures; remove incidental path or heading requirements. Rerun only affected cases already covered by the approved plan; otherwise obtain approval for a new preflight plan.
 
 ## Trigger Selection or Long-Term Value Regresses
 
