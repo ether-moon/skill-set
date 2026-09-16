@@ -37,7 +37,7 @@ Evaluate each in-scope rule using the five questions. Report the rule and path, 
 
 Prefer an existing relevant reference over a new file. Use a top-level directive for rules needed in nearly every session, and a focused reference with a clear loading condition for task-specific rules. Moving low-value text into a reference does not justify keeping it.
 
-For a failed addition, offer `Add anyway`, `Revise`, and `Don't add`; a user override is authoritative. Resolve contradictions using applicable instruction priority and explicit user decisions. If requirements, external behavior, or authority remain ambiguous, show both rules and ask for the unresolved choice. Do not invent a compromise; make exception scopes explicit.
+For a failed addition, offer `Add anyway`, `Revise`, and `Don't add`; a user override is authoritative. Resolve contradictions using applicable instruction priority and explicit user decisions. If requirements, external behavior, or authority remain ambiguous, show both rules and ask for the unresolved choice. Do not invent a compromise. For an undocumented exception, ask for its authoritative scope and leave unknown paths, keys, and namespaces unspecified in proposed wording.
 
 ## Apply Authorized Changes
 

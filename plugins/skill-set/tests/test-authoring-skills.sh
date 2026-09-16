@@ -175,9 +175,9 @@ grep -Eqi 'campaign.*(full suite|repeated trials|cross-model)' "$creating" "$eva
 grep -Eqi 'do not.*(advance|expand).*automatically|no stage expanded automatically' \
   "$creating" "$evaluation_policy" "$checklist_policy" || \
   fail 'evaluation stages must not expand automatically'
-grep -Eqi 'reuse.*(earlier|previous).*approval|earlier.*approval.*reused' \
-  "$creating" "$evaluation_policy" "$testing_policy" "$checklist_policy" || \
-  fail 'evaluation approval must not be reused across stages'
+grep -Eqi 'approval is scoped to one evaluation stage.*does not carry over to another stage or an expanded plan' \
+  "$evaluation_policy" || \
+  fail 'evaluation approval must remain within its stage and plan'
 grep -Fq 'execution calls = cases × arms × trials' "$evaluation_policy"
 grep -Fq 'projected tokens = total calls × estimated tokens per call' "$evaluation_policy"
 grep -Eqi '4 total calls.*100,000 projected tokens|4 calls.*100,000 projected tokens' \

@@ -58,21 +58,41 @@ assert_equals '2' "$(find "$plugin_dir/evals/improving-architecture" -type f -na
 assert_equals '2' "$(find "$plugin_dir/evals/grilling-plans" -type f -name case.yaml -exec grep -El '^  - functional$' {} + | wc -l | tr -d ' ')" 'grilling functional eval count'
 assert_equals '4' "$(find "$plugin_dir/evals/guarding-agent-directives" -type f -name case.yaml -exec grep -El '^  - functional$' {} + | wc -l | tr -d ' ')" 'directive functional eval count'
 
-for read_only_case in \
-  "$plugin_dir/evals/zooming-out-on-code/order-validation-map" \
-  "$plugin_dir/evals/improving-architecture/deletion-test-on-thin-wrapper" \
-  "$plugin_dir/evals/improving-architecture/shallow-validators-cluster" \
-  "$plugin_dir/evals/grilling-plans/early-stop-ledger" \
-  "$plugin_dir/evals/guarding-agent-directives/audit-existing"; do
-  if grep -Eq '^    - (Write|Edit)$' "$read_only_case/case.yaml" ||
-    grep -Eq 'outputs/' "$read_only_case/prompt.md"; then
-    fail "read-only eval grants or requests mutation: $read_only_case"
-  fi
-done
+read_only_cases=(
+  "$plugin_dir/evals/zooming-out-on-code/order-validation-map"
+  "$plugin_dir/evals/improving-architecture/deletion-test-on-thin-wrapper"
+  "$plugin_dir/evals/improving-architecture/shallow-validators-cluster"
+  "$plugin_dir/evals/grilling-plans/early-stop-ledger"
+  "$plugin_dir/evals/guarding-agent-directives/audit-existing"
+  "$plugin_dir/evals/guarding-agent-directives/accept-specific-rule"
+  "$plugin_dir/evals/guarding-agent-directives/reject-vague-rule"
+)
 
-for confirmation_case in accept-specific-rule reject-vague-rule; do
-  if grep -Eq -- '- Write|- Edit' "$plugin_dir/evals/guarding-agent-directives/$confirmation_case/case.yaml"; then
-    fail "pre-confirmation directive eval grants mutation: $confirmation_case"
+ruby -ryaml -rjson -e '
+  def unsafe_grants(document)
+    tools = YAML.safe_load(document, aliases: false).fetch("execution").fetch("allowed_tools")
+    tools.reject { |tool| %w[Skill Read Grep Glob].include?(tool.split("(", 2).first) }
+  end
+
+  # Exercise YAML formatting and scoped grants independently of the real cases.
+  safe = "description: Write commit messages in English\nexecution:\n  allowed_tools: [Skill, Read]\n"
+  abort "fixture prose was mistaken for a tool grant" unless unsafe_grants(safe).empty?
+  %w[Write Edit NotebookEdit Bash Bash(./validate:*) PowerShell *].each do |tool|
+    ["execution:\n  allowed_tools:\n  - #{tool.to_json}\n",
+     "execution: {allowed_tools: [Read, #{tool.to_json}]}\n"].each do |document|
+      abort "unsafe grant was accepted: #{tool}" if unsafe_grants(document).empty?
+    end
+  end
+
+  ARGV.each do |case_dir|
+    unsafe = unsafe_grants(File.read(File.join(case_dir, "case.yaml")))
+    abort "read-only eval grants unsupported tools: #{case_dir}: #{unsafe.join(", ")}" unless unsafe.empty?
+  end
+' "${read_only_cases[@]}"
+
+for read_only_case in "${read_only_cases[@]}"; do
+  if grep -Eq "outputs/" "$read_only_case/prompt.md"; then
+    fail "read-only eval requests output mutation: $read_only_case"
   fi
 done
 

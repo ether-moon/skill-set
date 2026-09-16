@@ -74,7 +74,7 @@ deterministic validation
 | Focused comparison | Only cases where a pinned baseline is needed | Separate purpose and freshly approved budget |
 | Campaign | Full suite, repeated trials, cross-model evaluation, or broad optimization | Explicit request and separate budget |
 
-Do not advance to another stage automatically, infer model-evaluation approval from a broad authoring request, or reuse an earlier stage's approval. Budget limits are not permission to make calls. Existing approval remains valid for the uncompleted work in that plan; do not request it again.
+Approval is scoped to one evaluation stage and its agreed plan: it remains valid for unfinished work inside that plan, but does not carry over to another stage or an expanded plan. Do not advance stages automatically or infer model-evaluation approval from a broad authoring request. Budget limits are not permission to make calls. Do not request the same approval again for work already covered by the plan.
 
 Count every fresh model-backed worker, qualitative judge, optimizer, or other delegated model call. Deterministic validators and aggregation scripts do not count. Before execution, run the stateless `scripts/plan_eval_budget.py` preflight for all calls in the approved plan. Compute:
 
