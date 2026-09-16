@@ -64,7 +64,7 @@ Do not use changed-line counts as a correctness proxy. When uncertain, choose AM
 
 Skip resolved, duplicate, previously addressed, or informational findings. Preserve source attribution so a skipped result remains auditable.
 
-See `reference/classification.md` for the decision tree and edge cases.
+Read [classification examples](reference/classification.md) when a finding is borderline. Examples apply only after source verification and never override the four OBVIOUS conditions or the always-AMBIGUOUS rules.
 
 ## Severity
 

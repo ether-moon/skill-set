@@ -1,12 +1,12 @@
 # Manual Probing and Reflection
 
-**Load this reference when:** tests are passing and you need to verify the feature actually works beyond what tests cover, or when multiple attempts at a task keep failing.
+**Load this reference when:** an uncovered risk needs a realistic probe, or multiple attempts at a task keep failing.
 
 ## Why Probing
 
 Tests cover what you **anticipated**. Probing discovers what you **didn't**.
 
-Coverage measures lines exercised, not behavior verified. A function can have 100% line coverage and still break on inputs no test sends. Passing the test suite is necessary but not sufficient — check that the program works in practice before declaring success.
+Coverage measures lines exercised, not behavior verified. Select a probe for a concrete gap; do not repeat equivalent validation just to complete a phase. Use disposable fixtures or an authorized test environment for state changes. Live writes, permission changes, and destructive failure injection require their own authority.
 
 ## CLI Probing
 
@@ -62,7 +62,7 @@ When probing reveals a gap:
 3. **Fix the issue** (Green phase)
 4. **Probe again** to verify the fix and look for related gaps
 
-This loop converts manual exploration into permanent automated coverage. Every probe that finds a bug should produce a regression test.
+Use this loop for executable behavior. For documentation, configuration, or other non-TDD artifacts, extend the appropriate schema, rendering, or fixture validation instead of forcing an artificial RED test.
 
 ## Reflection
 
@@ -75,7 +75,7 @@ When multiple attempts at a task keep failing, or probe cycles repeatedly reveal
 3. **Document what you've tried** — approaches taken and their results
 4. **Adjust strategy** — based on stored failure context, change the approach
 
-This prevents repeating the same mistakes across attempts. The reflection doesn't need to be formal — a few sentences stored in working memory or a comment in the code is enough. The key is to explicitly articulate what went wrong before trying again.
+Keep the failure and changed hypothesis in the working context or handoff. Add a code comment only when it explains a lasting, non-obvious constraint; do not write investigation history into production code.
 
 **When to reflect:**
 - After repeated failed Red/Green cycles on the same requirement

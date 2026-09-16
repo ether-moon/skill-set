@@ -79,15 +79,13 @@ A seam is a point where the interface lives — a place behavior can be altered 
 
 A seam is *interesting* when there's a real reason to vary behavior at it: testing (substitute a fake), product needs (swap providers), platform constraints (switch implementations). A seam invented for "potential future flexibility" is just speculative complexity.
 
-> One adapter = hypothetical seam. Two adapters = real seam.
-
-If only one adapter exists and is the only one that ever will exist, the seam is fictional and can usually be deleted.
+Multiple used adapters are evidence that behavior varies at a seam. A single adapter can still isolate a protocol, enforce an invariant, or concentrate failure handling. Judge that observed responsibility with the deletion test; do not invent a second adapter to justify an interface.
 
 ## Adapter
 
 A concrete thing that satisfies an interface at a seam. `PostgresUserRepo` and `InMemoryUserRepo` are two adapters at the `UserRepo` seam.
 
-Adapters justify seams. A seam without at least two real adapters is suspicious.
+Adapters can justify variation, but adapter count is not a requirement for a useful boundary.
 
 ## Leverage
 

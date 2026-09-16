@@ -35,7 +35,7 @@ After confirming the destination:
 
 The runner reads the destination SHA again immediately before publication, rejects behind or diverged history, and verifies that the resulting remote SHA equals local HEAD. It never creates a commit or includes dirty files.
 
-`--remote <name>` selects an explicit remote. `--remote-branch <short-name>` is reserved for an already-authorized resolver publishing an isolated worktree HEAD to a known PR branch; the runner validates that branch name and applies the same expected-SHA checks.
+`--remote <name>` selects an explicit remote. `--remote-branch <short-name>` selects the already-authorized destination branch, including a resolver's recorded PR branch. It does not authorize another checkout or expand publication scope; the runner validates the branch name and applies the same expected-SHA checks.
 
 ## Recovery
 

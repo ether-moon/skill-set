@@ -1,1 +1,3 @@
 I have a feature branch with several commits ahead of main. Generate the PR title and body that would be used. Do NOT create a PR or push. Inspect committed scope through the supported workflow, then replace the exact sentinels in `outputs/pr-title.txt` and `outputs/pr-body.md`; do not create other files. The scaffold has already created the main and feature branches with three feature commits.
+
+Use Korean for conversation. Repository policy requires English commit messages, PR titles, and PR bodies. No tests have been executed in this session; distinguish existing test coverage from checks actually run. Choose the body structure appropriate to the change.

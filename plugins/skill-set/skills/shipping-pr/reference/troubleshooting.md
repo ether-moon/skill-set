@@ -22,11 +22,11 @@ Pending, cancelled, unknown, and timed-out checks are never clean. Report their 
 
 ## Automated reviewer absent
 
-Reviewer detection cannot be overridden. Report the detected provider, its current state, and the review deadline. An active CodeRabbit reviewer without current-HEAD status/check evidence remains pending until that deadline. On later cycles, absent Claude or Codex evidence becomes `not_expected`; do not post a review command to manufacture a completion signal.
+Reviewer detection cannot be overridden. Report provider state as telemetry only; missing or pending provider evidence never creates a review wait or timeout. The deprecated review deadline does not gate completion. A reviewer matters only through an effective required check, an additionally selected optional check, an actionable thread, or a substantive current-HEAD review body found by the bounded final sweep. Do not post a review command to manufacture a completion signal.
 
 ## Resolver failure
 
-Do not push partial commits. Preserve the isolated worktree and branch, report their paths and the expected remote SHA, and transition to `awaiting_user` or `failed`.
+Do not push partial commits. Preserve the recorded current worktree and branch, report their paths and the expected remote SHA, and transition to `awaiting_user` or `failed`. Do not create a replacement checkout.
 
 ## PR head or remote binding changed
 

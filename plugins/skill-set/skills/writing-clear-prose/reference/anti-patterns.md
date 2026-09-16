@@ -18,7 +18,7 @@ Sources: Orwell, Strunk & White, [tropes.fyi](https://tropes.fyi/tropes-md), [Wi
 
 ## AI Vocabulary
 
-These words and phrases signal AI-generated text. Avoid or replace.
+Treat these as editing prompts, not evidence of authorship. Revise wording only when it adds filler, obscures meaning, or overstates the source; preserve precise technical terms and exact quotations.
 
 ### Cliche Phrases
 
@@ -69,11 +69,11 @@ Inventing specific numbers, percentages, or metrics to appear concrete when no r
 
 | Fabricated | Fix |
 |---|---|
-| "Reduced load time by 47%." (no benchmark run) | "Reduced load time." or "Reduced load time noticeably." |
-| "3x throughput improvement." (no measurement) | "Throughput improved after the refactor." |
-| "Saved the team 20 hours per sprint." (no tracking) | "Reduced manual work for the team." |
+| "Reduced load time by 47%." (no benchmark or observation) | Report the known change and say load-time impact is unmeasured |
+| "3x throughput improvement." (no measurement or observation) | Report the refactor and say throughput impact is unknown |
+| "Saved the team 20 hours per sprint." (no tracking or observation) | Describe the automated steps; do not claim time savings |
 
-**Rule**: Numbers require sources. If you can't link a number to a benchmark, profiling result, user requirement, or documented threshold, delete it. Qualitative descriptions are honest; fabricated metrics are misinformation.
+**Rule**: Both numbers and qualitative outcomes require sources. If no evidence supports improvement, removing its magnitude is insufficient: remove the improvement claim. Preserve supplied observations with their attribution and uncertainty, and do not infer causation.
 
 ### Assertive Verification Narrative
 
@@ -135,10 +135,10 @@ Limit to 1 per document. Never in sequence.
 
 **Pattern**: Appending a present participle phrase that adds no substance.
 
-Both tropes.fyi and Wikipedia flag this — Wikipedia found it in 100% of AI articles and 0% of human articles. The strongest single indicator.
+Delete a trailing phrase when it adds no supported information; grammar alone does not establish authorship or quality.
 
 - Before: "Response time improved by 40%, highlighting the importance of caching."
-- Fix: "Response time improved by 40%. The bottleneck was repeated database queries that caching eliminated."
+- Fix: "Response time improved by 40%." Keep the measurement only if supplied; do not add an unverified cause.
 - Before: "The team shipped three features, showcasing their dedication."
 - Fix: "The team shipped three features." (or explain what made it notable)
 

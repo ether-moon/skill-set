@@ -1,6 +1,6 @@
 # Revision Checklist
 
-Revise in this order — always structure before style. Fixing a sentence that belongs in a different section wastes effort.
+For a substantial revision, address structure before style. For a focused edit, use only the applicable checks and preserve the requested scope.
 
 ## Pass 1: Structure
 
@@ -20,16 +20,16 @@ Check the document's skeleton before touching any prose.
 
 ## Pass 2: Clarity
 
-Ensure every sentence communicates unambiguously to a context-zero reader.
+Ensure the intended audience can follow the document without access to the current conversation.
 
-- [ ] **Context zero**: A reader with no prior knowledge can follow the argument
+- [ ] **Audience context**: Supply missing context without re-teaching knowledge the user says the audience has
 - [ ] **Concrete over abstract**: Every abstract claim has a specific example, data point, or measurement
 - [ ] **Terms defined**: Technical terms and acronyms explained on first use
 - [ ] **Antecedents clear**: Every pronoun has an unambiguous referent in the same paragraph
 - [ ] **Transcreation applied**: Foreign-language sources and domain jargon adapted naturally
 - [ ] **Steel man present**: Opposing viewpoints presented in strongest form (for persuasive text)
 
-**Action**: Add examples, definitions, and context. Replace vague claims with specifics.
+**Action**: Add only supported examples, definitions, and context needed by this audience. Unknown evidence remains unknown.
 
 ## Pass 3: Style
 
@@ -45,7 +45,7 @@ Polish prose after structure and clarity are solid.
 - [ ] **Hedging minimal**: One hedge per claim maximum ("might", "could", "potentially")
 - [ ] **No stakes inflation**: Claims of importance backed by evidence, not assertion
 
-**Action**: Cut words, activate verbs, remove cliches and AI sentence patterns. Aim for 10-20% word count reduction.
+**Action**: Cut words that add no meaning, activate verbs, and remove filler. Do not target a word-count reduction unless the user requested one; preserve qualifications and facts.
 
 ## Pass 4: Consistency
 
@@ -63,7 +63,7 @@ Final polish for mechanical correctness.
 
 ## Section-by-Section Feedback Pattern
 
-When revising someone else's text, provide structured feedback per section:
+When the user requests section-by-section feedback, this format can help. Otherwise return the requested revision with a concise summary of material changes:
 
 ```
 ## Section: [Section Title]
@@ -78,7 +78,7 @@ Suggested revision:
 
 ## Versioning Guidance
 
-Track substantive revisions:
+When the document already has a revision-history convention, follow it for substantive revisions. Do not create version metadata merely to record a prose edit:
 
 - **Structural changes** (sections moved, added, or removed): Note in revision history
 - **Clarity changes** (examples added, terms defined): Minor revision
@@ -88,7 +88,7 @@ Track substantive revisions:
 ## When to Stop Revising
 
 Stop when:
-- All 4 passes complete with no remaining issues
+- Applicable checks are complete with no remaining issues
 - Further changes would be preference, not improvement
 - The document achieves its stated purpose (Step 1 of drafting)
 

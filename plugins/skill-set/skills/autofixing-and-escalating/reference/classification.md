@@ -2,6 +2,8 @@
 
 Detailed guidance for applying the OBVIOUS vs AMBIGUOUS classification. Use this when the primary criteria in SKILL.md leave a borderline case.
 
+Verify each finding against the target before using an example. A failure identifies a symptom, not necessarily the correct fix. These examples assume no always-AMBIGUOUS rule applies and the surrounding contract establishes exactly one resolution.
+
 ## Table of Contents
 
 - [Criteria Pass/Fail Examples](#criteria-passfail-examples)
@@ -39,14 +41,15 @@ Detailed guidance for applying the OBVIOUS vs AMBIGUOUS classification. Use this
 
 | Pass | Fail |
 |------|------|
-| Null check prevents guaranteed crash | Adding a log statement (some prefer silent, some verbose) |
+| Null check restores the documented missing-user response | Null is possible but its required response is unspecified |
 | Removing dead code with zero references | Choosing between two valid error-handling strategies |
 | Fixing SQL injection with parameterized query | Deciding whether to inline or extract a helper function |
 
 ## Domain-Specific Examples
 
 ### PR Review Comments
-- **OBVIOUS**: "@reviewer points out `user.name` is accessed without null check and the type allows null" — one fix, no debate
+- **OBVIOUS**: "`user.name` is accessed without a null check; the API contract and existing tests require the established not-found response" — restore that response
+- **AMBIGUOUS**: "`user` may be null" with no specified behavior — verify whether absence should return, throw, or use another documented path before editing
 - **AMBIGUOUS**: "@reviewer suggests using the repository pattern instead of direct DB calls" — architectural choice
 
 ### Linter Warnings
@@ -58,7 +61,8 @@ Detailed guidance for applying the OBVIOUS vs AMBIGUOUS classification. Use this
 - **AMBIGUOUS**: "Weak hash algorithm: MD5 used for password storage" — which algorithm? bcrypt? argon2? scrypt? Migration strategy?
 
 ### Test Failures
-- **OBVIOUS**: "Expected `true` but got `false` — assertion uses wrong comparator (`==` vs `===`)" — fix the comparator
+- **OBVIOUS**: A failing assertion exposes a production typo against an unchanged, documented requirement — fix the production typo and preserve the assertion
+- **AMBIGUOUS**: "Expected `true` but got `false`" with no established expected behavior — inspect the requirement, implementation, and test; do not rewrite the assertion just to pass
 - **AMBIGUOUS**: "Flaky test: passes 90% of runs — suspected race condition" — fix timing? add retry? restructure test? mock the dependency?
 
 ## Edge Cases
@@ -71,7 +75,7 @@ When a single issue contains both an obvious fix and an ambiguous suggestion, sp
 
 Because an AMBIGUOUS portion exists, complete its decision gate before applying either portion. After the decision is complete, automatically apply the queued OBVIOUS fix and the selected AMBIGUOUS resolution without another confirmation.
 
-**Example**: "Fix the null check (line 42) and also consider restructuring this into a guard clause pattern"
+**Example**: "Restore the documented not-found response with a null check (line 42) and also consider restructuring this into a guard clause pattern"
 - OBVIOUS: Add the null check
 - AMBIGUOUS: Restructure into guard clause (design choice)
 

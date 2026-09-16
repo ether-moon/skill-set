@@ -36,7 +36,7 @@ Repeat `--path` as needed, omit scope flags for the current index, or use explic
 
 ## 4. Prepare the Message File
 
-Match the repository's recent subject style and the user's language. Describe only the previewed diff. Include a ticket identifier from the branch only when it is actually present.
+Match the repository's recent subject style and the artifact-language policy in `SKILL.md`. Describe only the previewed diff. Include a ticket identifier from the branch only when it is actually present.
 
 Allocate a private file owned by the runner:
 
@@ -56,10 +56,10 @@ Use the fingerprint returned by the latest inspection:
 <git-runner> commit \
   --expected-index "<index-fingerprint>" \
   --path path/to/file \
-  --message-file /tmp/commit-message.txt
+  --message-file "<managed-message-file>"
 ```
 
-Use the same scope selected and previewed earlier. On success, report `commit.sha`, `commit.subject`, and `pushed:false`.
+Replace `<managed-message-file>` with the exact path returned by `input-prepare`; arbitrary temporary paths are not managed inputs. Use the same scope selected and previewed earlier. On success, report `commit.sha`, `commit.subject`, and `pushed:false`.
 
 The runner consumes the managed message allocation after a successful commit. If the user cancels first, call `input-discard --input-file <managed-path>`.
 

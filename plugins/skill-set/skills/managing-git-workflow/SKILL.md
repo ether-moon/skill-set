@@ -49,7 +49,7 @@ Do not infer one capability from another. A commit request does not authorize pu
 
 ## Language Detection
 
-Detect the user's language from the current conversation, project instructions, and recent commit subjects returned by `inspect`. Default to English. Adapt user-facing messages, commit messages, and PR text; keep commands, paths, and technical identifiers in English.
+Use the user's language for conversation. For commit messages and PR titles/bodies, follow an explicit artifact-language instruction or the repository's language policy first; otherwise use the user's language, then recent repository convention, then English. Match recent commit style without overriding the applicable language policy. Keep commands, paths, and technical identifiers exact.
 
 ## Safety Invariants
 
