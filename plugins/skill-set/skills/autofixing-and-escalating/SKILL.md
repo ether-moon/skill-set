@@ -1,6 +1,6 @@
 ---
 name: autofixing-and-escalating
-description: Classifies actionable findings from linters, tests, security scans, audits, and PR reviews, automatically applies unambiguous fixes, and pauses only for decisions required by ambiguous findings before applying the complete chosen resolution. Use when processing one or more externally produced findings with the intent to resolve them.
+description: Classifies actionable findings from linters, tests, security scans, audits, and PR reviews, automatically applies unambiguous fixes, and pauses only for decisions required by ambiguous findings before applying the complete chosen resolution. Use when processing one or more externally produced findings with the intent to resolve them; not for analysis-only reports or collaborative planning without authorized fixes.
 ---
 
 # Autofixing and Escalating
@@ -78,7 +78,7 @@ Severity affects ordering, never mutation authority.
 
 ## Workflow
 
-1. **Normalize** — deduplicate findings and record source, target, and scope.
+1. **Normalize** — deduplicate findings and record source, target, and scope. Preserve differing source positions, supporting evidence, and conditions when merging related findings; agreement alone does not verify correctness or settle a user decision.
 2. **Classify** — mark every finding OBVIOUS, AMBIGUOUS, or SKIP before mutation.
 3. **Decide** — if any item is AMBIGUOUS, pause before any mutation. Present every unresolved AMBIGUOUS item in one escalation batch, using the format below, then wait once for the user's answers. If some decisions remain unresolved, present all of them together in the next batch. Do not ask for approval of OBVIOUS fixes or for a generic proceed confirmation.
 4. **Resolve** — when no AMBIGUOUS item exists, apply all OBVIOUS fixes immediately. Otherwise, after every required decision is complete, automatically apply all queued OBVIOUS fixes and every selected AMBIGUOUS resolution in one bounded pass without another confirmation.
@@ -96,6 +96,7 @@ Severity: CRITICAL | MAJOR | MINOR
 Evidence: <finding and verified context>
 Why this matters: <consequence, downstream choice, or failure mode>
 Why ambiguous: <trade-off or missing policy decision>
+Source positions: <attributed options, reasons, and conditions when multiple sources differ>
 Options:
 1. <option>
 2. <option>

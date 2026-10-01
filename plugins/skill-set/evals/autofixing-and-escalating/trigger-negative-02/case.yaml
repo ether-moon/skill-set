@@ -5,7 +5,7 @@ tags:
   - autofixing-and-escalating
   - trigger-negative
 execution:
-  prompt: "Rename the local variable on line 12 to customerId."
+  prompt: "Process these six CodeRabbit review comments: classify every item, show what is obvious versus ambiguous, and do not edit anything yet."
   max_turns: 4
   timeout_seconds: 180
   allowed_tools:

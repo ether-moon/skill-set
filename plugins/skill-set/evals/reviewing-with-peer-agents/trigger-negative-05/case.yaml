@@ -5,7 +5,7 @@ tags:
   - reviewing-with-peer-agents
   - trigger-negative
 execution:
-  prompt: "Find ranked refactor candidates in this package."
+  prompt: "Have Codex and Claude independently design a retry policy, debate each other over several rounds, and produce a joint proposal."
   max_turns: 4
   timeout_seconds: 180
   allowed_tools:

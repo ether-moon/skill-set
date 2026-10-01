@@ -180,7 +180,17 @@ case_inventory=$(ruby -rjson -ryaml -e '
       next false unless frontmatter
       YAML.safe_load(frontmatter, permitted_classes: [], permitted_symbols: [], aliases: false)["type"] == "llm"
     end
-    {name: parsed["name"], qualitative_graders: graders.count { |grader| grader["type"] == "llm" } + linked_graders}
+    budget_file = File.join(File.dirname(file), "model-budget.json")
+    additional_calls = 0
+    if File.exist?(budget_file)
+      budget = JSON.parse(File.read(budget_file))
+      abort "invalid model budget: #{budget_file}" unless
+        budget.is_a?(Hash) && budget.keys == ["additional_calls_per_run"] &&
+        budget["additional_calls_per_run"].is_a?(Integer) && budget["additional_calls_per_run"] >= 0
+      additional_calls = budget.fetch("additional_calls_per_run")
+    end
+    {name: parsed["name"], qualitative_graders: graders.count { |grader| grader["type"] == "llm" } + linked_graders,
+     additional_calls: additional_calls}
   end
   abort "duplicate or invalid eval case names" unless cases.all? { |item| item[:name].is_a?(String) && !item[:name].empty? } && cases.map { |item| item[:name] }.uniq.length == cases.length
   puts JSON.generate(cases)
@@ -197,6 +207,9 @@ fi
 case_count=$(jq 'length' <<<"$selected_cases")
 arm_count=${#arms[@]}
 judge_calls=$((qualitative_graders * arm_count * trials))
+additional_calls=$(jq --argjson selected "$selected_cases" \
+  '[.[] | select(.name as $name | $selected | index($name)) | .additional_calls] | add // 0' <<<"$case_inventory")
+other_calls=$((additional_calls * arm_count * trials))
 normalized_model=$(printf '%s' "$model" | tr '[:upper:]' '[:lower:]')
 normalized_judge=$(printf '%s' "$judge_model" | tr '[:upper:]' '[:lower:]')
 if ((judge_calls > 0)) && [[ $normalized_model == "$normalized_judge" ]]; then
@@ -209,6 +222,7 @@ planner_args=(
   --arms "$arm_count"
   --trials "$trials"
   --judge-calls "$judge_calls"
+  --other-calls "$other_calls"
   --max-calls "$max_calls"
   --max-total-tokens "$max_total_tokens"
   --json
@@ -249,6 +263,11 @@ fi
 if [[ $plan_only == true ]]; then
   printf '%s\n' "$eval_plan"
   exit 0
+fi
+
+if ((other_calls > 0)); then
+  printf 'The current eval adapter cannot verify delegated model-call traces. Use --plan for budget inspection; live execution requires a trace-capable adapter.\n' >&2
+  exit 2
 fi
 
 require_command claude

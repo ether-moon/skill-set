@@ -1,0 +1,19 @@
+schema_version: "1.1"
+name: deliberating-with-peer-agents-trigger-positive-05
+description: Should select deliberating-with-peer-agents for a representative request
+tags:
+  - deliberating-with-peer-agents
+  - trigger-positive
+execution:
+  prompt: "Let three model sessions propose designs and respond to each other repeatedly; show me their positions on unresolved decisions."
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 1
+graders:
+  - type: tool_used
+    name: selected-deliberating-with-peer-agents
+    tool: Skill
+    input_match: "deliberating-with-peer-agents"
+    min: 1

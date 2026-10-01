@@ -1,0 +1,21 @@
+schema_version: "1.1"
+name: deliberating-with-peer-agents-trigger-negative-07
+description: Should not select deliberating-with-peer-agents for a near-miss request
+tags:
+  - deliberating-with-peer-agents
+  - trigger-negative
+execution:
+  prompt: "Summarize this research paper without contacting another model."
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 1
+graders:
+  - type: tool_used
+    name: did-not-select-deliberating-with-peer-agents
+    tool: Skill
+    input_match: "deliberating-with-peer-agents"
+    min: 0
+    max: 0
+    arm: both

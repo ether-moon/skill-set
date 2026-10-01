@@ -1,0 +1,19 @@
+schema_version: "1.1"
+name: deliberating-with-peer-agents-trigger-positive-03
+description: Should select deliberating-with-peer-agents for a representative request
+tags:
+  - deliberating-with-peer-agents
+  - trigger-positive
+execution:
+  prompt: "Ask OpenAI and Anthropic models to research these alternatives independently and debate the results before synthesizing them."
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 1
+graders:
+  - type: tool_used
+    name: selected-deliberating-with-peer-agents
+    tool: Skill
+    input_match: "deliberating-with-peer-agents"
+    min: 1

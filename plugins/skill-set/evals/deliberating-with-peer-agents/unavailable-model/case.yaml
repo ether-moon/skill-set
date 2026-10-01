@@ -1,0 +1,18 @@
+schema_version: "1.1"
+name: deliberating-with-peer-agents-unavailable-model
+description: Preserves an explicit provider and model request when the host cannot run it
+tags:
+  - deliberating-with-peer-agents
+  - functional
+execution:
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 1
+graders:
+  - type: tool_used
+    name: selected-deliberating-with-peer-agents
+    tool: Skill
+    input_match: deliberating-with-peer-agents
+    min: 1

@@ -5,7 +5,7 @@ tags:
   - autofixing-and-escalating
   - trigger-positive
 execution:
-  prompt: "Review these eight failing-test diagnostics from CI and separate mechanically correct fixes from decisions that need me."
+  prompt: "Resolve these eight failing-test diagnostics from CI, separating mechanically correct fixes from decisions that need me."
   max_turns: 4
   timeout_seconds: 180
   allowed_tools:

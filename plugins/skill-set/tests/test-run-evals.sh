@@ -41,6 +41,35 @@ jq -e '
 [[ ! -s $root_log ]] || fail "preflight rejection invoked the model executor"
 [[ ! -e $test_root/rejected-results/candidate.json ]] || fail "preflight rejection produced model output"
 
+set +e
+PATH="$test_root/bin:$PATH" "$runner" \
+  --plan --case deliberating-with-peer-agents-parallel-rounds \
+  >"$test_root/peer-plan.json" 2>"$test_root/peer-plan.stderr"
+peer_plan_status=$?
+set -e
+assert_equals 2 "$peer_plan_status" "peer calls must exceed the default budget"
+jq -e '
+  .allowed == false and .other_calls == 6 and
+  .total_calls == 8 and .projected_tokens == 200000
+' "$test_root/peer-plan.json" >/dev/null
+
+peer_plan=$("$runner" --plan --case deliberating-with-peer-agents-parallel-rounds \
+  --max-calls 8 --max-total-tokens 200000)
+jq -e '.budget.allowed == true and .budget.other_calls == 6 and .budget.total_calls == 8' \
+  <<<"$peer_plan" >/dev/null
+
+set +e
+PATH="$test_root/bin:$PATH" FAKE_CLAUDE_ROOT_LOG="$root_log" \
+  "$runner" --case deliberating-with-peer-agents-parallel-rounds \
+  --max-calls 8 --max-total-tokens 200000 \
+  >"$test_root/peer-execution.stdout" 2>"$test_root/peer-execution.stderr"
+peer_execution_status=$?
+set -e
+assert_equals 2 "$peer_execution_status" "unsupported delegated trace execution must stop"
+grep -Fq 'cannot verify delegated model-call traces' "$test_root/peer-execution.stderr" || \
+  fail 'missing delegated trace limitation'
+[[ ! -s $root_log ]] || fail 'unsupported peer eval invoked the model executor'
+
 allowed_plan=$(PATH="$test_root/bin:$PATH" "$runner" \
   --plan \
   --stage focused-comparison \
@@ -74,6 +103,7 @@ jq -e '
   .allowed == false and
   .execution_calls > 4 and
   .judge_calls > 0 and
+  .other_calls == 36 and
   .total_calls > .execution_calls and
   .projected_tokens > .max_total_tokens and
   (.reasons | length) == 2
@@ -200,9 +230,13 @@ jq -e '
   (.reasons | any(contains("trials")))
 ' "$test_root/mismatched-summary.json" >/dev/null
 
+# Exercise the campaign adapter with cases whose traces it supports.
+cp -R -- "$plugin_dir" "$test_root/campaign-candidate"
+rm -rf -- "$test_root/campaign-candidate/evals/deliberating-with-peer-agents/parallel-rounds"
 PATH="$test_root/bin:$PATH" FAKE_CLAUDE_ROOT_LOG="$root_log" \
   "$runner" \
     --stage campaign \
+    --candidate "$test_root/campaign-candidate" \
     --reason 'Run the explicitly approved release campaign.' \
     --runs 1 \
     --max-calls 1000 \
