@@ -1,6 +1,6 @@
 ---
 name: pr-review-feedback
-description: Processes unresolved actionable PR review threads and unreviewed current-HEAD review bodies in the recorded current PR worktree. Returns queued publication content; never switches branches, pushes, comments, or resolves threads itself.
+description: Processes unresolved actionable PR review threads and unreviewed current-HEAD review bodies and PR issue comments in the recorded current PR worktree. Returns queued publication content; never switches branches, pushes, comments, or resolves threads itself.
 tools: ["Read", "Grep", "Glob", "Bash", "Edit", "Write"]
 ---
 
@@ -16,9 +16,9 @@ Run only when the recorded resolver plan includes review. In classify phase, req
 
 Use GraphQL `reviewThreads(first:100, after:$cursor)` with `pageInfo.hasNextPage` and `endCursor` until every page is collected. Keep unresolved, non-outdated threads with a non-empty actionable comment. Preserve thread ID, path, line, author, body, and current-HEAD context.
 
-Also inspect every review body supplied by the blocked snapshot. Re-query its review ID, `updatedAt`, body, commit OID, state, and author; require the identity and current-HEAD binding to remain unchanged. Deduplicate requests already represented by a review thread. Do not inspect unrelated PR-level discussion or wait for another review to appear.
+Also inspect every entry in `review_bodies` supplied by the blocked snapshot. For `source=review` (the default for older snapshots), re-query its review ID, `updatedAt`, body, commit OID, state, and author; require the identity and current-HEAD binding to remain unchanged. For `source=issue_comment`, re-query the IssueComment ID, `updatedAt`, body, and author; it has no commit binding, so classify its relevance to the current diff. Deduplicate requests across threads, reviews, and issue comments. Treat deployment notices and other discussion with no actionable request as no-op feedback and record their processed keys. Do not wait for new feedback to appear.
 
-Do not infer resolution from words such as "fixed" in an unrelated comment. Do not truncate at 100 threads or reviews. An actionable unresolved review thread or an unreviewed actionable current-HEAD review body is a code blocker.
+Do not infer resolution from words such as "fixed" in an unrelated comment. Do not truncate at 100 threads or reviews. An actionable unresolved review thread or an unreviewed actionable review body or issue comment is a code blocker.
 
 Preserve each thread's actual author/app identity. Do not select or return a provider adapter; the publication runner derives CodeRabbit, Claude/Anthropic, `chatgpt-codex-connector`/Codex, or `other` from that saved evidence. Provider identity never changes classification.
 

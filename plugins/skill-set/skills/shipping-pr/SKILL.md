@@ -31,7 +31,7 @@ Do not use for:
 | `--ci-timeout` | 30 minutes | Current-HEAD check deadline |
 | `--review-timeout` | 10 minutes | Deprecated compatibility input; it does not gate completion |
 | `--no-create` | off | Refuse to create a missing PR |
-| `--required-only` | true | Enforce effective required checks only; `false` additionally selects observed optional checks |
+| `--required-only` | true | Enforce required check outcomes; `false` also enforces optional outcomes. Always wait for all observed checks |
 
 ## Common Scenarios
 
@@ -39,7 +39,7 @@ Do not use for:
 - “Ship this branch even though it is behind main” commits and publishes the current branch state, then lets the normal blocker cycle resolve any base conflict.
 - “Keep resolving without extra checkouts” reconciles and fixes the PR in the currently checked-out worktree and branch.
 - “Resume PR 42” loads the active run and branches on its persisted status/publication phase without starting a duplicate resolver.
-- “Is this PR truly clean?” snapshots the same HEAD across effective required checks, paginated threads, and mergeability. Automatic reviewer-discovery telemetry is reported without affecting the verdict.
+- “Is this PR truly clean?” snapshots the same HEAD across all observed checks, required outcomes, paginated feedback, and mergeability. Automatic reviewer-discovery telemetry is reported without affecting the verdict.
 
 ## Workflow
 
@@ -77,7 +77,7 @@ Convert minute flags to seconds, then run:
   --required-only "$REQUIRED_ONLY"
 ```
 
-Reviewer discovery is always automatic and reporting-only. The runner detects CodeRabbit, Claude, and `chatgpt-codex-connector` from recent merged-PR activity, but their absent, pending, or failed telemetry never affects status, deadlines, or blocker fingerprints. Do not ask the user to select an adapter or pass reviewer-specific flags. A review-related status or check gates completion only when it is an effective required context; `--required-only false` intentionally broadens the selected set to every observed check. Existing actionable review threads still participate through the review-thread gate. Separately, once checks, mergeability, and review threads would otherwise permit `clean`, the snapshot performs one bounded sweep of non-empty review bodies already attached to the current HEAD. It never waits for a review body to appear.
+Reviewer discovery is always automatic and reporting-only. The runner detects CodeRabbit, Claude, and `chatgpt-codex-connector` from recent merged-PR activity, but their absent, pending, or failed telemetry never affects status, deadlines, or blocker fingerprints. Do not ask the user to select an adapter or pass reviewer-specific flags. Every observed status or check must finish, including optional review workflows. Required failures block; `--required-only false` also blocks on optional failures. Reviewer discovery does not replace this check gate. Existing actionable review threads still participate through the review-thread gate. Separately, once checks, mergeability, and review threads would otherwise permit `clean`, the snapshot performs one bounded sweep of non-empty current-HEAD review bodies and PR issue comments. It never waits for new feedback to appear. Both sources use `review_bodies` and processed keys; issue comments have `source=issue_comment` and no commit binding, so the resolver checks their relevance to the current diff.
 
 Use `--resume` only when the runner reports an active run. State lives under the repository's Git common directory, so linked worktrees share one lock and one run. Branch on the returned status: snapshot only `polling`; handle `blocked`, `awaiting_user`, and `resolving` before polling again. A resumed `resolving` run must use its recorded `resolution` metadata, including `decision_requirements` and `decisions`, and must never dispatch a duplicate resolver. Resume a journaled `prepared`, `gate_passed`, or `commenting` publication by calling `publish` with the unchanged files; the runner reconciles the remote HEAD and hidden comment marker. If its phase is `pending`, report the recorded worktree/branch and treat the interrupted attempt as `partial-failure`. A resumed `awaiting_user` run remains paused with its saved result and recovery paths until the user explicitly decides every recorded ID.
 
@@ -97,7 +97,7 @@ Read `headRefOid`, `headRefName`, `headRepository.nameWithOwner`, `baseRefOid`, 
 
 Fetch the exact PR HEAD and base SHAs without checking out another branch. Preserve the complete current branch state. If new authorized working-tree changes exist, commit them through the Git runner before resolver classification. When local and remote PR history differ, reconcile it in place and continue: fast-forward the current branch when local HEAD is an ancestor of the fetched PR HEAD; keep local commits when the remote HEAD is their ancestor; otherwise merge the fetched exact PR HEAD into the current branch without rebasing. Resolve reconciliation conflicts under the same decision gate and preserve genuinely ambiguous conflicts for the user's decision. Re-read a concurrently changed PR HEAD and repeat this reconciliation instead of creating another checkout or stopping merely because the SHAs differ.
 
-Bind `$REMOTE` to a push URL whose canonical host and `owner/repo` equal the PR head repository; for a fork PR this is normally a fork remote, not the base repository's `origin`. Select the ordered resolver plan: merge alone for a base conflict; otherwise CI first when checks failed, then review when actionable threads or unreviewed current-HEAD review bodies exist.
+Bind `$REMOTE` to a push URL whose canonical host and `owner/repo` equal the PR head repository; for a fork PR this is normally a fork remote, not the base repository's `origin`. Select the ordered resolver plan: merge alone for a base conflict; otherwise CI first when checks failed, then review when actionable threads or unreviewed review bodies or issue comments exist.
 
 Transition from `blocked` to `resolving` with the returned `run_id`, `--increment-cycle`, one `--resolver-agent` per planned agent, and all recovery fields:
 
@@ -149,19 +149,19 @@ Declare clean only when one snapshot confirms all of the following for the same 
 
 - no merge conflict;
 - every effective required check context is present and `pass` or `skipping`;
-- every additionally selected optional check is `pass` or `skipping`;
-- no fail, cancel, pending, or timeout result;
+- every observed check has finished, including optional checks;
+- no selected fail/cancel result, missing required check, pending check, or timeout;
 - GitHub mergeability is known;
 - no unresolved actionable review thread;
-- no unreviewed substantive review body attached to the current HEAD;
+- no unreviewed substantive current-HEAD review body or PR issue comment;
 
-An effective required context that has not appeared on the current HEAD is `pending`, not absent from the verdict. Auto-detected reviewer signals are telemetry only and never override this rule; a reviewer affects the verdict only through a required check context, an existing actionable thread, or a substantive current-HEAD review body found by the final sweep. Absence of such a body never delays completion. `mergeStateStatus=BLOCKED` is reported but does not independently gate completion because it can include approval requirements outside the required check set.
+An effective required context that has not appeared on the current HEAD is `pending`, not absent from the verdict. Auto-detected reviewer signals are telemetry only and never override this rule; reviewer feedback affects the verdict through the all-check completion gate, selected check outcomes, actionable threads, or review bodies and issue comments found by the final sweep. Absence of such a body never delays completion. `mergeStateStatus=BLOCKED` is reported but does not independently gate completion because it can include approval requirements outside the required check set.
 
 If HEAD changes, discard the old results. The runner resets the check deadline and check-registration grace before snapshotting the new HEAD.
 
 ## Output
 
-Use the user's language for progress and the final report. Include PR URL/number, terminal status, HEAD, cycle count, check summary, review-thread count, unreviewed review-body count, and preserved recovery path if resolution failed. Keep commands, state names, and file paths in English.
+Use the user's language for progress and the final report. Include PR URL/number, terminal status, HEAD, cycle count, selected check summary and all observed checks, review-thread count, unreviewed review-body count, and preserved recovery path if resolution failed. Keep commands, state names, and file paths in English.
 
 ## Safety Rules
 

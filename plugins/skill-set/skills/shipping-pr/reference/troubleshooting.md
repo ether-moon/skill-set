@@ -18,11 +18,11 @@ A resumed `resolving` state must use `.resolution.worktree`, `.resolution.branch
 
 ## Pending or unknown checks
 
-Pending, cancelled, unknown, and timed-out checks are never clean. Report their buckets and deadline. Do not dispatch a code resolver for a merely pending check.
+Pending, unknown, and timed-out checks are never clean, including optional checks. Failed or cancelled selected checks block. Report their buckets and deadline. Do not dispatch a code resolver for a merely pending check.
 
 ## Automated reviewer absent
 
-Reviewer detection cannot be overridden. Report provider state as telemetry only; missing or pending provider evidence never creates a review wait or timeout. The deprecated review deadline does not gate completion. A reviewer matters only through an effective required check, an additionally selected optional check, an actionable thread, or a substantive current-HEAD review body found by the bounded final sweep. Do not post a review command to manufacture a completion signal.
+Reviewer detection cannot be overridden. Report provider state as telemetry only; missing or pending provider evidence never creates a review wait or timeout. The deprecated review deadline does not gate completion. Every observed check must finish regardless of reviewer detection. A reviewer can also block through a failed selected check, an actionable thread, or unreviewed substantive feedback from the bounded review-body and issue-comment sweep. Do not post a review command to manufacture a completion signal.
 
 ## Resolver failure
 

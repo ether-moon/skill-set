@@ -243,6 +243,8 @@ read_state() {
     (.checks_observed | type == "boolean") and
     ((.reviewed_review_keys // []) | type == "array") and
     all((.reviewed_review_keys // [])[]; type == "string" and length > 0) and
+    ((.published_comment_hashes // []) | type == "array") and
+    all((.published_comment_hashes // [])[]; type == "string" and length > 0) and
     (.options | type == "object") and
     (.options.ci_timeout_seconds | type == "number") and
     (.options.review_timeout_seconds | type == "number") and
@@ -401,8 +403,9 @@ gh_checks_json() {
   set -e
   error_output=$(<"$error_file")
   rm -f -- "$error_file"
-  if [[ $exit_code -eq 1 && $required == true && -z $output && \
-    $error_output == no\ required\ checks\ reported\ on\ the\ \'*\'\ branch ]]; then
+  if [[ $exit_code -eq 1 && -z $output && \
+    ( $error_output == no\ checks\ reported\ on\ the\ \'*\'\ branch || \
+      ( $required == true && $error_output == no\ required\ checks\ reported\ on\ the\ \'*\'\ branch ) ) ]]; then
     output='[]'
   fi
   case "$exit_code" in
@@ -876,80 +879,102 @@ collect_review_bodies() {
   local name=${repo#*/}
   local cursor=
   local pages=0
-  local response
+  local response connection source node body_hash ignored_ids
+  local published_hashes
+  published_hashes=$(jq -c '(.published_comment_hashes // [])' <<<"$STATE")
   # GraphQL variables must remain literal for gh to bind them.
   # shellcheck disable=SC2016
-  local query='query($owner:String!,$repo:String!,$number:Int!,$cursor:String){repository(owner:$owner,name:$repo){pullRequest(number:$number){reviews(first:100,after:$cursor){nodes{id state body submittedAt updatedAt commit{oid} author{login}}pageInfo{hasNextPage endCursor}}}}}'
+  local reviews_query='query($owner:String!,$repo:String!,$number:Int!,$cursor:String){repository(owner:$owner,name:$repo){pullRequest(number:$number){reviews(first:100,after:$cursor){nodes{id state body submittedAt updatedAt commit{oid} author{login}}pageInfo{hasNextPage endCursor}}}}}'
+  # shellcheck disable=SC2016
+  local comments_query='query($owner:String!,$repo:String!,$number:Int!,$cursor:String){repository(owner:$owner,name:$repo){pullRequest(number:$number){comments(first:100,after:$cursor){nodes{id body createdAt updatedAt author{login}}pageInfo{hasNextPage endCursor}}}}}'
+  local query
   REVIEW_BODY_DETAILS='[]'
+  for connection in reviews comments; do
+    cursor=
+    source=review
+    query=$reviews_query
+    if [[ $connection == comments ]]; then source=issue_comment; query=$comments_query; fi
 
-  while :; do
-    pages=$((pages + 1))
-    [[ $pages -le 1000 ]] || \
-      die pagination_limit "Review pagination exceeded 1000 pages." "Retry or inspect the GitHub API response."
-    if [[ -n $cursor ]]; then
-      response=$(gh_json api graphql -f query="$query" -F owner="$owner" -F repo="$name" \
-        -F number="$pr" -f cursor="$cursor")
-    else
-      response=$(gh_json api graphql -f query="$query" -F owner="$owner" -F repo="$name" \
-        -F number="$pr")
-    fi
-    validate_json_response "reviews GraphQL" "$response"
-    jq -e '
-      (.data.repository.pullRequest.reviews | type == "object") and
-      (.data.repository.pullRequest.reviews.nodes | type == "array") and
-      all(.data.repository.pullRequest.reviews.nodes[];
-        type == "object" and
-        (.id | type == "string" and length > 0) and
-        ((.state // "") | type == "string") and
-        ((.body // "") | type == "string") and
-        ((.submittedAt // "") | type == "string") and
-        ((.updatedAt // "") | type == "string" and length > 0) and
-        ((.commit? // {}) | type == "object") and
-        ((.commit?.oid? // "") | type == "string") and
-        ((.author?.login? // "") | type == "string")) and
-      (.data.repository.pullRequest.reviews.pageInfo | type == "object") and
-      (.data.repository.pullRequest.reviews.pageInfo.hasNextPage | type == "boolean") and
-      ((.data.repository.pullRequest.reviews.pageInfo.endCursor == null) or
-       (.data.repository.pullRequest.reviews.pageInfo.endCursor | type == "string"))
-    ' >/dev/null 2>&1 <<<"$response" || \
-      die invalid_github_response "GraphQL reviews returned an invalid nested shape." \
-        "Verify GitHub permissions, update gh, and retry."
-    REVIEW_BODY_DETAILS=$(jq -c --argjson existing "$REVIEW_BODY_DETAILS" \
-      --argjson reviewed "$reviewed_keys" --arg head "$head_sha" '
-      def non_actionable_body:
-        . as $raw
-        | ($raw | ascii_downcase | gsub("[[:punct:]]"; " ")
-          | gsub("[[:space:]]+"; " ")
-          | gsub("^[[:space:]]+|[[:space:]]+$"; "")) as $normalized
-        | ($raw | gsub("^[[:space:]]+|[[:space:]]+$"; "")) as $trimmed
-        | ((["lgtm","looks good","looks good to me","great work","great job",
-              "nice work","well done","thanks","thank you","approved","all good",
-              "ship it","summary","review summary","code review summary","walkthrough"]
-            | index($normalized)) != null)
-          or ((["👍","✅","🎉"] | index($trimmed)) != null);
-      $existing + [.data.repository.pullRequest.reviews.nodes[]?
-        | select((.commit.oid // "") == $head)
-        | select((.state // "") != "DISMISSED" and (.state // "") != "PENDING")
-        | (.body // "") as $body
-        | select((($body | gsub("^[[:space:]]+|[[:space:]]+$"; "")) | length) > 0)
-        | select(($body | non_actionable_body) | not)
-        | (.id + ":" + .updatedAt) as $key
-        | select(($reviewed | index($key)) == null)
-        | {key:$key,id:.id,author:(.author.login // ""),body:$body,state:(.state // ""),
-            submitted_at:(.submittedAt // ""),updated_at:.updatedAt,
-            commit_oid:(.commit.oid // "")}]
-      | sort_by(.key)
-    ' <<<"$response" 2>/dev/null) || \
-      die invalid_github_response "Unable to normalize GraphQL review bodies." \
-        "Inspect the GraphQL response shape and retry."
-    local has_next
-    has_next=$(jq -r '.data.repository.pullRequest.reviews.pageInfo.hasNextPage' \
-      <<<"$response" 2>/dev/null) || \
-      die invalid_github_response "Unable to read review pagination metadata." "Retry the snapshot."
-    [[ $has_next == true ]] || break
-    cursor=$(jq -er '.data.repository.pullRequest.reviews.pageInfo.endCursor' <<<"$response") || \
-      die invalid_github_response "Reviews indicated another page without an end cursor." \
-        "Retry after GitHub finishes computing review data."
+    while :; do
+      pages=$((pages + 1))
+      [[ $pages -le 1000 ]] || \
+        die pagination_limit "Review pagination exceeded 1000 pages." "Retry or inspect the GitHub API response."
+      if [[ -n $cursor ]]; then
+        response=$(gh_json api graphql -f query="$query" -F owner="$owner" -F repo="$name" \
+          -F number="$pr" -f cursor="$cursor")
+      else
+        response=$(gh_json api graphql -f query="$query" -F owner="$owner" -F repo="$name" \
+          -F number="$pr")
+      fi
+      validate_json_response "reviews GraphQL" "$response"
+      jq -e --arg connection "$connection" '
+        (.data.repository.pullRequest[$connection] | type == "object") and
+        (.data.repository.pullRequest[$connection].nodes | type == "array") and
+        all(.data.repository.pullRequest[$connection].nodes[];
+          type == "object" and
+          (.id | type == "string" and length > 0) and
+          ((.state // "") | type == "string") and
+          ((.body // "") | type == "string") and
+          ((.submittedAt // "") | type == "string") and
+          ((.updatedAt // "") | type == "string" and length > 0) and
+          ((.commit? // {}) | type == "object") and
+          ((.commit?.oid? // "") | type == "string") and
+          ((.author?.login? // "") | type == "string")) and
+        (.data.repository.pullRequest[$connection].pageInfo | type == "object") and
+        (.data.repository.pullRequest[$connection].pageInfo.hasNextPage | type == "boolean") and
+        ((.data.repository.pullRequest[$connection].pageInfo.endCursor == null) or
+         (.data.repository.pullRequest[$connection].pageInfo.endCursor | type == "string"))
+      ' >/dev/null 2>&1 <<<"$response" || \
+        die invalid_github_response "GraphQL reviews returned an invalid nested shape." \
+          "Verify GitHub permissions, update gh, and retry."
+      ignored_ids='[]'
+      if [[ $connection == comments && $published_hashes != '[]' ]]; then
+        while IFS= read -r node; do
+          body_hash=$(jq -j .body <<<"$node" | git hash-object --stdin)
+          if jq -e --arg hash "$body_hash" 'index($hash) != null' >/dev/null <<<"$published_hashes"; then
+            ignored_ids=$(jq -c --arg id "$(jq -r .id <<<"$node")" '. + [$id]' <<<"$ignored_ids")
+          fi
+        done < <(jq -c '.data.repository.pullRequest.comments.nodes[]' <<<"$response")
+      fi
+      REVIEW_BODY_DETAILS=$(jq -c --argjson existing "$REVIEW_BODY_DETAILS" \
+        --argjson reviewed "$reviewed_keys" --arg head "$head_sha" \
+        --arg connection "$connection" --arg source "$source" --argjson ignored "$ignored_ids" '
+        def non_actionable_body:
+          . as $raw
+          | ($raw | ascii_downcase | gsub("[[:punct:]]"; " ")
+            | gsub("[[:space:]]+"; " ")
+            | gsub("^[[:space:]]+|[[:space:]]+$"; "")) as $normalized
+          | ($raw | gsub("^[[:space:]]+|[[:space:]]+$"; "")) as $trimmed
+          | ((["lgtm","looks good","looks good to me","great work","great job",
+                "nice work","well done","thanks","thank you","approved","all good",
+                "ship it","summary","review summary","code review summary","walkthrough"]
+              | index($normalized)) != null)
+            or ((["👍","✅","🎉"] | index($trimmed)) != null);
+        $existing + [.data.repository.pullRequest[$connection].nodes[]?
+          | .id as $id | select(($ignored | index($id)) == null)
+          | select($source == "issue_comment" or (.commit.oid // "") == $head)
+          | select((.state // "") != "DISMISSED" and (.state // "") != "PENDING")
+          | (.body // "") as $body
+          | select((($body | gsub("^[[:space:]]+|[[:space:]]+$"; "")) | length) > 0)
+          | select(($body | non_actionable_body) | not)
+          | (.id + ":" + .updatedAt) as $key
+          | select(($reviewed | index($key)) == null)
+          | {key:$key,id:.id,source:$source,author:(.author.login // ""),body:$body,state:(.state // ""),
+              submitted_at:(.submittedAt // .createdAt // ""),updated_at:.updatedAt,
+              commit_oid:(.commit.oid // "")}]
+        | sort_by(.key)
+      ' <<<"$response" 2>/dev/null) || \
+        die invalid_github_response "Unable to normalize GraphQL review bodies." \
+          "Inspect the GraphQL response shape and retry."
+      local has_next
+      has_next=$(jq -r --arg connection "$connection" '.data.repository.pullRequest[$connection].pageInfo.hasNextPage' \
+        <<<"$response" 2>/dev/null) || \
+        die invalid_github_response "Unable to read review pagination metadata." "Retry the snapshot."
+      [[ $has_next == true ]] || break
+      cursor=$(jq -er --arg connection "$connection" '.data.repository.pullRequest[$connection].pageInfo.endCursor' <<<"$response") || \
+        die invalid_github_response "Reviews indicated another page without an end cursor." \
+          "Retry after GitHub finishes computing review data."
+    done
   done
   REVIEW_BODY_PAGES=$pages
 }
@@ -1208,32 +1233,57 @@ command_snapshot() {
   mergeable=$(jq -r '.mergeable // "UNKNOWN"' <<<"$before_json")
   merge_state=$(jq -r '.mergeStateStatus // "UNKNOWN"' <<<"$before_json")
 
-  local checks_json required_checks_json required_contexts missing_required required_summary
+  local checks_json all_checks_json required_checks_json required_contexts missing_required required_summary
   collect_required_contexts "$repo" "$start_base_branch"
   required_contexts=$REQUIRED_CONTEXTS
-  if [[ $required_only == true ]]; then
-    checks_json=$(gh_checks_json pr checks "$PR" --repo "$repo" --required \
-      --json bucket,name,state,link,workflow)
-    required_checks_json=$checks_json
-  else
-    checks_json=$(gh_checks_json pr checks "$PR" --repo "$repo" \
-      --json bucket,name,state,link,workflow)
-    required_checks_json=$(gh_checks_json pr checks "$PR" --repo "$repo" --required \
-      --json bucket,name,state,link,workflow)
-  fi
-  jq -e '
-    type == "array" and all(.[];
+  all_checks_json=$(gh_checks_json pr checks "$PR" --repo "$repo" \
+    --json bucket,name,state,link,workflow)
+  required_checks_json=$(gh_checks_json pr checks "$PR" --repo "$repo" --required \
+    --json bucket,name,state,link,workflow)
+  jq -en --argjson all "$all_checks_json" --argjson required "$required_checks_json" '
+    all([$all,$required][]; type == "array" and all(.[];
       type == "object" and
       ((.bucket // "pending") | type == "string") and
       ((.name // "") | type == "string") and
       ((.workflow // "") | type == "string") and
       ((.link // "") | type == "string") and
-      ((.state // "") | type == "string"))
-  ' >/dev/null 2>&1 <<<"$checks_json" || \
+      ((.state // "") | type == "string")))
+  ' >/dev/null 2>&1 || \
     die invalid_github_response "gh pr checks returned an invalid nested shape." "Update gh and retry."
-  jq -e 'type == "array" and all(.[]; type == "object" and ((.name // "") | type == "string"))' \
-    >/dev/null 2>&1 <<<"$required_checks_json" || \
-    die invalid_github_response "Required checks returned an invalid nested shape." "Update gh and retry."
+
+  local missing_unfinished='[]'
+  if [[ $prior_head == "$start_head" && \
+    $(lowercase "$prior_head_repo") == "$(lowercase "$start_head_repo")" && \
+    $prior_head_branch == "$start_head_branch" && $prior_base_branch == "$start_base_branch" && \
+    $prior_host == "$start_host" ]]; then
+    # Keep unfinished observations across partial responses until completion is observed.
+    missing_unfinished=$(jq -cn --argjson prior "$STATE" --argjson all "$all_checks_json" \
+      --argjson required "$required_checks_json" '
+      def identity: [.name // "",.workflow // "",.link // ""];
+      (($all + $required) | map(identity)) as $current
+      | ($prior.last_snapshot.required_checks.missing // []) as $unregistered
+      | [$prior.last_snapshot.check_details[]?
+        | select(.bucket == "pending")
+        | .name as $name
+        | select(.state != "MISSING" or ($unregistered | index($name)) == null)
+        | identity as $identity
+        | select(($current | index([$identity])) == null)
+        | .state = "MISSING"]
+    ')
+  fi
+  checks_json=$all_checks_json
+  if [[ $required_only == true ]]; then
+    # Optional failures remain reporting-only, but every unfinished check gates clean.
+    checks_json=$(jq -cn --argjson all "$all_checks_json" --argjson required "$required_checks_json" '
+      ($required | map([.name,.workflow,.link])) as $identities
+      | $required + [$all[]
+        | select(((.bucket // "pending") | ascii_downcase
+          | IN("pass","skip","skipping","fail","cancel","cancelled")) | not)
+        | [.name,.workflow,.link] as $identity
+        | select(($identities | index([$identity])) == null)]
+    ')
+  fi
+  checks_json=$(jq -cn --argjson checks "$checks_json" --argjson missing "$missing_unfinished" '$checks + $missing')
   missing_required=$(jq -cn --argjson required "$required_contexts" \
     --argjson observed "$required_checks_json" '
     ($observed | map(.name // "") | unique) as $observed_names
@@ -1270,7 +1320,7 @@ command_snapshot() {
       .[$check.bucket] += 1)
   ' <<<"$check_details" 2>/dev/null) || \
     die invalid_github_response "Unable to count normalized check buckets." "Retry the snapshot."
-  check_total=$(jq 'length' <<<"$check_details")
+  check_total=$(jq -n --argjson selected "$check_details" --argjson observed "$all_checks_json" '[$selected,$observed] | map(length) | max')
 
   collect_threads "$repo" "$PR"
   local unresolved_count
@@ -1280,6 +1330,7 @@ command_snapshot() {
   REVIEW_BODY_PAGES=0
   local review_sweep_ready=true prior_checks_observed review_now review_registration_epoch
   local review_registration_pending=false review_checks_missing=false
+  [[ $missing_unfinished == '[]' ]] || review_checks_missing=true
   local review_fail_count review_cancel_count review_pending_count
   prior_checks_observed=$(jq -r .checks_observed <<<"$STATE")
   review_now=$(now_epoch)
@@ -1387,6 +1438,7 @@ command_snapshot() {
 
   merge_state=$end_merge_state
   local status conflict=false merge_pending=false registration_pending=false checks_missing=false
+  [[ $missing_unfinished == '[]' ]] || checks_missing=true
   if [[ $pr_state == CLOSED || $pr_state == MERGED || $after_pr_state == CLOSED || $after_pr_state == MERGED ]]; then
     status=closed
   elif [[ $start_head != "$end_head" || \
@@ -1453,7 +1505,7 @@ command_snapshot() {
     status=stalled
   fi
   last_snapshot=$(jq -cn --argjson checks "$check_counts" --argjson check_details "$check_details" \
-    --argjson required_checks "$required_summary" \
+    --argjson observed_checks "$all_checks_json" --argjson required_checks "$required_summary" \
     --arg merge_state "$merge_state" --argjson conflict "$conflict" \
     --argjson threads "$THREAD_DETAILS" --argjson review_bodies "$REVIEW_BODY_DETAILS" \
     --argjson unresolved "$unresolved_count" --argjson pages "$THREAD_PAGES" \
@@ -1463,7 +1515,7 @@ command_snapshot() {
     --argjson reviewer_required "$reviewer_required" --argjson observed_at "$now" \
     --argjson reviewer_telemetry_available "$reviewer_telemetry_available" \
     --argjson registration_pending "$registration_pending" --argjson checks_missing "$checks_missing" \
-    '{checks:$checks,check_details:$check_details,required_checks:$required_checks,
+    '{checks:$checks,check_details:$check_details,required_checks:$required_checks,observed_checks:$observed_checks,
       merge_state:$merge_state,
       conflict:$conflict,review_threads:$threads,
       unresolved_actionable_threads:$unresolved,review_thread_pages:$pages,coderabbit:$coderabbit,
@@ -1497,7 +1549,7 @@ command_snapshot() {
   jq -cn --argjson state "$new_state" --argjson checks "$check_counts" \
     --argjson check_details "$check_details" --argjson threads "$THREAD_DETAILS" \
     --argjson review_bodies "$REVIEW_BODY_DETAILS" \
-    --argjson required_checks "$required_summary" --arg merge_state "$merge_state" \
+    --argjson observed_checks "$all_checks_json" --argjson required_checks "$required_summary" --arg merge_state "$merge_state" \
     --argjson head_changed "$head_changed" --argjson discarded "$discarded" \
     --argjson unresolved "$unresolved_count" --argjson pages "$THREAD_PAGES" \
     --argjson unreviewed_reviews "$unreviewed_review_count" \
@@ -1507,7 +1559,7 @@ command_snapshot() {
     --argjson reviewer_telemetry_available "$reviewer_telemetry_available" \
     --argjson dry_run "$dry_run" \
     '$state + {ok:true,command:"snapshot",checks:$checks,check_details:$check_details,
-      required_checks:$required_checks,merge_state:$merge_state,
+      required_checks:$required_checks,observed_checks:$observed_checks,merge_state:$merge_state,
       review_threads:$threads,head_changed:$head_changed,
       discarded:$discarded,unresolved_actionable_threads:$unresolved,
       review_thread_pages:$pages,coderabbit:$coderabbit,
@@ -2346,6 +2398,8 @@ command_publish() {
     --argjson comments "$comments_published" --argjson thread_feedback "$thread_feedback_published" '
     .resolution.publication += {phase:"complete",comments_published:$comments,
       thread_feedback_published:$thread_feedback,completed_at:$completed_at}
+    | .published_comment_hashes =
+        ([ (.published_comment_hashes // [])[], .resolution.publication.comment_hashes[] ] | unique)
   ' <<<"$STATE")
   write_state "$new_state"
   STATE=$new_state
