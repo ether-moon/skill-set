@@ -5,7 +5,7 @@ tags:
   - autofixing-and-escalating
   - trigger-positive
 execution:
-  prompt: "Process these six CodeRabbit review comments: classify every item, show what is obvious versus ambiguous, and do not edit anything yet."
+  prompt: "Process these six CodeRabbit comments and resolve the findings, pausing for unresolved decisions before editing."
   max_turns: 4
   timeout_seconds: 180
   allowed_tools:

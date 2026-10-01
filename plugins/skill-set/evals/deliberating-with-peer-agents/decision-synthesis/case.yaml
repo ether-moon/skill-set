@@ -1,0 +1,25 @@
+schema_version: "1.1"
+name: deliberating-with-peer-agents-decision-synthesis
+description: Preserves session dissent and a unanimous unresolved policy choice
+tags:
+  - deliberating-with-peer-agents
+  - functional
+execution:
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools:
+    - Skill
+runs: 1
+graders:
+  - type: tool_used
+    name: selected-deliberating-with-peer-agents
+    tool: Skill
+    input_match: deliberating-with-peer-agents
+    min: 1
+  - type: tool_used
+    name: no-autofixing-for-synthesis
+    tool: Skill
+    input_match: autofixing-and-escalating
+    min: 0
+    max: 0
+    arm: both

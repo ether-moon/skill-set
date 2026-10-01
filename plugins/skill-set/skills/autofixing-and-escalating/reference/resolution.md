@@ -24,6 +24,7 @@ Record every item before mutation:
 ```text
 ID: stable identifier
 Source: reviewer or tool
+Source positions: attributed views, evidence, and conditions when sources differ
 Target: path and location
 Classification: OBVIOUS | AMBIGUOUS | SKIP
 Severity: CRITICAL | MAJOR | MINOR (AMBIGUOUS only)
@@ -46,6 +47,7 @@ Severity: CRITICAL | MAJOR | MINOR
 Evidence: <finding and verified context>
 Why this matters: <consequence, downstream choice, or failure mode>
 Why ambiguous: <trade-off or missing policy decision>
+Source positions: <attributed options, reasons, and conditions when multiple sources differ>
 Options:
 1. <option>
 2. <option>

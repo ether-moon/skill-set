@@ -5,7 +5,7 @@ tags:
   - autofixing-and-escalating
   - trigger-negative
 execution:
-  prompt: "Draft a concise pull request title and body for these commits."
+  prompt: "Audit this external accessibility report in review-only mode and give me a severity-ordered decision record."
   max_turns: 4
   timeout_seconds: 180
   allowed_tools:

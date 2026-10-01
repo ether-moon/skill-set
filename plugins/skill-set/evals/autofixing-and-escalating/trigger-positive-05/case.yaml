@@ -5,7 +5,7 @@ tags:
   - autofixing-and-escalating
   - trigger-positive
 execution:
-  prompt: "Audit this external accessibility report in review-only mode and give me a severity-ordered decision record."
+  prompt: "Resolve the actionable issues in this external accessibility report and escalate policy choices before applying fixes."
   max_turns: 4
   timeout_seconds: 180
   allowed_tools:

@@ -1,0 +1,3 @@
+Have peer agents work on this implementation plan in parallel, exchange objections more than once, and produce a reconciled proposal. Use the default participants. Keep the result in chat; do not edit or publish anything.
+
+Design an in-process cache for a service with 500 requests per second, a 100 MB memory limit, and data that may be stale for at most 30 seconds. There are two service replicas. The cache may miss safely, but must never serve data older than the limit. No new external service is allowed. Produce the key design, failure behavior, implementation steps, and acceptance checks. Identify any decision that needs my input with each session's position and your recommendation.

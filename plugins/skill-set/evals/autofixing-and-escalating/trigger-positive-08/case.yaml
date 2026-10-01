@@ -5,7 +5,7 @@ tags:
   - autofixing-and-escalating
   - trigger-positive
 execution:
-  prompt: "Triage this batch of audit findings with explicit edit=false, commit=false, push=false, and comment=false capabilities."
+  prompt: "Apply this batch of audit findings with edit=true, commit=false, push=false, and comment=false capabilities."
   max_turns: 4
   timeout_seconds: 180
   allowed_tools:

@@ -1,23 +1,23 @@
 {
   "autofixing-and-escalating": {
     "positive": [
-      "Process these six CodeRabbit review comments: classify every item, show what is obvious versus ambiguous, and do not edit anything yet.",
+      "Process these six CodeRabbit comments and resolve the findings, pausing for unresolved decisions before editing.",
       "The linter produced a mixed batch of unused imports, naming preferences, and complexity warnings. Triage the findings and apply only what I have authorized.",
       "Resolve the actionable findings in this security scan, but stop for any policy or dependency decision.",
-      "Review these eight failing-test diagnostics from CI and separate mechanically correct fixes from decisions that need me.",
-      "Audit this external accessibility report in review-only mode and give me a severity-ordered decision record.",
+      "Resolve these eight failing-test diagnostics from CI, separating mechanically correct fixes from decisions that need me.",
+      "Resolve the actionable issues in this external accessibility report and escalate policy choices before applying fixes.",
       "Fix the obvious issues in these PR review comments; record ambiguous design suggestions for my decision and do not publish anything.",
       "A static analyzer and a reviewer reported overlapping defects. Deduplicate, classify, and summarize the authorized resolution results.",
-      "Triage this batch of audit findings with explicit edit=false, commit=false, push=false, and comment=false capabilities."
+      "Apply this batch of audit findings with edit=true, commit=false, push=false, and comment=false capabilities."
     ],
     "negative": [
       "Explore this package and suggest architecture improvements you notice.",
-      "Rename the local variable on line 12 to customerId.",
-      "Draft a concise pull request title and body for these commits.",
+      "Process these six CodeRabbit review comments: classify every item, show what is obvious versus ambiguous, and do not edit anything yet.",
+      "Audit this external accessibility report in review-only mode and give me a severity-ordered decision record.",
       "Explain why this single test assertion is failing; I am still investigating the bug.",
       "Challenge this implementation plan one decision at a time.",
       "Give me a big-picture map of the payments module and its callers.",
-      "Rewrite this technical report so the claims are clearer.",
+      "Triage this batch of audit findings with explicit edit=false, commit=false, push=false, and comment=false capabilities.",
       "Prepare a minor version bump and changelog entry."
     ]
   },
@@ -37,7 +37,7 @@
       "Fix the actionable findings from these CodeRabbit comments.",
       "Grill this implementation plan one decision at a time.",
       "Explain where this unfamiliar module fits in the system.",
-      "Find ranked refactor candidates in this package.",
+      "Have Codex and Claude independently design a retry policy, debate each other over several rounds, and produce a joint proposal.",
       "Ask a human teammate to review this pull request.",
       "Summarize the existing review comments without requesting another review.",
       "Run the tests and tell me whether they pass."
@@ -283,6 +283,28 @@
       "Explain how to use this external framework API.",
       "Grill the migration plan associated with this module.",
       "Write an ADR describing where this module belongs."
+    ]
+  },
+  "deliberating-with-peer-agents": {
+    "positive": [
+      "Have multiple agents design this service in parallel, challenge one another twice, and reconcile their proposals.",
+      "Use Codex and Claude to independently plan this migration, exchange rebuttals over two rounds, and recommend a path.",
+      "Ask OpenAI and Anthropic models to research these alternatives independently and debate the results before synthesizing them.",
+      "I want the default pair of peer sessions to work on the same requirements and negotiate a coherent implementation plan.",
+      "Let three model sessions propose designs and respond to each other repeatedly; show me their positions on unresolved decisions.",
+      "Use the configured Codex planning model and Claude research model for a parallel investigation followed by multiple rounds of objections.",
+      "Resume our peer deliberation from these transcripts and show each session opinion plus your recommendation for the remaining choices.",
+      "Get independent agent proposals for this architecture, have them answer counterarguments, and keep dissent visible in the final plan."
+    ],
+    "negative": [
+      "Give this diff an independent second-opinion review using Claude, then report verified defects.",
+      "Write an implementation plan yourself from the requirements below.",
+      "Ask two agents to review the branch once and deduplicate their findings.",
+      "Split these unrelated documentation updates across workers and combine the edited files.",
+      "Resolve the verified lint findings, escalating choices that need my input.",
+      "Challenge my RFC and ask me all the unresolved decision questions.",
+      "Summarize this research paper without contacting another model.",
+      "Compare model subscription prices; I do not want agents to run a debate."
     ]
   }
 }
