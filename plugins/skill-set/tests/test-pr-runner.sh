@@ -36,6 +36,7 @@ make_fixture() {
   export MOCK_GH_HEAD=$head_sha
   export MOCK_GH_NEW_HEAD=$new_sha
   export MOCK_GH_BASE_SHA=$head_sha
+  export MOCK_GH_BASE_BRANCH=main
   export MOCK_GH_HEAD_REPO=owner/repo
   export MOCK_GH_HEAD_BRANCH=feature
   export MOCK_GH_HOST=example.test
@@ -147,6 +148,69 @@ assert_equals 0 "$(count_log 'reviews\(first:100')" "no final sweep before optio
 printf 'pass\n' >"$MOCK_GH_DIR/optional-bucket"
 optional_complete=$(snapshot_case 102)
 assert_equals clean "$(jq -r .status <<<"$optional_complete")" "completed optional review"
+
+for required_only in true false; do
+  make_fixture "optional-partial-disappearance-$required_only"
+  export MOCK_GH_SCENARIO=optional-running
+  printf 'pending\n' >"$MOCK_GH_DIR/optional-bucket"
+  init_case --required-only "$required_only" >/dev/null
+  snapshot_case 101 >/dev/null
+  touch "$MOCK_GH_DIR/optional-disappeared"
+  for tick in 102 103; do
+    missing_optional=$(snapshot_case "$tick")
+    assert_equals polling "$(jq -r .status <<<"$missing_optional")" "partially missing optional check remains pending"
+    jq -e '.checks.pending == 1 and (.check_details | any(.name == "optional-review" and .state == "MISSING"))' \
+      <<<"$missing_optional" >/dev/null
+  done
+  assert_equals 0 "$(count_log 'reviews\(first:100')" "missing optional check prevents final sweep"
+  rm "$MOCK_GH_DIR/optional-disappeared"
+  printf 'pass\n' >"$MOCK_GH_DIR/optional-bucket"
+  reappeared=$(snapshot_case 104)
+  assert_equals clean "$(jq -r .status <<<"$reappeared")" "reappeared optional check completes"
+
+  make_fixture "optional-missing-timeout-$required_only"
+  export MOCK_GH_SCENARIO=optional-running
+  printf 'pending\n' >"$MOCK_GH_DIR/optional-bucket"
+  init_case --required-only "$required_only" --ci-timeout-seconds 5 >/dev/null
+  snapshot_case 101 >/dev/null
+  touch "$MOCK_GH_DIR/optional-disappeared"
+  missing_timeout=$(snapshot_case 106)
+  assert_equals timed_out "$(jq -r .status <<<"$missing_timeout")" "partially missing optional check times out"
+done
+
+for binding in head repository branch base host; do
+  make_fixture "optional-missing-reset-$binding"
+  export MOCK_GH_SCENARIO=optional-running
+  printf 'pending\n' >"$MOCK_GH_DIR/optional-bucket"
+  init_case >/dev/null
+  snapshot_case 101 >/dev/null
+  touch "$MOCK_GH_DIR/optional-disappeared"
+  case "$binding" in
+    head) printf '%s\n' "$new_sha" >"$MOCK_GH_HEAD_FILE" ;;
+    repository) export MOCK_GH_HEAD_REPO=contributor/repo ;;
+    branch) export MOCK_GH_HEAD_BRANCH=replacement ;;
+    base) export MOCK_GH_BASE_BRANCH=release ;;
+    host) export MOCK_GH_HOST=other.test ;;
+  esac
+  reset_optional=$(snapshot_case 102)
+  assert_equals clean "$(jq -r .status <<<"$reset_optional")" "$binding binding drops old unfinished check"
+  jq -e '.checks.pending == 0 and .head_changed == true' <<<"$reset_optional" >/dev/null
+done
+
+make_fixture optional-missing-discarded
+export MOCK_GH_SCENARIO=optional-running
+printf 'pending\n' >"$MOCK_GH_DIR/optional-bucket"
+init_case >/dev/null
+snapshot_case 101 >/dev/null
+export MOCK_GH_SCENARIO=head-race
+printf '1\n' >"$MOCK_GH_DIR/pr-view.count"
+discarded_optional=$(snapshot_case 102)
+jq -e '.discarded == true and .last_snapshot.discarded == true' <<<"$discarded_optional" >/dev/null
+export MOCK_GH_SCENARIO=optional-running
+printf '%s\n' "$new_sha" >"$MOCK_GH_HEAD_FILE"
+touch "$MOCK_GH_DIR/optional-disappeared"
+after_discard=$(snapshot_case 103)
+assert_equals clean "$(jq -r .status <<<"$after_discard")" "discarded snapshot drops unfinished check history"
 
 make_fixture optional-feedback
 export MOCK_GH_SCENARIO=optional-running

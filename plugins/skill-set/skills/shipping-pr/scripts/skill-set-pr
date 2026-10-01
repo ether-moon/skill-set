@@ -1250,6 +1250,27 @@ command_snapshot() {
       ((.state // "") | type == "string")))
   ' >/dev/null 2>&1 || \
     die invalid_github_response "gh pr checks returned an invalid nested shape." "Update gh and retry."
+
+  local missing_unfinished='[]'
+  if [[ $prior_head == "$start_head" && \
+    $(lowercase "$prior_head_repo") == "$(lowercase "$start_head_repo")" && \
+    $prior_head_branch == "$start_head_branch" && $prior_base_branch == "$start_base_branch" && \
+    $prior_host == "$start_host" ]]; then
+    # Keep unfinished observations across partial responses until completion is observed.
+    missing_unfinished=$(jq -cn --argjson prior "$STATE" --argjson all "$all_checks_json" \
+      --argjson required "$required_checks_json" '
+      def identity: [.name // "",.workflow // "",.link // ""];
+      (($all + $required) | map(identity)) as $current
+      | ($prior.last_snapshot.required_checks.missing // []) as $unregistered
+      | [$prior.last_snapshot.check_details[]?
+        | select(.bucket == "pending")
+        | .name as $name
+        | select(.state != "MISSING" or ($unregistered | index($name)) == null)
+        | identity as $identity
+        | select(($current | index([$identity])) == null)
+        | .state = "MISSING"]
+    ')
+  fi
   checks_json=$all_checks_json
   if [[ $required_only == true ]]; then
     # Optional failures remain reporting-only, but every unfinished check gates clean.
@@ -1262,6 +1283,7 @@ command_snapshot() {
         | select(($identities | index([$identity])) == null)]
     ')
   fi
+  checks_json=$(jq -cn --argjson checks "$checks_json" --argjson missing "$missing_unfinished" '$checks + $missing')
   missing_required=$(jq -cn --argjson required "$required_contexts" \
     --argjson observed "$required_checks_json" '
     ($observed | map(.name // "") | unique) as $observed_names
@@ -1308,6 +1330,7 @@ command_snapshot() {
   REVIEW_BODY_PAGES=0
   local review_sweep_ready=true prior_checks_observed review_now review_registration_epoch
   local review_registration_pending=false review_checks_missing=false
+  [[ $missing_unfinished == '[]' ]] || review_checks_missing=true
   local review_fail_count review_cancel_count review_pending_count
   prior_checks_observed=$(jq -r .checks_observed <<<"$STATE")
   review_now=$(now_epoch)
@@ -1415,6 +1438,7 @@ command_snapshot() {
 
   merge_state=$end_merge_state
   local status conflict=false merge_pending=false registration_pending=false checks_missing=false
+  [[ $missing_unfinished == '[]' ]] || checks_missing=true
   if [[ $pr_state == CLOSED || $pr_state == MERGED || $after_pr_state == CLOSED || $after_pr_state == MERGED ]]; then
     status=closed
   elif [[ $start_head != "$end_head" || \

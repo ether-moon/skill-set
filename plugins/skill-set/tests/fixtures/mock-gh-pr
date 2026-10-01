@@ -95,10 +95,10 @@ if [[ ${1:-} == pr && ${2:-} == view ]]; then
   fi
   jq -cn --arg sha "$sha" --arg base "$MOCK_GH_BASE_SHA" --arg mergeable "$mergeable" \
     --arg merge_state "$merge_state" --arg state "$pr_state" --arg head_repo "$head_repo" \
-    --arg head_branch "$head_branch" --arg host "$github_host" \
+    --arg head_branch "$head_branch" --arg host "$github_host" --arg base_branch "${MOCK_GH_BASE_BRANCH:-main}" \
     --argjson reviews "$reviews" --argjson comments "$comments" \
     '{number:17,headRefOid:$sha,headRefName:$head_branch,
-      headRepository:{nameWithOwner:$head_repo},baseRefOid:$base,baseRefName:"main",
+      headRepository:{nameWithOwner:$head_repo},baseRefOid:$base,baseRefName:$base_branch,
       mergeable:$mergeable,mergeStateStatus:$merge_state,state:$state,
       url:("https://" + $host + "/owner/repo/pull/17"),reviews:$reviews,comments:$comments}'
   exit 0
@@ -172,6 +172,8 @@ if [[ ${1:-} == pr && ${2:-} == checks ]]; then
       printf "%s\n" "no required checks reported on the 'feature' branch" >&2
       exit 1
     elif [[ " $* " == *" --required "* ]]; then
+      printf '%s\n' '[{"bucket":"pass","name":"verify","state":"SUCCESS"}]'
+    elif [[ -f $MOCK_GH_DIR/optional-disappeared ]]; then
       printf '%s\n' '[{"bucket":"pass","name":"verify","state":"SUCCESS"}]'
     else
       jq -cn --arg bucket "$(cat "$MOCK_GH_DIR/optional-bucket")" '[
