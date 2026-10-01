@@ -105,14 +105,16 @@ if [[ ${1:-} == pr && ${2:-} == view ]]; then
 fi
 
 if [[ ${1:-} == api && ${2:-} == repos/*/rules/branches/* ]]; then
-  if [[ $MOCK_GH_SCENARIO == malformed-rules ]]; then
+  if [[ -f $MOCK_GH_DIR/no-required ]]; then
+    printf '%s\n' '[]'
+  elif [[ $MOCK_GH_SCENARIO == malformed-rules ]]; then
     printf '%s\n' '[{"type":"required_status_checks","parameters":{"required_status_checks":[{"context":42}]}}]'
   elif [[ $MOCK_GH_SCENARIO == missing-required-review ]]; then
     jq -cn '[{type:"required_status_checks",parameters:{required_status_checks:[
       {context:"verify",integration_id:null},
       {context:"signal-gated-review",integration_id:null}
     ]}}]'
-  elif [[ $MOCK_GH_SCENARIO == no-required ]]; then
+  elif [[ $MOCK_GH_SCENARIO == no-required || $MOCK_GH_SCENARIO == no-checks ]]; then
     printf '%s\n' '[]'
   elif [[ $MOCK_GH_SCENARIO == signal-gated-* ]]; then
     jq -cn '[{type:"required_status_checks",parameters:{required_status_checks:[
@@ -154,14 +156,46 @@ if [[ ${1:-} == pr && ${2:-} == comment ]]; then
 fi
 
 if [[ ${1:-} == pr && ${2:-} == checks ]]; then
-  count=$(next_count checks)
+  if [[ " $* " == *" --required "* ]]; then
+    count=$(next_count checks-required)
+  else
+    count=$(next_count checks)
+  fi
+  if [[ $MOCK_GH_SCENARIO == checks-auth-error ]]; then
+    printf '%s\n' 'HTTP 401: Bad credentials' >&2
+    exit 1
+  fi
+  if [[ $MOCK_GH_SCENARIO == optional-running ]]; then
+    if [[ -f $MOCK_GH_DIR/checks-disappeared ]]; then
+      printf '%s\n' '[]'
+    elif [[ " $* " == *" --required "* && -f $MOCK_GH_DIR/no-required ]]; then
+      printf "%s\n" "no required checks reported on the 'feature' branch" >&2
+      exit 1
+    elif [[ " $* " == *" --required "* ]]; then
+      printf '%s\n' '[{"bucket":"pass","name":"verify","state":"SUCCESS"}]'
+    else
+      jq -cn --arg bucket "$(cat "$MOCK_GH_DIR/optional-bucket")" '[
+        {bucket:"pass",name:"verify",state:"SUCCESS"},
+        {bucket:$bucket,name:"optional-review",state:$bucket,workflow:"Review"}
+      ]'
+    fi
+    exit 0
+  fi
   if [[ $MOCK_GH_SCENARIO == malformed-checks ]]; then
     printf '%s\n' '[1]'
     exit 0
   fi
-  if [[ $MOCK_GH_SCENARIO == no-required ]]; then
-    printf "%s\n" "no required checks reported on the 'feature' branch" >&2
+  if [[ $MOCK_GH_SCENARIO == no-checks ]]; then
+    printf "%s\n" "no checks reported on the 'feature' branch" >&2
     exit 1
+  fi
+  if [[ $MOCK_GH_SCENARIO == no-required ]]; then
+    if [[ " $* " == *" --required "* ]]; then
+      printf "%s\n" "no required checks reported on the 'feature' branch" >&2
+      exit 1
+    fi
+    printf '%s\n' '[]'
+    exit 0
   fi
   if [[ $MOCK_GH_SCENARIO == missing-required-review && $count -gt 1 ]]; then
     jq -cn '[
@@ -185,7 +219,7 @@ if [[ ${1:-} == pr && ${2:-} == checks ]]; then
     bucket=pending
   elif [[ $MOCK_GH_SCENARIO == registration-delay ]]; then
     if [[ $count -eq 1 ]]; then
-      printf "%s\n" "no required checks reported on the 'feature' branch" >&2
+      printf "%s\n" "no checks reported on the 'feature' branch" >&2
       exit 1
     elif [[ $count -eq 2 ]]; then
       bucket=pending
@@ -243,6 +277,27 @@ if [[ ${1:-} == api && ${2:-} == graphql ]]; then
     fi
     jq -cn --arg id "$graphql_id" --argjson resolved "$resolved" --argjson replies "$reply_nodes" \
       '{data:{node:{id:$id,isResolved:$resolved,comments:{nodes:$replies}}}}'
+  elif [[ "$*" == *'comments(first:100'* ]]; then
+    nodes='[]'
+    if [[ -f $MOCK_GH_DIR/optional-feedback ]]; then
+      nodes='[{id:"comment-optional",body:"Please fix the missing token validation.",
+        createdAt:"2026-09-04T00:00:00Z",updatedAt:"2026-09-04T00:00:00Z",
+        author:{login:"github-actions[bot]"}}]'
+      nodes=$(jq -cn "$nodes")
+    fi
+    if [[ -f $MOCK_GH_DIR/edited-feedback ]]; then
+      nodes=$(jq -c '.[0].updatedAt = "2026-09-04T00:01:00Z" | .[0].body = "Please also validate the audience."' <<<"$nodes")
+    fi
+    if [[ $MOCK_GH_SCENARIO == malformed-comments ]]; then
+      nodes='[{"id":"bad","body":42}]'
+    fi
+    if [[ -f $MOCK_GH_DIR/comment.body ]]; then
+      nodes=$(jq -cn --argjson nodes "$nodes" --rawfile body "$MOCK_GH_DIR/comment.body" '
+        $nodes + [{id:"comment-own",body:$body,createdAt:"2026-09-04T00:00:00Z",
+          updatedAt:"2026-09-04T00:00:00Z",author:{login:"user"}}]')
+    fi
+    jq -cn --argjson nodes "$nodes" '{data:{repository:{pullRequest:{comments:{
+      nodes:$nodes,pageInfo:{hasNextPage:false,endCursor:null}}}}}}'
   elif [[ "$*" == *'reviews(first:100'* ]]; then
     if [[ $MOCK_GH_SCENARIO == malformed-reviews ]]; then
       jq -cn '{data:{repository:{pullRequest:{reviews:{nodes:[{

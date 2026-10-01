@@ -68,6 +68,14 @@ if [[ ${1:-} == api && ${2:-} == graphql ]]; then
       '{data:{node:{id:$id,isResolved:$resolved,comments:{nodes:$replies}}}}'
   elif [[ "$*" == *'reviews(first:100'* ]]; then
     printf '%s\n' '{"data":{"repository":{"pullRequest":{"reviews":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}'
+  elif [[ "$*" == *'comments(first:100'* ]]; then
+    nodes='[]'
+    if [[ -f $MOCK_GH_DIR/comment.body ]]; then
+      nodes=$(jq -Rs '[{id:"summary-1",body:.,updatedAt:"2026-09-04T00:00:00Z",
+        createdAt:"2026-09-04T00:00:00Z",author:{login:"user"}}]' <"$MOCK_GH_DIR/comment.body")
+    fi
+    jq -cn --argjson nodes "$nodes" '{data:{repository:{pullRequest:{comments:{
+      nodes:$nodes,pageInfo:{hasNextPage:false,endCursor:null}}}}}}'
   elif [[ -f $MOCK_GH_DIR/publication-complete ]]; then
     printf '%s\n' '{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}'
   else

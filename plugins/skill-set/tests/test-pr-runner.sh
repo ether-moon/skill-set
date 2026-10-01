@@ -137,6 +137,83 @@ count_log() {
   { grep -E "$pattern" "$MOCK_GH_LOG" || true; } | wc -l | tr -d ' '
 }
 
+make_fixture optional-running
+export MOCK_GH_SCENARIO=optional-running
+printf 'pending\n' >"$MOCK_GH_DIR/optional-bucket"
+init_case >/dev/null
+optional_pending=$(snapshot_case 101)
+assert_equals polling "$(jq -r .status <<<"$optional_pending")" "optional review must finish"
+assert_equals 0 "$(count_log 'reviews\(first:100')" "no final sweep before optional completion"
+printf 'pass\n' >"$MOCK_GH_DIR/optional-bucket"
+optional_complete=$(snapshot_case 102)
+assert_equals clean "$(jq -r .status <<<"$optional_complete")" "completed optional review"
+
+make_fixture optional-feedback
+export MOCK_GH_SCENARIO=optional-running
+printf 'pass\n' >"$MOCK_GH_DIR/optional-bucket"
+touch "$MOCK_GH_DIR/optional-feedback"
+feedback_init=$(init_case)
+feedback_run=$(jq -r .run_id <<<"$feedback_init")
+feedback=$(snapshot_case 101)
+assert_equals blocked "$(jq -r .status <<<"$feedback")" "optional workflow issue comment needs review"
+jq -e '.review_bodies[0].source == "issue_comment" and .unreviewed_review_bodies == 1' <<<"$feedback" >/dev/null
+start_resolution "$feedback_run" --resolver-agent pr-review-feedback >/dev/null
+results_file=$repo/resolver-results.json
+summary_file=$repo/summary.md
+write_single_result "$results_file" pr-review-feedback no-op "$head_sha" "$head_sha" \
+  '["comment-optional:2026-09-04T00:00:00Z"]'
+printf 'Reviewed the workflow comment; the existing validation covers this case.\n' >"$summary_file"
+publish_single_result "$feedback_run" "$head_sha" "$head_sha" "$results_file" \
+  --summary-file "$summary_file" >/dev/null
+run_ok transition --pr 17 --from resolving --to polling --expected-run-id "$feedback_run" \
+  --resolver-attempt --resolver-result no-op >/dev/null
+feedback_clean=$(run_ok snapshot --pr 17 --expected-run-id "$feedback_run" --now 102 --dry-run)
+assert_equals clean "$(jq -r .status <<<"$feedback_clean")" "reviewed comment and own summary do not loop"
+
+touch "$MOCK_GH_DIR/edited-feedback"
+feedback_edited=$(snapshot_case 103)
+jq -e '.status == "blocked" and .review_bodies[0].key == "comment-optional:2026-09-04T00:01:00Z"' <<<"$feedback_edited" >/dev/null
+
+for required_only in true false; do
+  make_fixture "optional-failed-$required_only"
+  export MOCK_GH_SCENARIO=optional-running
+  printf 'fail\n' >"$MOCK_GH_DIR/optional-bucket"
+  init_case --required-only "$required_only" >/dev/null
+  optional_failed=$(snapshot_case 101)
+  expected=clean
+  [[ $required_only == false ]] && expected=blocked
+  assert_equals "$expected" "$(jq -r .status <<<"$optional_failed")" "optional failure selection"
+  jq -e '.observed_checks | any(.name == "optional-review" and .bucket == "fail")' <<<"$optional_failed" >/dev/null
+done
+
+make_fixture optional-timeout
+export MOCK_GH_SCENARIO=optional-running
+printf 'unknown\n' >"$MOCK_GH_DIR/optional-bucket"
+touch "$MOCK_GH_DIR/no-required"
+init_case --ci-timeout-seconds 5 >/dev/null
+optional_timeout=$(snapshot_case 106)
+assert_equals timed_out "$(jq -r .status <<<"$optional_timeout")" "optional unknown check times out without required checks"
+
+make_fixture optional-disappeared
+export MOCK_GH_SCENARIO=optional-running
+printf 'pending\n' >"$MOCK_GH_DIR/optional-bucket"
+touch "$MOCK_GH_DIR/no-required"
+init_case --ci-timeout-seconds 100 >/dev/null
+snapshot_case 101 >/dev/null
+touch "$MOCK_GH_DIR/checks-disappeared"
+optional_disappeared=$(snapshot_case 170)
+jq -e '.status == "polling" and .last_snapshot.checks_missing == true' <<<"$optional_disappeared" >/dev/null
+
+for scenario in checks-auth-error malformed-comments; do
+  make_fixture "$scenario"
+  export MOCK_GH_SCENARIO=$scenario
+  error_init=$(init_case)
+  error_result=$(run_fail snapshot --pr 17 --expected-run-id "$(jq -r .run_id <<<"$error_init")" --now 101)
+  expected=github_query_failed
+  [[ $scenario == malformed-comments ]] && expected=invalid_github_response
+  assert_equals "$expected" "$(jq -r .error.code <<<"$error_result")" "$scenario fails closed"
+done
+
 make_fixture delayed
 export MOCK_GH_SCENARIO=delayed
 init_case >/dev/null
@@ -175,6 +252,14 @@ export MOCK_GH_SCENARIO=skipping
 init_case >/dev/null
 skipping=$(snapshot_case 101)
 assert_equals clean "$(jq -r .status <<<"$skipping")" "skipping check state"
+
+make_fixture no-checks
+export MOCK_GH_SCENARIO=no-checks
+init_case >/dev/null
+no_checks_wait=$(snapshot_case 101)
+jq -e '.status == "polling" and (.checks | add) == 0' <<<"$no_checks_wait" >/dev/null
+no_checks=$(snapshot_case 160)
+jq -e '.status == "clean" and (.checks | add) == 0' <<<"$no_checks" >/dev/null
 
 make_fixture no-required
 export MOCK_GH_SCENARIO=no-required
@@ -259,7 +344,7 @@ jq -e '
   .checks.pass == 1 and
   .unresolved_actionable_threads == 0 and
   .unreviewed_review_bodies == 0 and
-  .review_body_pages == 1 and
+  .review_body_pages == 2 and
   .reviewers.states.claude == "not_expected" and
   .reviewers.states.codex == "not_expected" and
   .reviewers.required.claude == false and
