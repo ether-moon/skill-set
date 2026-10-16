@@ -138,6 +138,273 @@ count_log() {
   { grep -E "$pattern" "$MOCK_GH_LOG" || true; } | wc -l | tr -d ' '
 }
 
+write_status_check() {
+  local execution=$1 state=$2
+  jq -cn --arg execution "$execution" --arg state "$state" '[
+    {name:"verify",workflow:"",link:("https://example.test/build/" + $execution),state:$state,
+      bucket:(if $state == "SUCCESS" then "pass" elif $state == "PENDING" then "pending" else "fail" end)}
+  ]' >"$MOCK_GH_DIR/checks.json"
+}
+
+write_status_history() {
+  jq -cn --arg head "$head_sha" '[
+    {context:"verify",target_url:"https://example.test/build/B",state:"success",id:4},
+    {context:"verify",target_url:"https://example.test/build/B",state:"pending",id:3},
+    {context:"verify",target_url:"https://example.test/build/A",state:"success",id:2},
+    {context:"verify",target_url:"https://example.test/build/A",state:"pending",id:1}
+  ] | map(. + {url:("https://api.example.test/repos/owner/repo/statuses/" + $head)})' \
+    >"$MOCK_GH_DIR/history-1.json"
+}
+
+make_fixture superseded-status-success
+write_status_check A PENDING
+init_case >/dev/null
+assert_equals polling "$(snapshot_case 101 | jq -r .status)" "execution A starts pending"
+write_status_history
+write_status_check B SUCCESS
+superseded_success=$(snapshot_case 102)
+assert_equals clean "$(jq -r .status <<<"$superseded_success")" "exact historical success discharges superseded execution A"
+
+# Commit-status history must never discharge an unconfirmed or different execution.
+for history_case in failure pending error unknown empty context url null-url; do
+  make_fixture "status-history-$history_case"
+  write_status_check A PENDING
+  init_case >/dev/null
+  snapshot_case 101 >/dev/null
+  assert_equals 0 "$(count_log '/statuses\?')" "no history query before disappearance"
+  write_status_history
+  case "$history_case" in
+    failure|pending|error|unknown) filter=".[2].state = \"$history_case\" | .[3].state = \"success\"" ;;
+    empty) filter='[]' ;;
+    context) filter='map(.context = "other")' ;;
+    url) filter='map(.target_url = "https://example.test/build/other")' ;;
+    null-url) filter='map(.target_url = null)' ;;
+  esac
+  jq "$filter" "$MOCK_GH_DIR/history-1.json" >"$case_dir/history.json"
+  mv "$case_dir/history.json" "$MOCK_GH_DIR/history-1.json"
+  write_status_check B SUCCESS
+  for tick in 102 103; do
+    result=$(snapshot_case "$tick")
+    jq -e '.status == "polling" and .checks.pending == 1 and
+      (.check_details | any(.state == "MISSING" and .link == "https://example.test/build/A"))' <<<"$result" >/dev/null
+  done
+  assert_equals 0 "$(count_log 'reviews\(first:100')" "unconfirmed history prevents review sweep"
+  # The marker must survive MISSING snapshots and permit later exact proof.
+  write_status_history
+  assert_equals clean "$(snapshot_case 104 | jq -r .status)" "later exact success recovers $history_case"
+done
+
+for required_only in true false; do
+  for replacement in PENDING FAILURE ERROR; do
+    make_fixture "status-replacement-$required_only-$replacement"
+    write_status_check A PENDING
+    init_case --required-only "$required_only" >/dev/null
+    snapshot_case 101 >/dev/null
+    write_status_history
+    write_status_check B "$replacement"
+    result=$(snapshot_case 102)
+    expected=blocked
+    [[ $replacement != PENDING ]] || expected=polling
+    assert_equals "$expected" "$(jq -r .status <<<"$result")" "replacement execution gates independently"
+    jq -e 'all(.check_details[]; .state != "MISSING")' <<<"$result" >/dev/null
+  done
+done
+
+for kind in check-run empty-workflow-check-run ambiguous unknown; do
+  make_fixture "status-history-kind-$kind"
+  write_status_check A PENDING
+  case "$kind" in
+    check-run)
+      jq '.[0].workflow = "CI"' "$MOCK_GH_DIR/checks.json" >"$case_dir/checks.json"
+      mv "$case_dir/checks.json" "$MOCK_GH_DIR/checks.json" ;;
+    empty-workflow-check-run)
+      printf '%s\n' '[{"__typename":"CheckRun","name":"verify","detailsUrl":"https://example.test/build/A","status":"PENDING"}]' >"$MOCK_GH_DIR/rollup.json" ;;
+    ambiguous)
+      printf '%s\n' '[{"__typename":"CheckRun","name":"verify","detailsUrl":"https://example.test/build/A","status":"PENDING"},{"__typename":"StatusContext","context":"verify","targetUrl":"https://example.test/build/A","state":"PENDING"}]' >"$MOCK_GH_DIR/rollup.json" ;;
+    unknown) printf '%s\n' '[]' >"$MOCK_GH_DIR/rollup.json" ;;
+  esac
+  init_case >/dev/null
+  snapshot_case 101 >/dev/null
+  write_status_history
+  write_status_check B SUCCESS
+  result=$(snapshot_case 102)
+  assert_equals polling "$(jq -r .status <<<"$result")" "only proven StatusContext can use history"
+  assert_equals 0 "$(count_log '/statuses\?')" "no history retrieval for $kind"
+done
+
+for history_case in second-page latest-failure latest-pending latest-error page-limit; do
+  make_fixture "status-history-$history_case"
+  write_status_check A PENDING
+  init_case >/dev/null
+  snapshot_case 101 >/dev/null
+  write_status_history
+  cp "$MOCK_GH_DIR/history-1.json" "$MOCK_GH_DIR/history-2.json"
+  jq --arg state "$history_case" '[range(0;100) as $i | .[0] +
+    {context:("unrelated-" + ($i|tostring)),id:(1000 - $i)}]
+    | if ($state | startswith("latest-")) then
+        .[0] += {context:"verify",target_url:"https://example.test/build/A",state:($state | ltrimstr("latest-"))}
+      else . end' "$MOCK_GH_DIR/history-2.json" >"$MOCK_GH_DIR/history-1.json"
+  if [[ $history_case == page-limit ]]; then
+    for page in {2..10}; do cp "$MOCK_GH_DIR/history-1.json" "$MOCK_GH_DIR/history-$page.json"; done
+    write_status_history
+    mv "$MOCK_GH_DIR/history-1.json" "$MOCK_GH_DIR/history-11.json"
+    cp "$MOCK_GH_DIR/history-2.json" "$MOCK_GH_DIR/history-1.json"
+  fi
+  write_status_check B SUCCESS
+  result=$(snapshot_case 102)
+  expected=polling
+  expected_pages=1
+  case "$history_case" in
+    second-page) expected=clean; expected_pages=2 ;;
+    page-limit) expected_pages=10 ;;
+  esac
+  assert_equals "$expected" "$(jq -r .status <<<"$result")" "bounded newest-first history: $history_case"
+  assert_equals "$expected_pages" "$(count_log '/statuses\?')" "bounded history calls: $history_case"
+done
+
+for history_case in api-error malformed wrong-head wrong-repo missing-state second-page-error; do
+  make_fixture "status-history-$history_case"
+  write_status_check A PENDING
+  initialized=$(init_case)
+  history_run=$(jq -r .run_id <<<"$initialized")
+  snapshot_case 101 >/dev/null
+  write_status_history
+  expected_error=invalid_github_response
+  case "$history_case" in
+    api-error)
+      printf 'HTTP 403: API access denied\n' >"$MOCK_GH_DIR/history-1.error"
+      expected_error=github_query_failed ;;
+    malformed) printf '%s\n' '{not-json' >"$MOCK_GH_DIR/history-1.json" ;;
+    wrong-head|wrong-repo|missing-state)
+      # shellcheck disable=SC2016 # $head is a jq variable bound below.
+      case "$history_case" in
+        wrong-head) filter='map(.url = "https://api.example.test/repos/owner/repo/statuses/1111111111111111111111111111111111111111")' ;;
+        wrong-repo) filter='map(.url = "https://api.example.test/repos/other/repo/statuses/" + $head)' ;;
+        missing-state) filter='map(del(.state))' ;;
+      esac
+      jq --arg head "$head_sha" "$filter" "$MOCK_GH_DIR/history-1.json" >"$case_dir/history.json"
+      mv "$case_dir/history.json" "$MOCK_GH_DIR/history-1.json" ;;
+    second-page-error)
+      jq '[range(0;100) as $i | .[0] + {context:("unrelated-" + ($i|tostring))}]' \
+        "$MOCK_GH_DIR/history-1.json" >"$case_dir/history.json"
+      mv "$case_dir/history.json" "$MOCK_GH_DIR/history-1.json"
+      printf 'HTTP 500: API unavailable\n' >"$MOCK_GH_DIR/history-2.error"
+      expected_error=github_query_failed ;;
+  esac
+  write_status_check B SUCCESS
+  cp "$repo/.git/skill-set/shipping-pr/17.json" "$case_dir/before.json"
+  result=$(run_fail snapshot --pr 17 --expected-run-id "$history_run" --now 102)
+  assert_equals "$expected_error" "$(jq -r .error.code <<<"$result")" "invalid history fails closed"
+  cmp "$case_dir/before.json" "$repo/.git/skill-set/shipping-pr/17.json"
+done
+
+for gate in conflict unresolved unthreaded-review required-context; do
+  make_fixture "status-history-gate-$gate"
+  write_status_check A PENDING
+  init_case >/dev/null
+  snapshot_case 101 >/dev/null
+  write_status_history
+  write_status_check B SUCCESS
+  export MOCK_GH_SCENARIO=$gate
+  expected=blocked
+  if [[ $gate == required-context ]]; then
+    export MOCK_GH_SCENARIO=missing-required-review
+    expected=polling
+  fi
+  result=$(snapshot_case 102)
+  assert_equals "$expected" "$(jq -r .status <<<"$result")" "history recovery preserves $gate gate"
+done
+
+make_fixture status-history-head-race
+write_status_check A PENDING
+init_case >/dev/null
+snapshot_case 101 >/dev/null
+write_status_history
+write_status_check B SUCCESS
+export MOCK_GH_SCENARIO=head-race
+printf '1\n' >"$MOCK_GH_DIR/pr-view.count"
+result=$(snapshot_case 102)
+jq -e '.status == "polling" and .discarded == true and .last_snapshot.discarded == true' <<<"$result" >/dev/null
+
+make_fixture status-history-new-head
+write_status_check A PENDING
+init_case >/dev/null
+snapshot_case 101 >/dev/null
+printf '%s\n' "$new_sha" >"$MOCK_GH_HEAD_FILE"
+write_status_check B PENDING
+result=$(snapshot_case 102)
+jq -e '.status == "polling" and .head_changed == true and .checks.pending == 1' <<<"$result" >/dev/null
+assert_equals 0 "$(count_log '/statuses\?')" "old HEAD history never queried for new HEAD"
+
+for required_only in true false; do
+  make_fixture "status-history-optional-$required_only"
+  touch "$MOCK_GH_DIR/no-required"
+  printf '%s\n' '[]' >"$MOCK_GH_DIR/required-checks.json"
+  write_status_check A PENDING
+  init_case --required-only "$required_only" >/dev/null
+  snapshot_case 101 >/dev/null
+  write_status_history
+  write_status_check B PENDING
+  result=$(snapshot_case 102)
+  jq -e '.status == "polling" and .checks.pending == 1 and
+    all(.check_details[]; .state != "MISSING")' <<<"$result" >/dev/null
+  write_status_check B FAILURE
+  result=$(snapshot_case 103)
+  expected=blocked
+  [[ $required_only != true ]] || expected=clean
+  assert_equals "$expected" "$(jq -r .status <<<"$result")" "optional replacement preserves required-only policy"
+  assert_equals 1 "$(count_log '/statuses\?')" "history stops once missing identity is resolved"
+done
+
+make_fixture status-history-empty-rollup
+write_status_check A PENDING
+init_case >/dev/null
+snapshot_case 101 >/dev/null
+printf '%s\n' '[]' >"$MOCK_GH_DIR/checks.json"
+result=$(snapshot_case 102)
+jq -e '.status == "polling" and .required_checks.missing == ["verify"]' <<<"$result" >/dev/null
+write_status_check B SUCCESS
+result=$(snapshot_case 103)
+assert_equals polling "$(jq -r .status <<<"$result")" "empty rollup must retain missing execution identity"
+write_status_history
+assert_equals clean "$(snapshot_case 104 | jq -r .status)" "exact proof still recovers after empty rollup"
+
+make_fixture status-history-multiple-identities
+write_status_check A PENDING
+jq '. + [.[0] | .name = "lint" | .link = "https://example.test/build/C"]' \
+  "$MOCK_GH_DIR/checks.json" >"$case_dir/checks.json"
+mv "$case_dir/checks.json" "$MOCK_GH_DIR/checks.json"
+init_case >/dev/null
+snapshot_case 101 >/dev/null
+write_status_history
+jq '.[2].state = "failure" | [.[2]] +
+  [range(0;99) as $i | .[0] | .context = ("unrelated-" + ($i|tostring))]' \
+  "$MOCK_GH_DIR/history-1.json" >"$case_dir/history.json"
+jq '[.[2], (.[2] | .context = "lint" | .target_url = "https://example.test/build/C")]' \
+  "$MOCK_GH_DIR/history-1.json" >"$MOCK_GH_DIR/history-2.json"
+mv "$case_dir/history.json" "$MOCK_GH_DIR/history-1.json"
+write_status_check B SUCCESS
+result=$(snapshot_case 102)
+jq -e '.status == "polling" and .checks.pending == 1 and
+  (.check_details | any(.name == "verify" and .state == "MISSING")) and
+  (.check_details | all(.name != "lint"))' <<<"$result" >/dev/null
+assert_equals 2 "$(count_log '/statuses\?')" "older success cannot override latest failure while resolving another identity"
+
+make_fixture missing-status-without-url
+write_status_check A PENDING
+jq '.[0].link = ""' "$MOCK_GH_DIR/checks.json" >"$case_dir/checks.json"
+mv "$case_dir/checks.json" "$MOCK_GH_DIR/checks.json"
+init_case >/dev/null
+snapshot_case 101 >/dev/null
+printf '%s\n' '[]' >"$MOCK_GH_DIR/checks.json"
+snapshot_case 102 >/dev/null
+write_status_check B SUCCESS
+result=$(snapshot_case 103)
+assert_equals polling "$(jq -r .status <<<"$result")" "real execution without URL is not a synthetic required placeholder"
+assert_equals 0 "$(count_log '/statuses\?')" "unknown execution cannot use history recovery"
+
+printf 'PASS: commit status history reconciliation\n'
+
 make_fixture optional-running
 export MOCK_GH_SCENARIO=optional-running
 printf 'pending\n' >"$MOCK_GH_DIR/optional-bucket"

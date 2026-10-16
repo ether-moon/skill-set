@@ -78,6 +78,15 @@ if [[ ${1:-} == pr && ${2:-} == view ]]; then
   pr_state=OPEN
   reviews='[]'
   comments='[]'
+  rollup='[]'
+  if [[ $* == *statusCheckRollup* && -f $MOCK_GH_DIR/checks.json ]]; then
+    rollup=$(jq '[.[] | if .workflow == "" then
+      {__typename:"StatusContext",context:.name,targetUrl:.link,state:.state}
+      else {__typename:"CheckRun",name:.name,detailsUrl:.link,status:.state} end]' "$MOCK_GH_DIR/checks.json")
+  fi
+  if [[ $* == *statusCheckRollup* && -f $MOCK_GH_DIR/rollup.json ]]; then
+    rollup=$(cat "$MOCK_GH_DIR/rollup.json")
+  fi
   if [[ $MOCK_GH_SCENARIO == reviewers-active ]]; then
     reviews=$(jq -cn --arg sha "$sha" '[{author:{login:"chatgpt-codex-connector[bot]"},commit:{oid:$sha},state:"COMMENTED"}]')
   elif [[ $MOCK_GH_SCENARIO == claude-review ]]; then
@@ -96,11 +105,11 @@ if [[ ${1:-} == pr && ${2:-} == view ]]; then
   jq -cn --arg sha "$sha" --arg base "$MOCK_GH_BASE_SHA" --arg mergeable "$mergeable" \
     --arg merge_state "$merge_state" --arg state "$pr_state" --arg head_repo "$head_repo" \
     --arg head_branch "$head_branch" --arg host "$github_host" --arg base_branch "${MOCK_GH_BASE_BRANCH:-main}" \
-    --argjson reviews "$reviews" --argjson comments "$comments" \
+    --argjson reviews "$reviews" --argjson comments "$comments" --argjson rollup "$rollup" \
     '{number:17,headRefOid:$sha,headRefName:$head_branch,
       headRepository:{nameWithOwner:$head_repo},baseRefOid:$base,baseRefName:$base_branch,
       mergeable:$mergeable,mergeStateStatus:$merge_state,state:$state,
-      url:("https://" + $host + "/owner/repo/pull/17"),reviews:$reviews,comments:$comments}'
+      url:("https://" + $host + "/owner/repo/pull/17"),reviews:$reviews,comments:$comments,statusCheckRollup:$rollup}'
   exit 0
 fi
 
@@ -156,6 +165,14 @@ if [[ ${1:-} == pr && ${2:-} == comment ]]; then
 fi
 
 if [[ ${1:-} == pr && ${2:-} == checks ]]; then
+  if [[ " $* " == *" --required "* && -f $MOCK_GH_DIR/required-checks.json ]]; then
+    cat "$MOCK_GH_DIR/required-checks.json"
+    exit 0
+  fi
+  if [[ -f $MOCK_GH_DIR/checks.json ]]; then
+    cat "$MOCK_GH_DIR/checks.json"
+    exit 0
+  fi
   if [[ " $* " == *" --required "* ]]; then
     count=$(next_count checks-required)
   else
@@ -377,6 +394,24 @@ if [[ ${1:-} == api && ${2:-} == repos/*/commits/*/check-runs* ]]; then
     fi
   else
     printf '%s\n' '{"check_runs":[]}'
+  fi
+  exit 0
+fi
+
+if [[ ${1:-} == api && ${2:-} == repos/*/commits/*/statuses\?* ]]; then
+  [[ ${2:-} == "repos/owner/repo/commits/$(cat "$MOCK_GH_HEAD_FILE")/statuses?per_page=100&page="* ]] || {
+    printf 'wrong status history HEAD or pagination\n' >&2
+    exit 1
+  }
+  page=${2##*page=}
+  if [[ -f $MOCK_GH_DIR/history-$page.error ]]; then
+    cat "$MOCK_GH_DIR/history-$page.error" >&2
+    exit 1
+  fi
+  if [[ -f $MOCK_GH_DIR/history-$page.json ]]; then
+    cat "$MOCK_GH_DIR/history-$page.json"
+  else
+    printf '%s\n' '[]'
   fi
   exit 0
 fi
