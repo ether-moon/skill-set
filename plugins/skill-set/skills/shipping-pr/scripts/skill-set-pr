@@ -1150,6 +1150,44 @@ collect_optional_reviewer_telemetry() {
   fi
 }
 
+reconcile_missing_statuses() {
+  local repo=$1 head_sha=$2 missing=$3
+  local unresolved completed='[]' response matches page=1
+  unresolved=$(jq -c '[.[] | select(.status_context == true and .link != "")
+    | [.name,.link]]' <<<"$missing")
+  # Ten 100-entry pages bound recovery cost per snapshot. Unseen identities stay pending.
+  while [[ $unresolved != '[]' && $page -le 10 ]]; do
+    response=$(gh_json api "repos/$repo/commits/$head_sha/statuses?per_page=100&page=$page") || return $?
+    jq -e --arg suffix "/repos/$repo/statuses/$head_sha" '
+      type == "array" and length <= 100 and all(.[];
+        type == "object" and
+        (.context | type == "string" and length > 0) and
+        (.target_url == null or (.target_url | type == "string")) and
+        (.state | type == "string" and length > 0) and
+        (.url | type == "string") and
+        (.url | ascii_downcase | endswith($suffix | ascii_downcase)))
+    ' >/dev/null 2>&1 <<<"$response" || \
+      die invalid_github_response "Commit status history returned an invalid or mismatched response." \
+        "Verify GitHub API access and retry the snapshot."
+    # GitHub returns newest first. Resolve each identity once, even for non-success,
+    # so an older success on this page or a later page cannot override it.
+    matches=$(jq -cn --argjson remaining "$unresolved" --argjson history "$response" '
+      [$remaining[] as $identity
+        | first($history[] | select([.context,.target_url] == $identity))]
+    ')
+    completed=$(jq -cn --argjson completed "$completed" --argjson matches "$matches" '
+      $completed + [$matches[] | select(.state == "success") | [.context,.target_url]]')
+    unresolved=$(jq -cn --argjson remaining "$unresolved" --argjson matches "$matches" '
+      ($matches | map([.context,.target_url])) as $seen
+      | $remaining - $seen')
+    [[ $(jq length <<<"$response") -eq 100 ]] || break
+    page=$((page + 1))
+  done
+  jq -cn --argjson missing "$missing" --argjson completed "$completed" '
+    [$missing[] | [.name,.link] as $identity
+      | select(.status_context != true or ($completed | index([$identity])) == null)]'
+}
+
 command_snapshot() {
   PR=
   local expected_run_id=''
@@ -1203,7 +1241,7 @@ command_snapshot() {
 
   local before_json start_head start_head_repo start_head_branch start_base_branch start_host pr_state mergeable merge_state
   before_json=$(gh_json pr view "$PR" --repo "$repo" \
-    --json headRefOid,headRefName,headRepository,baseRefName,mergeable,mergeStateStatus,state,url)
+    --json headRefOid,headRefName,headRepository,baseRefName,mergeable,mergeStateStatus,state,url,statusCheckRollup)
   validate_json_response "gh pr view" "$before_json"
   jq -e '
     type == "object" and
@@ -1261,15 +1299,17 @@ command_snapshot() {
       --argjson required "$required_checks_json" '
       def identity: [.name // "",.workflow // "",.link // ""];
       (($all + $required) | map(identity)) as $current
-      | ($prior.last_snapshot.required_checks.missing // []) as $unregistered
       | [$prior.last_snapshot.check_details[]?
         | select(.bucket == "pending")
-        | .name as $name
-        | select(.state != "MISSING" or ($unregistered | index($name)) == null)
+        # Only runner-created placeholders may be dropped without execution evidence.
+        | select(.required_context_missing != true)
         | identity as $identity
         | select(($current | index([$identity])) == null)
         | .state = "MISSING"]
     ')
+  fi
+  if [[ $missing_unfinished != '[]' ]]; then
+    missing_unfinished=$(reconcile_missing_statuses "$repo" "$start_head" "$missing_unfinished")
   fi
   checks_json=$all_checks_json
   if [[ $required_only == true ]]; then
@@ -1301,7 +1341,8 @@ command_snapshot() {
        missing:$missing}
   ')
   local check_details check_counts check_total
-  check_details=$(jq -cn --argjson checks "$checks_json" --argjson missing "$missing_required" '
+  check_details=$(jq -cn --argjson checks "$checks_json" --argjson missing "$missing_required" \
+    --argjson rollup "$(jq -c '.statusCheckRollup // []' <<<"$before_json")" '
     ([ $checks[]? as $check
       | (($check.bucket // "pending") | ascii_downcase) as $bucket
       | {name:($check.name // ""),workflow:($check.workflow // ""),link:($check.link // ""),
@@ -1310,8 +1351,16 @@ command_snapshot() {
             elif ($bucket == "skip" or $bucket == "skipping") then "skipping"
             elif $bucket == "fail" then "fail"
             elif ($bucket == "cancel" or $bucket == "cancelled") then "cancel"
-            else "pending" end)} ]
-      + [$missing[] | {name:.,workflow:"",link:"",state:"MISSING",bucket:"pending"}])
+            else "pending" end)}
+        # Empty workflow and PENDING alone cannot distinguish a CheckRun from a StatusContext.
+        | . + (if $check.status_context == true or
+            ((.workflow == "" and .link != "") and
+              any($rollup[]?; .__typename == "StatusContext" and
+                .context == $check.name and .targetUrl == $check.link and .state == $check.state) and
+              (any($rollup[]?; .__typename == "CheckRun" and
+                .name == $check.name and .detailsUrl == $check.link) | not))
+          then {status_context:true} else {} end) ]
+      + [$missing[] | {name:.,workflow:"",link:"",state:"MISSING",bucket:"pending",required_context_missing:true}])
     | sort_by(.workflow,.name,.link,.bucket,.state)
   ' 2>/dev/null) || \
     die invalid_github_response "Unable to normalize gh pr checks data." "Inspect the check response and retry."
